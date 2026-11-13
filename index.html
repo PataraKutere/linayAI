@@ -78,7 +78,7 @@ dialog a{color:var(--ac)}dialog small{color:var(--mu)}
 <dialog id="dl">
  <h3 style="margin-top:0">Ayarlar</h3>
  <div id="keybox"><label>Gemini API anahtarı</label>
- <input id="key" type="password" placeholder="AIza…" autocomplete="off">
+ <input id="key" type="password" placeholder="API anahtarı" autocomplete="off">
  <small>Ücretsiz: <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a>. Anahtar sadece bu cihazda saklanır.</small></div>
  <label style="display:block;margin-top:12px">Model</label>
  <input id="model" list="ml"><datalist id="ml"><option value="gemini-3.8-flash"><option value="gemini-flash-latest"><option value="gemini-flash-lite-latest"></datalist>
@@ -92,7 +92,7 @@ dialog a{color:var(--ac)}dialog small{color:var(--mu)}
 const $=id=>document.getElementById(id),dl=$('dl'),inp=$('inp');
 let S=JSON.parse(localStorage.getItem('ai1')||'null')||{chats:[],cur:null,cfg:{key:'',model:'gemini-3.8-flash',mode:'gen',search:true}};
 if(S.cfg.model=='gemini-2.5-flash')S.cfg.model='gemini-3.8-flash';
-const BUILT=(window.LINAY_KEY||'').trim().startsWith('AIza')?window.LINAY_KEY.trim():'';
+const BUILT=String(window.LINAY_KEY||'').trim();
 const KEY=()=>BUILT||S.cfg.key;
 let files=[],busy=false,ctl=null;
 const GEN="Sen yardımsever, dürüst ve net konuşan bir yapay zekâ asistanısın. Kullanıcı hangi dilde yazarsa (Türkçe/İngilizce) o dilde yanıtla. Kod yazarken kod bloğu kullan ve kısaca açıkla. Emin olmadığın şeyi uydurma.";
