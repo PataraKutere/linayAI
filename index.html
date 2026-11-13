@@ -1,14 +1,14 @@
 <!DOCTYPE html>
 <html lang="tr"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#262624">
+<meta name="theme-color" content="#0d0d0f">
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon-192.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<title>Asistan</title>
+<meta name="apple-mobile-web-app-title" content="Linay">
+<title>Linay</title>
 <style>
-:root{--bg:#faf9f5;--fg:#1f1e1d;--mu:#73726c;--card:#fff;--bd:#e5e3da;--ac:#c96442;--ub:#efece3}
-@media(prefers-color-scheme:dark){:root{--bg:#262624;--fg:#f0eee6;--mu:#9c9a92;--card:#30302e;--bd:#3f3e3b;--ub:#3a3936}}
+:root{color-scheme:dark;--bg:#0d0d0f;--fg:#d6d3cc;--mu:#8a8892;--card:#151518;--bd:#26262b;--ac:#8c74cf;--ub:#1e1e23}
 *{box-sizing:border-box}html,body{height:100%;margin:0}
 body{background:var(--bg);color:var(--fg);font:16px/1.55 system-ui,-apple-system,sans-serif;display:flex;padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
 button,select,textarea,input{font:inherit;color:inherit}
@@ -32,9 +32,9 @@ header select{background:var(--card);border:1px solid var(--bd);border-radius:8p
 .code{position:relative;margin:8px 0}.code button{position:absolute;right:6px;top:6px;font-size:12px;background:var(--bd)}
 .code pre{margin:0;background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:12px;overflow-x:auto;font-size:13px}
 .code code{background:none;padding:0}
-.act{opacity:.6;font-size:14px}.err{color:#d33}
+.act{opacity:.6;font-size:14px}.err{color:#e8707a;white-space:pre-wrap}
 .att{font-size:13px;color:var(--mu);margin-top:4px}
-#hello{text-align:center;color:var(--mu);margin-top:18vh}
+#hello{text-align:center;color:var(--fg);margin-top:14vh}#hello h2{font-weight:500;font-size:20px;margin:14px 12px 0;line-height:1.35}
 #chips{display:flex;gap:6px;flex-wrap:wrap;padding:0 12px;max-width:784px;margin:0 auto;width:100%}
 #chips span{background:var(--ub);border-radius:10px;padding:3px 10px;font-size:13px;cursor:pointer}
 #bar{display:flex;align-items:flex-end;gap:4px;margin:8px auto 10px;padding:6px;max-width:760px;width:calc(100% - 20px);background:var(--card);border:1px solid var(--bd);border-radius:18px}
@@ -61,7 +61,7 @@ dialog a{color:var(--ac)}dialog small{color:var(--mu)}
 <div id="shade" onclick="tg()"></div>
 <main>
  <header>
-  <button id="menu" onclick="tg()">☰</button><b id="ttl">Asistan</b>
+  <button id="menu" onclick="tg()">☰</button><svg width="24" height="24" viewBox="0 0 64 64"><defs><mask id="mh"><rect width="64" height="64" fill="#fff"/><circle cx="40" cy="26" r="20" fill="#000"/></mask></defs><circle cx="28" cy="32" r="22" fill="#d9b86a" mask="url(#mh)"/><path d="M48 14l2.2 5.8L56 22l-5.8 2.2L48 30l-2.2-5.8L40 22l5.8-2.2z" fill="#d9b86a"/></svg><b id="ttl">Linay</b>
   <select id="mode" onchange="S.cfg.mode=this.value;save()"><option value="gen">Genel</option><option value="linay">Linay Fal</option></select>
  </header>
  <div id="msgs"></div>
@@ -81,7 +81,7 @@ dialog a{color:var(--ac)}dialog small{color:var(--mu)}
  <input id="key" type="password" placeholder="AIza…" autocomplete="off">
  <small>Ücretsiz: <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a>. Anahtar sadece bu cihazda saklanır.</small>
  <label style="display:block;margin-top:12px">Model</label>
- <input id="model">
+ <input id="model" list="ml"><datalist id="ml"><option value="gemini-3.8-flash"><option value="gemini-flash-latest"><option value="gemini-flash-lite-latest"></datalist>
  <div style="display:flex;gap:8px;justify-content:space-between">
   <button onclick="if(confirm('Tüm sohbetler silinsin mi?')){S.chats=[];S.cur=null;save();render();dl.close()}">Sohbetleri sil</button>
   <button class="nb" onclick="saveSet()">Kaydet</button>
@@ -96,6 +96,8 @@ const GEN="Sen yardımsever, dürüst ve net konuşan bir yapay zekâ asistanıs
 const LINAY="Sen Linay'sın: tarot, kahve falı, el falı ve burç yorumu yapan sıcak, gizemli ama saygılı bir fal rehberisin. Fotoğraf (fincan, avuç içi) gelirse görünenleri betimleyip yorumla. Fal eğlence ve ilham amaçlıdır; sağlık, hukuk ve para kararlarında kesin hüküm verme, gerçekçi yönlendir. Kullanıcının dilinde yanıtla.";
 const save=()=>{try{localStorage.setItem('ai1',JSON.stringify({...S,chats:S.chats.map(c=>({...c,msgs:c.msgs.map(m=>({...m,parts:m.parts.map(p=>p.inlineData?{text:'[Ek dosya gönderilmişti]'}:p)}))}))}))}catch(e){}};
 const cur=()=>S.chats.find(c=>c.id===S.cur);
+const FB='gemini-flash-lite-latest';
+function logo(n,id){return `<svg width="${n}" height="${n}" viewBox="0 0 64 64"><defs><mask id="${id}"><rect width="64" height="64" fill="#fff"/><circle cx="40" cy="26" r="20" fill="#000"/></mask></defs><circle cx="28" cy="32" r="22" fill="#d9b86a" mask="url(#${id})"/><path d="M48 14l2.2 5.8L56 22l-5.8 2.2L48 30l-2.2-5.8L40 22l5.8-2.2z" fill="#d9b86a"/></svg>`}
 const esc=s=>s.replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
 function md(t){
  const b=[];
@@ -117,7 +119,7 @@ function add(role,html,raw){
  $('msgs').appendChild(w);return d;
 }
 function render(){
- const c=cur();$('ttl').textContent=c?c.title:'Asistan';$('mode').value=S.cfg.mode;$('web').classList.toggle('on',S.cfg.search);
+ const c=cur();$('ttl').textContent=c?c.title:'Linay';$('mode').value=S.cfg.mode;$('web').classList.toggle('on',S.cfg.search);
  $('list').innerHTML='';
  S.chats.slice().reverse().forEach(x=>{const r=document.createElement('div');r.className='ci'+(x.id==S.cur?' on':'');
   r.innerHTML='<span></span><button>✕</button>';r.firstChild.textContent=x.title;
@@ -125,7 +127,7 @@ function render(){
   r.lastChild.onclick=()=>{S.chats=S.chats.filter(y=>y.id!=x.id);if(S.cur==x.id)S.cur=null;save();render()};
   $('list').appendChild(r)});
  const m=$('msgs');m.innerHTML='';
- if(!c||!c.msgs.length)m.innerHTML='<div id="hello"><h2>Merhaba 👋</h2>Bir şey sor, fotoğraf at ya da 🎤 ile konuş.</div>';
+ if(!c||!c.msgs.length)m.innerHTML='<div id="hello">'+logo(80,'mx')+"<h2>Berat'ın yüce beynine başvur.</h2></div>";
  else c.msgs.forEach(x=>x.role=='user'?add('user',esc(x.t||'')+(x.att&&x.att.length?`<div class="att">📎 ${esc(x.att.join(', '))}</div>`:'')):add('model',md(x.text)));
  m.scrollTop=m.scrollHeight;
 }
@@ -152,10 +154,20 @@ async function send(){
  try{
   const body={systemInstruction:{parts:[{text:(S.cfg.mode=='linay'?LINAY:GEN)+' Bugün: '+new Date().toLocaleDateString('tr-TR')}]},
    contents:c.msgs.map(m=>({role:m.role,parts:m.parts}))};
-  if(S.cfg.search)body.tools=[{google_search:{}}];
-  const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${S.cfg.model}:streamGenerateContent?alt=sse`,
-   {method:'POST',signal:ctl.signal,headers:{'Content-Type':'application/json','x-goog-api-key':S.cfg.key},body:JSON.stringify(body)});
-  if(!r.ok){let m=r.status+'';try{m=(await r.json()).error.message}catch(e){}throw new Error(m)}
+  const tries=[[S.cfg.model,S.cfg.search]];
+  if(S.cfg.search)tries.push([S.cfg.model,false]);
+  if(S.cfg.model!=FB)tries.push([FB,false]);
+  let r,note='';
+  for(const [mdl,se] of tries){
+   const b2={...body};if(se)b2.tools=[{google_search:{}}];
+   r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${mdl}:streamGenerateContent?alt=sse`,
+    {method:'POST',signal:ctl.signal,headers:{'Content-Type':'application/json','x-goog-api-key':S.cfg.key},body:JSON.stringify(b2)});
+   if(r.ok){if(mdl!=S.cfg.model||se!=S.cfg.search)note="\n\n*(Ücretsiz kota nedeniyle "+(mdl!=S.cfg.model?mdl+" modeliyle":"internet araması olmadan")+" yanıtlandı.)*";break}
+   let m=r.status+'';try{m=(await r.json()).error.message}catch(e){}
+   if(!(r.status==429||/quota/i.test(m)))throw new Error(m);
+   r.msg=m;
+  }
+  if(!r.ok)throw new Error(r.msg||('Hata '+r.status));
   const rd=r.body.getReader(),dc=new TextDecoder();let buf='';
   for(;;){
    const {done,value}=await rd.read();if(done)break;
@@ -167,11 +179,12 @@ async function send(){
      el.innerHTML=md(out);$('msgs').scrollTop=$('msgs').scrollHeight}catch(e){}}
   }
   if(!out)out='(Boş yanıt geldi, tekrar dene.)';
+  out+=note;
   if(src.size)out+='\n\n**Kaynaklar:** '+[...src].slice(0,5).map(([u,t])=>`[${t||'kaynak'}](${u})`).join(' · ');
   c.msgs.push({role:'model',parts:[{text:out}],text:out});
  }catch(e){
   if(e.name=='AbortError'){if(out)c.msgs.push({role:'model',parts:[{text:out}],text:out});else c.msgs.pop()}
-  else{c.msgs.pop();files=sf;chips();inp.value=text;el.className='a err';el.textContent='Hata: '+e.message}
+  else{c.msgs.pop();files=sf;chips();inp.value=text;el.className='a err';el.textContent='Hata: '+e.message+(/quota/i.test(e.message)?"\n\nİpucu: Ayarlar'dan başka bir model dene (örn. gemini-flash-lite-latest) ya da yarın tekrar dene.":'')}
  }
  busy=false;$('go').textContent='➤';save();
  if(!el.classList.contains('err'))render();
