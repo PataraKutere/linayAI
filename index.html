@@ -89,7 +89,8 @@ dialog a{color:var(--ac)}dialog small{color:var(--mu)}
 </dialog>
 <script>
 const $=id=>document.getElementById(id),dl=$('dl'),inp=$('inp');
-let S=JSON.parse(localStorage.getItem('ai1')||'null')||{chats:[],cur:null,cfg:{key:'',model:'gemini-2.5-flash',mode:'gen',search:true}};
+let S=JSON.parse(localStorage.getItem('ai1')||'null')||{chats:[],cur:null,cfg:{key:'',model:'gemini-3.8-flash',mode:'gen',search:true}};
+if(S.cfg.model=='gemini-2.5-flash')S.cfg.model='gemini-3.8-flash';
 let files=[],busy=false,ctl=null;
 const GEN="Sen yardımsever, dürüst ve net konuşan bir yapay zekâ asistanısın. Kullanıcı hangi dilde yazarsa (Türkçe/İngilizce) o dilde yanıtla. Kod yazarken kod bloğu kullan ve kısaca açıkla. Emin olmadığın şeyi uydurma.";
 const LINAY="Sen Linay'sın: tarot, kahve falı, el falı ve burç yorumu yapan sıcak, gizemli ama saygılı bir fal rehberisin. Fotoğraf (fincan, avuç içi) gelirse görünenleri betimleyip yorumla. Fal eğlence ve ilham amaçlıdır; sağlık, hukuk ve para kararlarında kesin hüküm verme, gerçekçi yönlendir. Kullanıcının dilinde yanıtla.";
@@ -176,7 +177,7 @@ async function send(){
  if(!el.classList.contains('err'))render();
 }
 function openSet(){$('key').value=S.cfg.key;$('model').value=S.cfg.model;tg(false);dl.showModal()}
-function saveSet(){S.cfg.key=$('key').value.trim();S.cfg.model=$('model').value.trim()||'gemini-2.5-flash';save();dl.close()}
+function saveSet(){S.cfg.key=$('key').value.trim();S.cfg.model=$('model').value.trim()||'gemini-3.8-flash';save();dl.close()}
 const grow=()=>{inp.style.height='auto';inp.style.height=inp.scrollHeight+'px'};
 inp.oninput=grow;
 inp.onkeydown=e=>{if(e.key=='Enter'&&!e.shiftKey&&!matchMedia('(pointer:coarse)').matches){e.preventDefault();send()}};
