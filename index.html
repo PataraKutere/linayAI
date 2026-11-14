@@ -52,9 +52,36 @@ dialog a{color:var(--ac)}dialog small{color:var(--mu)}
  #shade.open{display:block;position:fixed;inset:0;background:#0006;z-index:4}
  #menu{display:block}
 }
-</style></head><body>
+body{font-family:Inter,system-ui,-apple-system,sans-serif}
+#side{background:#101013;width:280px}
+.nb{background:linear-gradient(135deg,#8c74cf,#6a56b8);border-radius:12px;padding:11px;font-weight:500}
+#q{width:100%;padding:9px 12px;background:var(--card);border:1px solid var(--bd);border-radius:10px;outline:0}
+.ci{border-radius:10px}.ci:hover{background:var(--ub)}
+header{border:0;padding:12px 16px}header b{font-weight:600}
+.u{background:var(--ub);border-radius:18px 18px 4px 18px;padding:11px 16px}
+.a{line-height:1.7}.a p{margin:8px 0}.a h1,.a h2,.a h3{margin:16px 0 6px;font-weight:600}.a h1{font-size:1.4em}.a h2{font-size:1.2em}.a h3{font-size:1.05em}
+.a table{border-collapse:collapse;display:block;overflow-x:auto}.a th,.a td{border:1px solid var(--bd);padding:6px 10px}
+.a blockquote{border-left:3px solid var(--ac);margin:8px 0;padding:2px 14px;color:var(--mu)}
+.code{border:1px solid var(--bd);border-radius:12px;overflow:hidden;margin:12px 0;background:#0b0b0d}
+.code .ch{display:flex;justify-content:space-between;align-items:center;padding:3px 6px 3px 14px;background:var(--card);font-size:12px;color:var(--mu)}
+.code .ch button{position:static;font-size:12px;background:none;color:var(--mu)}
+.code pre{border:0;border-radius:0;background:#0b0b0d;padding:14px}.code code.hljs{background:none;padding:0}
+#bar{border-radius:26px;padding:8px 10px;box-shadow:0 6px 30px #000a;border-color:#33333a}
+#go{border-radius:50%;width:40px;height:40px;padding:0;font-size:16px}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;max-width:640px;margin:28px auto 0}
+.cards div{background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:14px;text-align:left;cursor:pointer;font-size:14px;line-height:1.4;transition:.15s}
+.cards div:hover{border-color:var(--ac);transform:translateY(-2px)}.cards b{display:block;font-size:22px;margin-bottom:4px}
+#pv{width:94%;max-width:900px;height:80vh;padding:0}#pvf{width:100%;height:calc(100% - 44px);border:0;background:#fff}
+</style>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.9/purify.min.js"></script>
+</head><body>
 <aside id="side">
  <button class="nb" onclick="nc()">+ Yeni sohbet</button>
+ <input id="q" placeholder="Sohbetlerde ara" oninput="render()">
  <div id="list"></div>
  <button onclick="openSet()">⚙ Ayarlar</button>
 </aside>
@@ -69,6 +96,7 @@ dialog a{color:var(--ac)}dialog small{color:var(--mu)}
  <div id="bar">
   <button onclick="$('f').click()" title="Dosya / fotoğraf">📎</button>
   <button id="web" title="İnternette ara">🌐</button>
+  <button id="img" title="Resim oluştur">🎨</button>
   <textarea id="inp" rows="1" placeholder="Bir şey sor…"></textarea>
   <button id="mic" title="Sesle yaz">🎤</button>
   <button id="go">➤</button>
@@ -80,15 +108,14 @@ dialog a{color:var(--ac)}dialog small{color:var(--mu)}
  <div id="keybox"><label>Gemini API anahtarı</label>
  <input id="key" type="password" placeholder="API anahtarı" autocomplete="off">
  <small>Ücretsiz: <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a>. Anahtar sadece bu cihazda saklanır.</small></div>
- <label style="display:block;margin-top:12px">Mod</label>
- <select id="mode" style="width:100%;padding:8px;margin:4px 0 12px;background:var(--bg);border:1px solid var(--bd);border-radius:8px" onchange="S.cfg.mode=this.value;save()"><option value="gen">Genel asistan</option><option value="linay">Linay (fal yorumcusu)</option></select>
- <label style="display:block">Model</label>
+ <label style="display:block;margin-top:12px">Model</label>
  <input id="model" list="ml"><datalist id="ml"><option value="gemini-flash-lite-latest"><option value="gemini-flash-latest"><option value="gemini-3.8-flash"></datalist>
  <div style="display:flex;gap:8px;justify-content:space-between">
   <button onclick="if(confirm('Tüm sohbetler silinsin mi?')){S.chats=[];S.cur=null;save();render();dl.close()}">Sohbetleri sil</button>
   <button class="nb" onclick="saveSet()">Kaydet</button>
  </div>
 </dialog>
+<dialog id="pv"><div style="display:flex;justify-content:space-between;align-items:center;padding:6px 14px"><b>Önizleme</b><button onclick="$('pv').close()">✕</button></div><iframe id="pvf" sandbox="allow-scripts"></iframe></dialog>
 <script src="config.js"></script>
 <script>
 const $=id=>document.getElementById(id),dl=$('dl'),inp=$('inp');
@@ -98,15 +125,18 @@ const RAW=String(window.LINAY_PROXY||window.LINAY_KEY||'').trim();
 const PROXY=/^https?:\/\//i.test(RAW)?RAW.replace(/\/+$/,''):'';
 const BUILT=PROXY?'':String(window.LINAY_KEY||'').trim();
 const KEY=()=>BUILT||S.cfg.key;
+const HDR=()=>PROXY?{'Content-Type':'application/json'}:{'Content-Type':'application/json','x-goog-api-key':KEY()};
+let imgMode=false;
+const IMG_RE=/(resim|resm\w*|görsel|fotoğraf|foto|logo|poster|illüstrasyon|çizim|image|picture)\w*\s+(yap|çiz|oluştur|üret|hazırla|tasarla|generate|create|make)|(^|\s)çiz(er\s*misin)?([\s.!?]|$)|\b(draw|generate|create|make)\b.{0,15}\b(image|picture|photo|logo|drawing)\b/i;
 let files=[],busy=false,ctl=null;
-const GEN="Sen yardımsever, dürüst ve net konuşan bir yapay zekâ asistanısın. Kullanıcı hangi dilde yazarsa (Türkçe/İngilizce) o dilde yanıtla. Kod yazarken kod bloğu kullan ve kısaca açıkla. Emin olmadığın şeyi uydurma.";
-const LINAY="Sen Linay'sın: tarot, kahve falı, el falı ve burç yorumu yapan sıcak, gizemli ama saygılı bir fal rehberisin. Fotoğraf (fincan, avuç içi) gelirse görünenleri betimleyip yorumla. Fal eğlence ve ilham amaçlıdır; sağlık, hukuk ve para kararlarında kesin hüküm verme, gerçekçi yönlendir. Kullanıcının dilinde yanıtla.";
+const GEN="Sen Linay'sın: kod yazma, analiz, yazı yazma, öğrenme, günlük sorular ve resim üretme konularında yardım eden, net, dürüst ve sıcak bir yapay zekâ asistanısın. Kullanıcının dilinde (Türkçe/İngilizce) yanıtla. Kod yazarken tam ve çalışır kod ver, dil etiketli kod bloğu kullan, kısaca açıkla; web sayfası, oyun veya arayüz istenirse tek dosyalık HTML ver. Gerektiğinde başlık, madde ve tablo kullan ama gereksiz uzatma. Emin olmadığın şeyi uydurma, bilmiyorsan söyle. Kullanıcı resim, logo veya çizim isterse resim çizemediğini ASLA söyleme: yanıtına tam olarak şu satırı yaz: [RESIM: ayrıntılı İngilizce prompt] ve altına kısa bir cümle ekle.";
 const save=()=>{try{localStorage.setItem('ai1',JSON.stringify({...S,chats:S.chats.map(c=>({...c,msgs:c.msgs.map(m=>({...m,parts:m.parts.map(p=>p.inlineData?{text:'[Ek dosya gönderilmişti]'}:p)}))}))}))}catch(e){}};
 const cur=()=>S.chats.find(c=>c.id===S.cur);
 const FB='gemini-flash-lite-latest';
+const CARDS='<div class="cards">'+[['💻','Kod yaz','Python ile basit bir hesap makinesi yaz ve açıkla'],['🎨','Resim oluştur','Gün batımında sahilde yürüyen bir astronot resmi yap'],['🧠','Bir şey öğren','Kuantum bilgisayarlar nasıl çalışır? Basitçe anlat'],['✍️','Yazı yaz','Patronuma izin isteyen kısa ve kibar bir e-posta yaz']].map(([i,t,p])=>`<div data-p="${p}"><b>${i}</b>${t}</div>`).join('')+'</div>';
 function logo(n,id){return `<svg width="${n}" height="${n}" viewBox="0 0 64 64"><defs><mask id="${id}"><rect width="64" height="64" fill="#fff"/><circle cx="40" cy="26" r="20" fill="#000"/></mask></defs><circle cx="28" cy="32" r="22" fill="#d9b86a" mask="url(#${id})"/><path d="M48 14l2.2 5.8L56 22l-5.8 2.2L48 30l-2.2-5.8L40 22l5.8-2.2z" fill="#d9b86a"/></svg>`}
 const esc=s=>s.replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
-function md(t){
+function md0(t){
  const b=[];
  t=t.replace(/```(\w*)\n?([\s\S]*?)(```|$)/g,(m,l,c)=>{b.push(`<div class="code"><button onclick="cp(this)">Kopyala</button><pre><code>${esc(c)}</code></pre></div>`);return '\u0000'+(b.length-1)+'\u0000'});
  t=esc(t).replace(/`([^`\n]+)`/g,'<code>$1</code>').replace(/\*\*(.+?)\*\*/g,'<b>$1</b>').replace(/(^|\s)\*(?!\s)([^*\n]+?)\*/g,'$1<i>$2</i>')
@@ -114,29 +144,39 @@ function md(t){
   .replace(/\[([^\]]+)\]\((https?:[^)\s]+)\)/g,'<a href="$2" target="_blank" rel="noopener">$1</a>').replace(/\n/g,'<br>');
  return t.replace(/\u0000(\d+)\u0000/g,(m,i)=>b[i]);
 }
+let MD=!!(window.marked&&window.hljs&&window.DOMPurify);
+if(MD){
+ marked.use({renderer:{code(code,lang){
+  const l=(lang||'').split(/\s/)[0];let h;
+  try{h=l&&hljs.getLanguage(l)?hljs.highlight(code,{language:l}).value:hljs.highlightAuto(code).value}catch(e){h=esc(code)}
+  const pv=/^(html|svg)$/i.test(l)?'<button data-a="pv">▶ Önizle</button>':'';
+  return `<div class="code"><div class="ch"><span>${l||'kod'}</span><span>${pv}<button data-a="cp">Kopyala</button></span></div><pre><code class="hljs">${h}</code></pre></div>`}}});
+ DOMPurify.addHook('afterSanitizeAttributes',n=>{if(n.tagName=='A'){n.setAttribute('target','_blank');n.setAttribute('rel','noopener')}});
+}
+function md(t){if(!MD)return md0(t);try{return DOMPurify.sanitize(marked.parse(t,{breaks:true}))}catch(e){return md0(t)}}
 function cp(b){navigator.clipboard.writeText(b.nextElementSibling.innerText);b.textContent='Kopyalandı';setTimeout(()=>b.textContent='Kopyala',1200)}
 const say=t=>{speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(t.replace(/[`*#]/g,''));u.lang=/[çğıöşüÇĞİÖŞÜ]/.test(t)?'tr-TR':'en-US';speechSynthesis.speak(u)};
 function tg(o){$('side').classList.toggle('open',o);$('shade').classList.toggle('open',o)}
 function nc(){S.cur=null;render();tg(false);inp.focus()}
-function add(role,html,raw){
+function add(role,html,last){
  const w=document.createElement('div');w.className='w';
  const d=document.createElement('div');d.className=role=='user'?'u':'a';d.innerHTML=html;w.appendChild(d);
- if(role!='user'){const a=document.createElement('div');a.className='act';a.innerHTML='<button>🔊</button><button>📋</button>';
-  a.children[0].onclick=()=>say(d.innerText);a.children[1].onclick=()=>navigator.clipboard.writeText(d.innerText);w.appendChild(a)}
+ if(role!='user'){const a=document.createElement('div');a.className='act';a.innerHTML='<button>🔊</button><button>📋</button>'+(last?'<button>🔄</button>':'');
+  a.children[0].onclick=()=>say(d.innerText);a.children[1].onclick=()=>navigator.clipboard.writeText(d.innerText);if(last)a.children[2].onclick=regen;w.appendChild(a)}
  $('msgs').appendChild(w);return d;
 }
 function render(){
- const c=cur();$('ttl').textContent=c?c.title:'Linay';$('mode').value=S.cfg.mode;$('web').classList.toggle('on',S.cfg.search);
+ const c=cur();$('ttl').textContent=c?c.title:'Linay';$('web').classList.toggle('on',S.cfg.search);
  $('list').innerHTML='';
- S.chats.slice().reverse().forEach(x=>{const r=document.createElement('div');r.className='ci'+(x.id==S.cur?' on':'');
+ const q=($('q').value||'').toLowerCase();S.chats.slice().reverse().filter(x=>!q||(x.title+' '+x.msgs.map(m=>m.text||m.t||'').join(' ')).toLowerCase().includes(q)).forEach(x=>{const r=document.createElement('div');r.className='ci'+(x.id==S.cur?' on':'');
   r.innerHTML='<span></span><button>✕</button>';r.firstChild.textContent=x.title;
   r.firstChild.onclick=()=>{S.cur=x.id;render();tg(false)};
   r.lastChild.onclick=()=>{S.chats=S.chats.filter(y=>y.id!=x.id);if(S.cur==x.id)S.cur=null;save();render()};
   $('list').appendChild(r)});
  const m=$('msgs');m.innerHTML='';
- if(!c||!c.msgs.length)m.innerHTML='<div id="hello">'+logo(80,'mx')+"<h2>Berat'ın yüce beynine başvur.</h2></div>";
- else c.msgs.forEach(x=>x.role=='user'?add('user',esc(x.t||'')+(x.att&&x.att.length?`<div class="att">📎 ${esc(x.att.join(', '))}</div>`:'')):add('model',md(x.text)));
- m.scrollTop=m.scrollHeight;
+ if(!c||!c.msgs.length)m.innerHTML='<div id="hello">'+logo(80,'mx')+"<h2>Berat'ın yüce beynine başvur.</h2>"+CARDS+'</div>';
+ else c.msgs.forEach((x,i)=>x.role=='user'?add('user',esc(x.t||'')+(x.att&&x.att.length?`<div class="att">📎 ${esc(x.att.join(', '))}</div>`:'')):add('model',md(x.text),i==c.msgs.length-1));
+ m.querySelectorAll('.cards div').forEach(d=>d.onclick=()=>{inp.value=d.dataset.p;inp.focus();grow()});m.scrollTop=m.scrollHeight;
 }
 function chips(){$('chips').innerHTML='';files.forEach((f,i)=>{const s=document.createElement('span');s.textContent='📎 '+f.name+' ✕';s.onclick=()=>{files.splice(i,1);chips()};$('chips').appendChild(s)})}
 $('f').onchange=async e=>{
@@ -147,6 +187,29 @@ $('f').onchange=async e=>{
  }
  e.target.value='';chips();
 };
+function regen(){if(busy)return;const c=cur();if(!c)return;while(c.msgs.length&&c.msgs[c.msgs.length-1].role=='model')c.msgs.pop();const u=c.msgs.pop();if(!u)return;inp.value=u.t||'';send()}
+async function enPrompt(t){
+ try{
+  const r=await fetch(`${PROXY||'https://generativelanguage.googleapis.com'}/v1beta/models/${FB}:streamGenerateContent?alt=sse`,{method:'POST',headers:HDR(),signal:AbortSignal.timeout(15000),
+   body:JSON.stringify({systemInstruction:{parts:[{text:"Kullanıcının isteğini bir yapay zeka resim üretici için tek paragraflık, ayrıntılı bir İngilizce prompta çevir. Sadece promptu yaz, başka hiçbir şey yazma."}]},contents:[{role:'user',parts:[{text:t}]}]})});
+  if(!r.ok)return t;
+  let o='';(await r.text()).split('\n').forEach(l=>{if(l.startsWith('data:'))try{const j=JSON.parse(l.slice(5));o+=(j.candidates[0].content.parts||[]).map(x=>x.text||'').join('')}catch(e){}});
+  return o.trim()||t;
+ }catch(e){return t}
+}
+async function genImg(text,el,raw){
+ el.innerHTML='<span style="color:var(--mu)">Resim hazırlanıyor… (10-40 sn)</span>';
+ const p=raw?text:await enPrompt(text);let src=null;
+ if(PROXY){try{
+  const r=await fetch(PROXY+'/image',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt:p}),signal:AbortSignal.timeout(60000)});
+  if(r.ok){const j=await r.json();if(j.image)src='data:image/jpeg;base64,'+j.image}
+ }catch(e){}}
+ const dl=!!src;
+ if(!src)src='https://image.pollinations.ai/prompt/'+encodeURIComponent(p).replace(/[!'()*]/g,c=>'%'+c.charCodeAt(0).toString(16).toUpperCase())+'?width=1024&height=1024&nologo=true&seed='+Math.floor(Math.random()*1e6);
+ el.innerHTML=`<img src="${src}" alt="" style="max-width:100%;border-radius:12px;display:block">`+(dl?`<a download="linay.jpg" href="${src}">İndir</a>`:'')+`<div class="att">${esc(p)}</div>`;
+ el.querySelector('img').onerror=()=>{el.innerHTML='Resim oluşturulamadı, biraz sonra tekrar dene.'};
+ return p;
+}
 async function send(){
  if(busy){ctl&&ctl.abort();return}
  const text=inp.value.trim();if(!text&&!files.length)return;
@@ -157,9 +220,15 @@ async function send(){
  const um={role:'user',parts,t:text,att:files.map(f=>f.name)};c.msgs.push(um);
  const sf=files;files=[];chips();inp.value='';grow();render();
  const el=add('model','<span style="color:var(--mu)">Linay düşünüyor…</span>');busy=true;$('go').textContent='■';ctl=new AbortController();
- let out='',src=new Map();
+ if(text&&(imgMode||IMG_RE.test(text))){
+  imgMode=false;$('img').classList.remove('on');
+  const p=await genImg(text,el);
+  c.msgs.push({role:'model',parts:[{text:'[Resim oluşturuldu: '+p+']'}],text:'🖼 Resim oluşturuldu: '+p});
+  busy=false;$('go').textContent='➤';save();return;
+ }
+ let out='',src=new Map(),shown=false;
  try{
-  const body={systemInstruction:{parts:[{text:(S.cfg.mode=='linay'?LINAY:GEN)+' Bugün: '+new Date().toLocaleDateString('tr-TR')}]},
+  const body={systemInstruction:{parts:[{text:GEN+' Bugün: '+new Date().toLocaleDateString('tr-TR')}]},
    contents:c.msgs.map(m=>({role:m.role,parts:m.parts}))};
   const tries=[[S.cfg.model,S.cfg.search]];
   if(S.cfg.search)tries.push([S.cfg.model,false]);
@@ -198,6 +267,8 @@ async function send(){
   }
   if(!out)out='(Boş yanıt geldi, tekrar dene.)';
   out+=note;
+  const mi=out.match(/\[RESIM:\s*([^\]]+)\]/i);
+  if(mi){out=out.replace(mi[0],'').trim();el.innerHTML=md(out);const ie=add('model','');const ip=await genImg(mi[1].trim(),ie,true);out+='\n\n🖼 *Resim oluşturuldu: '+ip+'*';shown=true}
   if(src.size)out+='\n\n**Kaynaklar:** '+[...src].slice(0,5).map(([u,t])=>`[${t||'kaynak'}](${u})`).join(' · ');
   c.msgs.push({role:'model',parts:[{text:out}],text:out});
  }catch(e){
@@ -205,7 +276,7 @@ async function send(){
   else{c.msgs.pop();files=sf;chips();inp.value=text;el.className='a err';el.textContent='Hata: '+e.message+(/key not valid|API key/i.test(e.message)?"\n\nİpucu: Anahtar geçersiz ya da Google tarafından kapatılmış olabilir. AI Studio'dan yeni anahtar al.":/quota|demand/i.test(e.message)?"\n\nİpucu: Ayarlar'dan başka bir model dene (örn. gemini-flash-lite-latest) ya da yarın tekrar dene.":'')}
  }
  busy=false;$('go').textContent='➤';save();
- if(!el.classList.contains('err'))render();
+ if(!el.classList.contains('err')&&!shown)render();
 }
 function openSet(){$('keybox').style.display=(BUILT||PROXY)?'none':'';$('key').value=S.cfg.key;$('model').value=S.cfg.model;tg(false);dl.showModal()}
 function saveSet(){if(!BUILT)S.cfg.key=$('key').value.trim();S.cfg.model=$('model').value.trim()||'gemini-flash-lite-latest';save();dl.close()}
@@ -213,6 +284,7 @@ const grow=()=>{inp.style.height='auto';inp.style.height=inp.scrollHeight+'px'};
 inp.oninput=grow;
 inp.onkeydown=e=>{if(e.key=='Enter'&&!e.shiftKey&&!matchMedia('(pointer:coarse)').matches){e.preventDefault();send()}};
 $('go').onclick=send;
+$('img').onclick=()=>{imgMode=!imgMode;$('img').classList.toggle('on',imgMode);if(imgMode)inp.placeholder='Nasıl bir resim istiyorsun?';else inp.placeholder='Bir şey sor…'};
 $('web').onclick=()=>{S.cfg.search=!S.cfg.search;$('web').classList.toggle('on',S.cfg.search);save()};
 const SR=window.SpeechRecognition||window.webkitSpeechRecognition;let rec;
 $('mic').onclick=()=>{
@@ -222,6 +294,12 @@ $('mic').onclick=()=>{
  rec.onresult=e=>{inp.value+=(inp.value?' ':'')+e.results[0][0].transcript;grow()};
  rec.onend=()=>{rec=null;$('mic').classList.remove('on')};rec.start();$('mic').classList.add('on');
 };
+$('msgs').addEventListener('click',e=>{
+ const b=e.target.closest('button[data-a]');if(!b)return;
+ const code=b.closest('.code').querySelector('code').innerText;
+ if(b.dataset.a=='cp'){navigator.clipboard.writeText(code);b.textContent='Kopyalandı';setTimeout(()=>b.textContent='Kopyala',1200)}
+ else{$('pvf').srcdoc=code;$('pv').showModal()}
+});
 if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js');
 render();if(!KEY()&&!PROXY)setTimeout(openSet,300);
 </script></body></html>
