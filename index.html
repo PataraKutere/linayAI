@@ -26,10 +26,11 @@ body.side-closed #side{width:0;padding:0;border:0;overflow:hidden}
 .sec{font-size:11px;color:var(--mu);padding:8px 8px 0;letter-spacing:.04em;text-transform:uppercase}
 .ci{display:flex;align-items:center;border-radius:10px}.ci.on,.ci:hover{background:var(--ub)}
 .ci span{flex:1;padding:8px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;cursor:pointer;font-size:14px}
-.nb{background:linear-gradient(135deg,#8c74cf,#6a56b8);color:#fff;text-align:center;padding:11px;border-radius:12px;font-weight:500}.nb:hover{opacity:.9}
+.nb{background:linear-gradient(135deg,#8c74cf,#6a56b8);color:#fff;text-align:center;padding:12px;border-radius:14px;font-weight:600;box-shadow:0 4px 15px rgba(140,116,207,0.3);transition:transform 0.1s,opacity 0.2s}
+.nb:hover{opacity:.95;transform:translateY(-1px)}
 main{flex:1;display:flex;flex-direction:column;min-width:0}
-header{display:flex;align-items:center;gap:8px;padding:12px 16px;border:0}
-header b{flex:1;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-weight:600}
+header{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border:0;position:relative}
+header .brand{position:absolute;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:8px;font-weight:600;pointer-events:none}
 #msgs{flex:1;overflow:auto;padding:16px 12px}
 .w{max-width:760px;margin:0 auto 14px}
 .u{background:var(--ub);padding:11px 16px;border-radius:18px 18px 4px 18px;margin-left:auto;width:fit-content;max-width:90%;white-space:pre-wrap;word-break:break-word}
@@ -98,7 +99,12 @@ body{font-family:Inter,system-ui,-apple-system,sans-serif}
 <div id="lb" onclick="this.classList.remove('open')"><img alt=""></div>
 <main>
  <header>
-  <button id="menu" onclick="tg()">☰</button><svg width="24" height="24" viewBox="0 0 64 64"><defs><mask id="mh"><rect width="64" height="64" fill="#fff"/><circle cx="40" cy="26" r="20" fill="#000"/></mask></defs><circle cx="28" cy="32" r="22" fill="#d9b86a" mask="url(#mh)"/><path d="M48 14l2.2 5.8L56 22l-5.8 2.2L48 30l-2.2-5.8L40 22l5.8-2.2z" fill="#d9b86a"/></svg><b id="ttl">Linay</b>
+  <button id="menu" onclick="tg()">☰</button>
+  <div class="brand">
+   <svg width="26" height="26" viewBox="0 0 64 64"><path d="M22 36C22 28 28 22 36 22C44 22 50 28 50 36C50 44 44 50 36 50C28 50 22 44 22 36Z" fill="none" stroke="#d9b86a" stroke-width="5" stroke-linecap="round"/><path d="M14 28C18 22 26 20 32 22M50 22C56 20 60 26 56 32" stroke="#d9b86a" stroke-width="5" stroke-linecap="round"/><circle cx="36" cy="36" r="4" fill="#d9b86a"/></svg>
+   <span id="ttl" style="font-weight:600;letter-spacing:.3px;">Linay</span>
+  </div>
+  <div style="width:24px"></div>
  </header>
  <div id="msgs"></div>
  <div id="chips"></div>
@@ -143,7 +149,7 @@ const save=()=>{try{localStorage.setItem('ai1',JSON.stringify({...S,chats:S.chat
 const cur=()=>S.chats.find(c=>c.id===S.cur);
 const FB='gemini-flash-lite-latest';
 const CARDS='<div class="cards">'+[['💻','Kod yaz','Python ile basit bir hesap makinesi yaz ve açıkla'],['🎨','Resim oluştur','Gün batımında sahilde yürüyen bir astronot resmi yap'],['🧠','Bir şey öğren','Kuantum bilgisayarlar nasıl çalışır? Basitçe anlat'],['✍️','Yazı yaz','Patronuma izin isteyen kısa ve kibar bir e-posta yaz']].map(([i,t,p])=>`<div data-p="${p}"><b>${i}</b>${t}</div>`).join('')+'</div>';
-function logo(n,id){return `<svg width="${n}" height="${n}" viewBox="0 0 64 64"><defs><mask id="${id}"><rect width="64" height="64" fill="#fff"/><circle cx="40" cy="26" r="20" fill="#000"/></mask></defs><circle cx="28" cy="32" r="22" fill="#d9b86a" mask="url(#${id})"/><path d="M48 14l2.2 5.8L56 22l-5.8 2.2L48 30l-2.2-5.8L40 22l5.8-2.2z" fill="#d9b86a"/></svg>`}
+function logo(n,id){return `<svg width="${n}" height="${n}" viewBox="0 0 64 64"><path d="M22 36C22 28 28 22 36 22C44 22 50 28 50 36C50 44 44 50 36 50C28 50 22 44 22 36Z" fill="none" stroke="#d9b86a" stroke-width="5" stroke-linecap="round"/><path d="M14 28C18 22 26 20 32 22M50 22C56 20 60 26 56 32" stroke="#d9b86a" stroke-width="5" stroke-linecap="round"/><circle cx="36" cy="36" r="4" fill="#d9b86a"/></svg>`}
 const esc=s=>s.replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
 function md0(t){
  const b=[];
@@ -165,7 +171,7 @@ if(MD){
 }
 function md(t){if(!MD)return md0(t);try{return DOMPurify.sanitize(marked.parse(t,{breaks:true}))}catch(e){return md0(t)}}
 function cp(b){navigator.clipboard.writeText(b.nextElementSibling.innerText);b.textContent='Kopyalandı';setTimeout(()=>b.textContent='Kopyala',1200)}
-const say=t=>{speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(t.replace(/[`*#]/g,''));u.lang=/[çğıöşüÇĞİÖŞÜ]/.test(t)?'tr-TR':'en-US';speechSynthesis.speak(u)};
+const say=t=>{speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(t.replace(/[`*#]/g, ''));u.lang=/[çğıöşüÇĞİÖŞÜ]/.test(t)?'tr-TR':'en-US';speechSynthesis.speak(u)};
 function tg(o){
  const mobile=matchMedia('(max-width:760px)').matches;
  if(mobile){
@@ -254,7 +260,7 @@ async function renderLib(){
  }
  if(n===libGen&&!box.querySelector('img')) box.innerHTML='<div class="att">Kayıtlı resim bulunamadı.</div>';
 }
-function chips(){$('chips').innerHTML='';files.forEach((f,i)=>{const s=document.createElement('span');s.textContent='📎 '+f.name+' ✕';s.onclick=()=>{files.splice(i,1);chips()};$('chips').appendChild(s)})}
+function chips(){$('chips').innerHTML='';files.forEach((f,i)=>{const s=document.createElement('span');s.textContent='📎 '+f.name+' ✕';s.onclick=()=>{files.splice(i,1);chips()};$('chips').appendChild(s)});}
 $('f').onchange=async e=>{
  for(const f of e.target.files){
   if(f.size>15e6){alert(f.name+' çok büyük (en fazla 15 MB)');continue}
