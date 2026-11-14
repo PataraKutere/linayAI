@@ -23,7 +23,6 @@ button:hover{background:var(--ub)}
 main{flex:1;display:flex;flex-direction:column;min-width:0}
 header{display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid var(--bd)}
 header b{flex:1;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-weight:600}
-header select{background:var(--card);border:1px solid var(--bd);border-radius:8px;padding:5px}
 #menu{display:none}
 #msgs{flex:1;overflow:auto;padding:20px 12px}
 .w{max-width:780px;margin:0 auto 16px;width:100%}
@@ -59,7 +58,7 @@ dialog a{color:var(--ac)}dialog small{color:var(--mu)}
 .cards div{background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:16px;text-align:left;cursor:pointer;font-size:14px;line-height:1.4;transition:.15s}
 .cards div:hover{border-color:var(--ac);transform:translateY(-2px)}.cards b{display:block;font-size:22px;margin-bottom:6px}
 #pv{width:94%;max-width:960px;height:82vh;padding:0}#pvf{width:100%;height:calc(100% - 48px);border:0;background:#fff}
-.img-card{margin:12px 0;background:var(--card);border:1px solid var(--bd);border-radius:14px;overflow:hidden;max-width:420px}
+.img-card{margin:12px 0;background:var(--card);border:1px solid var(--bd);border-radius:14px;overflow:hidden;max-width:440px}
 .img-card img{width:100%;height:auto;display:block;cursor:pointer}
 .img-foot{display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:#101013;font-size:13px;border-top:1px solid var(--bd)}
 @media(max-width:760px){
@@ -174,7 +173,7 @@ function render(){
   r.lastChild.onclick=()=>{S.chats=S.chats.filter(y=>y.id!=x.id);if(S.cur==x.id)S.cur=null;save();render()};
   $('list').appendChild(r)});
  const m=$('msgs');m.innerHTML='';
- if(!c||!c.msgs.length)m.innerHTML='<div id="hello">'+logo(82)+"<h2>Linay'a hoş geldin, ne yapmak istersin?</h2>"+CARDS+'</div>';
+ if(!c||!c.msgs.length)m.innerHTML='<div id="hello">'+logo(82)+"<h2>Linay'sına hoş geldin, ne yapmak istersin?</h2>"+CARDS+'</div>';
  else c.msgs.forEach((x,i)=>x.role=='user'?add('user',esc(x.t||'')+(x.att&&x.att.length?`<div class="att">📎 ${esc(x.att.join(', '))}</div>`:'')):add('model',md(x.text),i==c.msgs.length-1));
  m.querySelectorAll('.cards div').forEach(d=>d.onclick=()=>{inp.value=d.dataset.p;inp.focus();grow()});m.scrollTop=m.scrollHeight;
 }
@@ -191,18 +190,30 @@ function regen(){if(busy)return;const c=cur();if(!c)return;while(c.msgs.length&&
 async function enPrompt(t){
  try{
   const r=await fetch(`${PROXY||'https://generativelanguage.googleapis.com'}/v1beta/models/${FB}:streamGenerateContent?alt=sse`,{method:'POST',headers:HDR(),signal:AbortSignal.timeout(12000),
-   body:JSON.stringify({systemInstruction:{parts:[{text:"Translate and enhance this image prompt into a detailed English prompt suitable for AI image generators. Output ONLY the prompt."}]},contents:[{role:'user',parts:[{text:t}]}]})});
+   body:JSON.stringify({systemInstruction:{parts:[{text:"Translate and enhance this image request into a concise, vivid English prompt (max 35 words) suitable for AI image generators. Output ONLY the prompt."}]},contents:[{role:'user',parts:[{text:t}]}]})});
   if(!r.ok)return t;
   let o='';(await r.text()).split('\n').forEach(l=>{if(l.startsWith('data:'))try{const j=JSON.parse(l.slice(5));o+=(j.candidates[0].content.parts||[]).map(x=>x.text||'').join('')}catch(e){}});
   return o.trim()||t;
  }catch(e){return t}
 }
 async function genImg(text,el,raw){
- el.innerHTML='<span style="color:var(--mu)">Görsel oluşturuluyor…</span>';
+ el.innerHTML='<span style="color:var(--mu)">Linay görseli oluşturuyor… (10-30 sn)</span>';
  const p=raw?text:await enPrompt(text);
- let src='https://image.pollinations.ai/prompt/'+encodeURIComponent(p).replace(/[!'()*]/g,c=>'%'+c.charCodeAt(0).toString(16).toUpperCase())+'?width=1024&height=1024&nologo=true&seed='+Math.floor(Math.random()*1e6);
- el.innerHTML=`<div class="img-card"><img src="${src}" alt="Linay Görsel" onclick="openImgModal('${src}')"><div class="img-foot"><span>🎨 AI Görsel</span><a href="${src}" download="linay-gorsel.jpg" target="_blank" style="color:var(--ac);text-decoration:none">İndir 📥</a></div></div><div class="att">${esc(p)}</div>`;
- el.querySelector('img').onerror=()=>{el.innerHTML='Görsel oluşturulamadı, lütfen tekrar deneyin.'};
+ let finalSrc=null;
+ if(PROXY){
+  try{
+   const r=await fetch(PROXY+'/image',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt:p}),signal:AbortSignal.timeout(50000)});
+   if(r.ok){
+    const j=await r.json();
+    if(j.image)finalSrc=j.image.startsWith('data:')?j.image:'data:image/jpeg;base64,'+j.image;
+   }
+  }catch(e){}
+ }
+ if(!finalSrc){
+  el.innerHTML='<span class="err">Görsel üretilemedi. Cloudflare Worker /image rotasını kontrol edin.</span>';
+  return p;
+ }
+ el.innerHTML=`<div class="img-card"><img src="${finalSrc}" alt="Linay Görsel" onclick="openImgModal(this.src)"><div class="img-foot"><span>🎨 Linay Görsel</span><a href="${finalSrc}" download="linay-gorsel.jpg" style="color:var(--ac);text-decoration:none;font-weight:500">İndir 📥</a></div></div>`;
  return p;
 }
 function openImgModal(url){$('modalimg').src=url;$('imgprev').showModal()}
@@ -219,7 +230,7 @@ async function send(){
  if(text&&(imgMode||IMG_RE.test(text))){
   imgMode=false;$('img').classList.remove('on');
   const p=await genImg(text,el);
-  c.msgs.push({role:'model',parts:[{text:'[Görsel oluşturuldu: '+p+']'}],text:'🖼 Görsel oluşturuldu: '+p});
+  c.msgs.push({role:'model',parts:[{text:'[Görsel oluşturuldu: '+p+']'}],text:'🖼 Görsel oluşturuldu.'});
   busy=false;$('go').textContent='➤';save();return;
  }
  let out='',src=new Map(),shown=false;
@@ -264,7 +275,7 @@ async function send(){
   if(!out)out='(Boş yanıt alındı.)';
   out+=note;
   const mi=out.match(/\[RESIM:\s*([^\]]+)\]/i);
-  if(mi){out=out.replace(mi[0],'').trim();el.innerHTML=md(out);const ie=add('model','');const ip=await genImg(mi[1].trim(),ie,true);out+='\n\n🖼 *Görsel oluşturuldu: '+ip+'*';shown=true}
+  if(mi){out=out.replace(mi[0],'').trim();el.innerHTML=md(out);const ie=add('model','');await genImg(mi[1].trim(),ie,true);out+='\n\n🖼 *Görsel oluşturuldu.*';shown=true}
   if(src.size)out+='\n\n**Kaynaklar:** '+[...src].slice(0,5).map(([u,t])=>`[${t||'kaynak'}](${u})`).join(' · ');
   c.msgs.push({role:'model',parts:[{text:out}],text:out});
  }catch(e){
