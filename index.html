@@ -5,8 +5,8 @@
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon-192.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="Linay Pro">
-<title>Linay AI - Enterprise Assistant</title>
+<meta name="apple-mobile-web-app-title" content="Linay">
+<title>Linay AI</title>
 <style>
 :root{color-scheme:dark;--bg:#0a0a0c;--fg:#ededf0;--mu:#8b8b9e;--card:#121216;--card-hover:#1a1a21;--bd:#22222c;--ac:#8c74cf;--ac-hover:#9d85df;--ub:#1e1e26;--glow:rgba(140,116,207,0.15)}
 *{box-sizing:border-box}html,body{height:100%;margin:0}
@@ -15,11 +15,10 @@ button,select,textarea,input{font:inherit;color:inherit}
 button{background:none;border:0;cursor:pointer;padding:6px 10px;border-radius:8px;transition:.15s}
 button:hover{background:var(--ub)}
 
-/* SaaS Sidebar Tasarımı */
+/* Sidebar Tasarımı */
 #side{width:290px;background:#0e0e12;border-right:1px solid var(--bd);display:flex;flex-direction:column;padding:14px;gap:10px;flex-shrink:0;z-index:10}
 .brand{display:flex;align-items:center;justify-content:space-between;padding:4px 6px 8px}
 .brand-title{font-weight:700;font-size:1.15em;letter-spacing:-0.3px;background:linear-gradient(135deg,#fff,#9d85df);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
-.pro-badge{background:linear-gradient(135deg,#8c74cf,#6a56b8);color:#fff;font-size:10px;font-weight:600;padding:2px 8px;border-radius:20px;letter-spacing:.5px}
 
 .nb{background:linear-gradient(135deg,#8c74cf,#6a56b8);color:#fff;text-align:center;padding:11px;font-weight:600;border-radius:10px;box-shadow:0 4px 14px var(--glow);transition:.2s;display:flex;align-items:center;justify-content:center;gap:8px}
 .nb:hover{opacity:.95;transform:translateY(-1px)}
@@ -43,8 +42,6 @@ header{display:flex;align-items:center;gap:12px;padding:12px 20px;border-bottom:
 header b{font-weight:600;font-size:1.05em}
 #menu{display:none}
 
-.model-selector{background:var(--card);border:1px solid var(--bd);border-radius:8px;padding:5px 10px;font-size:13px;display:flex;align-items:center;gap:6px;cursor:pointer}
-
 #msgs{flex:1;overflow:auto;padding:24px 16px;scroll-behavior:smooth}
 .w{max-width:780px;margin:0 auto 20px}
 .u{background:var(--ub);border-radius:16px 16px 4px 16px;padding:12px 18px;margin-left:auto;width:fit-content;max-width:85%;white-space:pre-wrap;word-break:break-word;font-size:14.5px}
@@ -55,7 +52,7 @@ header b{font-weight:600;font-size:1.05em}
 .a th,.a td{border:1px solid var(--bd);padding:8px 12px;font-size:14px}
 .a blockquote{border-left:3px solid var(--ac);margin:10px 0;padding:4px 16px;color:var(--mu);background:var(--card);border-radius:0 8px 8px 0}
 
-/* Kod Kutuları & Modern Header */
+/* Kod Kutuları */
 .code{border:1px solid var(--bd);border-radius:12px;overflow:hidden;margin:14px 0;background:#0d0d10;box-shadow:0 4px 20px rgba(0,0,0,0.3)}
 .code .ch{display:flex;justify-content:space-between;align-items:center;padding:6px 12px;background:#141418;font-size:12px;color:var(--mu);border-bottom:1px solid var(--bd)}
 .code .ch div{display:flex;gap:6px;align-items:center}
@@ -68,7 +65,7 @@ header b{font-weight:600;font-size:1.05em}
 .err{color:#e8707a;white-space:pre-wrap;background:rgba(232,112,122,0.1);padding:12px;border-radius:8px;border:1px solid rgba(232,112,122,0.2)}
 .att{font-size:13px;color:var(--mu);margin-top:6px}
 
-/* Profesyonel Görsel Kartları */
+/* Görsel Kutuları */
 .img-box{margin:12px 0;border-radius:14px;overflow:hidden;border:1px solid var(--bd);background:var(--card);padding:12px;width:fit-content;max-width:100%;box-shadow:0 8px 30px rgba(0,0,0,0.4)}
 .img-box img{max-width:100%;max-height:520px;border-radius:10px;display:block;cursor:pointer;transition:.2s}
 .img-box img:hover{opacity:.97}
@@ -76,7 +73,7 @@ header b{font-weight:600;font-size:1.05em}
 .img-actions a{background:var(--ub);padding:6px 14px;border-radius:8px;font-size:13px;color:var(--fg);text-decoration:none;border:1px solid var(--bd);transition:.15s}
 .img-actions a:hover{background:var(--bd);border-color:var(--ac)}
 
-/* Karşılama Ekranı (Hero Cards) */
+/* Karşılama Ekranı */
 #hello{text-align:center;color:var(--fg);margin-top:10vh}
 #hello h2{font-weight:600;font-size:24px;margin:16px 12px 6px;letter-spacing:-0.5px}
 #hello p{color:var(--mu);font-size:15px;margin-bottom:28px}
@@ -84,7 +81,7 @@ header b{font-weight:600;font-size:1.05em}
 #chips span{background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:6px 12px;font-size:13px;cursor:pointer;transition:.15s}
 #chips span:hover{border-color:var(--ac);background:var(--card-hover)}
 
-/* Input Bar (Alt Alan) */
+/* Input Bar */
 #bar{display:flex;align-items:flex-end;gap:8px;margin:12px auto 16px;padding:10px 14px;max-width:780px;width:calc(100% - 32px);background:var(--card);border:1px solid var(--bd);border-radius:22px;box-shadow:0 10px 30px rgba(0,0,0,0.5);transition:.2s}
 #bar:focus-within{border-color:var(--ac);box-shadow:0 0 0 2px var(--glow),0 10px 30px rgba(0,0,0,0.5)}
 #inp{flex:1;border:0;outline:0;background:none;resize:none;max-height:160px;padding:8px 4px;font-size:15px}
@@ -123,12 +120,11 @@ dialog a{color:var(--ac)}dialog small{color:var(--mu)}
 <aside id="side">
  <div class="brand">
   <span class="brand-title">Linay AI</span>
-  <span class="pro-badge">PRO</span>
  </div>
  <button class="nb" onclick="nc()">+ Yeni Sohbet</button>
  <input id="q" placeholder="Sohbetlerde ara..." oninput="render()">
  <div id="list"></div>
- <button onclick="openSet()" style="display:flex;align-items:center;gap:10px;padding:10px;border-radius:10px;color:var(--mu);margin-top:auto">⚙ Sistem Ayarları</button>
+ <button onclick="openSet()" style="display:flex;align-items:center;gap:10px;padding:10px;border-radius:10px;color:var(--mu);margin-top:auto">⚙ Ayarlar</button>
 </aside>
 <div id="shade" onclick="tg()"></div>
 <main>
@@ -136,9 +132,6 @@ dialog a{color:var(--ac)}dialog small{color:var(--mu)}
   <button id="menu" onclick="tg()">☰</button>
   <svg width="22" height="22" viewBox="0 0 64 64"><circle cx="28" cy="32" r="22" fill="#d9b86a"/><path d="M48 14l2.2 5.8L56 22l-5.8 2.2L48 30l-2.2-5.8L40 22l5.8-2.2z" fill="#d9b86a"/></svg>
   <b id="ttl">Linay</b>
-  <div style="margin-left:auto;display:flex;gap:8px;align-items:center">
-   <div class="model-selector" onclick="openSet()">⚡ Gemini 2.5 Pro</div>
-  </div>
  </header>
  <div id="msgs"></div>
  <div id="chips"></div>
@@ -153,12 +146,12 @@ dialog a{color:var(--ac)}dialog small{color:var(--mu)}
  <input type="file" id="f" hidden multiple accept="image/*,.pdf,.txt,.md,.csv,.json,.js,.py,.html,.css,.java,.c,.cpp">
 </main>
 <dialog id="dl">
- <h3 style="margin-top:0">Sistem ve API Ayarları</h3>
+ <h3 style="margin-top:0">Ayarlar</h3>
  <div id="keybox"><label>Gemini API Anahtarı</label>
- <input id="key" type="password" placeholder="AI Studio API Key" autocomplete="off">
- <small>Ücretsiz anahtar: <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a></small></div>
+ <input id="key" type="password" placeholder="API Anahtarı (Opsiyonel)" autocomplete="off">
+ <small>Codex veya Proxy kullanıyorsanız boş bırakabilirsiniz.</small></div>
  <label style="display:block;margin-top:14px">Aktif Model</label>
- <input id="model" list="ml"><datalist id="ml"><option value="gemini-2.5-flash"><option value="gemini-2.5-pro"><option value="gemini-2.0-flash"></datalist>
+ <input id="model" list="ml"><datalist id="ml"><option value="gemini-3.8-flash"><option value="gemini-flash-lite-latest"></datalist>
  <div style="display:flex;gap:8px;justify-content:space-between;margin-top:24px">
   <button onclick="if(confirm('Tüm sohbet geçmişi silinsin mi?')){S.chats=[];S.cur=null;save();render();dl.close()}">Sohbetleri Temizle</button>
   <button class="nb" onclick="saveSet()" style="padding:8px 20px;">Kaydet</button>
@@ -169,8 +162,8 @@ dialog a{color:var(--ac)}dialog small{color:var(--mu)}
 <script src="config.js"></script>
 <script>
 const $=id=>document.getElementById(id),dl=$('dl'),inp=$('inp');
-let S=JSON.parse(localStorage.getItem('ai1')||'null')||{chats:[],cur:null,cfg:{key:'',model:'gemini-2.5-flash',search:false,v:5}};
-if(S.cfg.v!==5){S.cfg.v=5;S.cfg.model='gemini-2.5-flash';S.cfg.search=false}
+let S=JSON.parse(localStorage.getItem('ai1')||'null')||{chats:[],cur:null,cfg:{key:'',model:'gemini-3.8-flash',search:false,v:6}};
+if(S.cfg.v!==6){S.cfg.v=6;S.cfg.model='gemini-3.8-flash';S.cfg.search=false}
 const RAW=String(window.LINAY_PROXY||window.LINAY_KEY||'').trim();
 const PROXY=/^https?:\/\//i.test(RAW)?RAW.replace(/\/+$/,''):'';
 const BUILT=PROXY?'':String(window.LINAY_KEY||'').trim();
@@ -179,7 +172,7 @@ const HDR=()=>PROXY?{'Content-Type':'application/json'}:{'Content-Type':'applica
 let imgMode=false;
 const IMG_RE=/(resim|resm\w*|görsel|fotoğraf|foto|logo|poster|illüstrasyon|çizim|image|picture)\w*\s+(yap|çiz|oluştur|üret|hazırla|tasarla|generate|create|make)|(^|\s)çiz(er\s*misin)?([\s.!?]|$)|\b(draw|generate|create|make)\b.{0,15}\b(image|picture|photo|logo|drawing)\b/i;
 let files=[],busy=false,ctl=null;
-const GEN="Sen Linay Pro'sun: Dünya standartlarında kıdemli bir yapay zeka asistanı ve yazılım mühendisisin. Kod yazarken son derece temiz, hatasız ve tam kod ver, web projelerinde tek dosyalık kusursuz HTML/CSS/JS üret. Kullanıcının dilinde sıcak, net ve profesyonel yanıtla.";
+const GEN="Sen Linay'sın: Dünya standartlarında kıdemli bir yapay zeka asistanı ve yazılım mühendisisin. Kod yazarken son derece temiz, hatasız ve tam kod ver, web projelerinde tek dosyalık kusursuz HTML/CSS/JS üret. Kullanıcının dilinde sıcak, net ve profesyonel yanıtla.";
 
 const save=()=>{
  try{
@@ -192,7 +185,7 @@ const save=()=>{
 };
 
 const cur=()=>S.chats.find(c=>c.id===S.cur);
-const FB='gemini-2.5-flash';
+const FB='gemini-3.8-flash';
 const CARDS='<div class="cards">'+[['💻','Mimari Kod Yaz','Python ile profesyonel bir veri analiz scripti yaz'],['🎨','Sinematik Görsel','Cyberpunk sokaklarında neon ışıklı bir spor araba'],['🧠','Teknik Analiz','Kuantum şifreleme algoritmaları nasıl çalışır?'],['✍️','Kurumsal E-posta','Yatırımcı toplantısı için profesyonel davet metni yaz']].map(([i,t,p])=>`<div data-p="${p}"><b>${i}</b>${t}</div>`).join('')+'</div>';
 function logo(n,id){return `<svg width="${n}" height="${n}" viewBox="0 0 64 64"><circle cx="28" cy="32" r="22" fill="#d9b86a"/><path d="M48 14l2.2 5.8L56 22l-5.8 2.2L48 30l-2.2-5.8L40 22l5.8-2.2z" fill="#d9b86a"/></svg>`}
 const esc=s=>s.replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
@@ -238,7 +231,7 @@ function add(role, html, last, imgPrompt, messageObj){
   const box=document.createElement('div');box.className='img-box';
   box.innerHTML=`<img src="${imgUrl}" alt="Linay Görsel" onclick="showImageInModal('${imgUrl}')">
    <div class="img-actions">
-    <a download="linay-pro-gorsel.jpg" href="${imgUrl}" target="_blank">Yüksek Kalite İndir</a>
+    <a download="linay-gorsel.jpg" href="${imgUrl}" target="_blank">İndir</a>
    </div><div class="att">Prompt: ${esc(activePrompt)}</div>`;
   d.appendChild(box);
  }
@@ -256,8 +249,7 @@ function add(role, html, last, imgPrompt, messageObj){
 }
 
 function render(){
- const c=cur();$('ttl').textContent=c?c.title:'Linay Pro';$('web').classList.toggle('on',S.cfg.search);
- $('list').innerHTML='';
+ const c=cur();$('ttl').textContent=c?c.title:'Linay';$('web').classList.toggle('on',S.cfg.search);$('list').innerHTML='';
  const q=($('q').value||'').toLowerCase();
  
  const filteredChats = S.chats.slice().reverse().filter(x=>!q||(x.title+' '+x.msgs.map(m=>m.text||m.t||'').join(' ')).toLowerCase().includes(q));
@@ -277,7 +269,7 @@ function render(){
  });
  
  const m=$('msgs');m.innerHTML='';
- if(!c||!c.msgs.length)m.innerHTML='<div id="hello">'+logo(72,'mx')+"<h2>Merhaba, Berat</h2><p>Bugün hangi projeyi veya fikri hayata geçirelim?</p>"+CARDS+'</div>';
+ if(!c||!c.msgs.length)m.innerHTML='<div id="hello">'+logo(72,'mx')+"<h2>Merhaba, Hoş Geldiniz!</h2><p>Bugün hangi projeyi veya fikri hayata geçirelim?</p>"+CARDS+'</div>';
  else c.msgs.forEach((x,i)=>{
   if(x.role=='user'){
    add('user',esc(x.t||'')+(x.att&&x.att.length?`<div class="att">📎 ${esc(x.att.join(', '))}</div>`:''));
@@ -313,7 +305,7 @@ async function enPrompt(t){
 }
 
 async function genImg(text,el,raw,msgObj){
- el.innerHTML='<span style="color:var(--mu)">✨ Profesyonel görsel render ediliyor…</span>';
+ el.innerHTML='<span style="color:var(--mu)">✨ Görsel hazırlanıyor…</span>';
  const p=raw?text:await enPrompt(text);
  const seed = Math.floor(Math.random()*1e9);
  msgObj.imagePrompt = p;
@@ -324,9 +316,9 @@ async function genImg(text,el,raw,msgObj){
 
  el.innerHTML='';
  const box=document.createElement('div');box.className='img-box';
- box.innerHTML=`<img src="${src}" alt="Linay Pro Görsel" onclick="showImageInModal('${src}')">
+ box.innerHTML=`<img src="${src}" alt="Linay Görsel" onclick="showImageInModal('${src}')">
   <div class="img-actions">
-   <a download="linay-pro-gorsel.jpg" href="${src}" target="_blank">Yüksek Kalite İndir</a>
+   <a download="linay-gorsel.jpg" href="${src}" target="_blank">İndir</a>
   </div><div class="att">Prompt: ${esc(p)}</div>`;
  el.appendChild(box);
  return p;
@@ -345,13 +337,13 @@ async function send(){
  const modelMsg = {role:'model', parts:[], text:''};
  c.msgs.push(modelMsg);
  
- const el=add('model','<span style="color:var(--mu)">Linay Pro yanıt oluşturuyor…</span>');
+ const el=add('model','<span style="color:var(--mu)">Linay düşünüyor…</span>');
  busy=true;$('go').textContent='■';ctl=new AbortController();
 
  if(text&&(imgMode||IMG_RE.test(text))){
   imgMode=false;$('img').classList.remove('on');
   const p=await genImg(text,el,false,modelMsg);
-  modelMsg.text = '🖼 Profesyonel görsel oluşturuldu: '+p;
+  modelMsg.text = '🖼 Görsel oluşturuldu: '+p;
   modelMsg.parts = [{text:'[Resim oluşturuldu: '+p+']'}];
   busy=false;$('go').textContent='➤';save();return;
  }
@@ -362,7 +354,7 @@ async function send(){
    contents:c.msgs.slice(0, -1).map(m=>({role:m.role,parts:m.parts}))};
   const tries=[[S.cfg.model,S.cfg.search]];
   if(S.cfg.search)tries.push([S.cfg.model,false]);
-  [FB,'gemini-2.5-flash-lite','gemini-2.0-flash'].forEach(x=>{if(x!=S.cfg.model)tries.push([x,false])});
+  [FB,'gemini-flash-lite-latest','gemini-2.0-flash'].forEach(x=>{if(x!=S.cfg.model)tries.push([x,false])});
   let r,note='';
   for(const [mdl,se] of tries){
    const b2={...body};if(se)b2.tools=[{google_search:{}}];
@@ -377,7 +369,7 @@ async function send(){
     r={ok:false,status:408,msg:'Zaman aşımı oluştu.'};continue;
    }
    clearTimeout(to);
-   if(r.ok){if(mdl!=S.cfg.model||se!=S.cfg.search)note="\n\n*(Sistem yoğunluğu nedeniyle en uygun model optimize edildi.)*";break}
+   if(r.ok){if(mdl!=S.cfg.model||se!=S.cfg.search)note="\n\n*(Model otomatik olarak optimize edildi.)*";break}
    let m=r.status+'';try{m=(await r.json()).error.message}catch(e){}
    if(!(/^(400|404|408|429|500|503|504)$/.test(r.status)||/quota|demand|overload|unavailable|not found/i.test(m)))throw new Error(m);
    r.msg=m;
@@ -388,76 +380,4 @@ async function send(){
    const {done,value}=await rd.read();if(done)break;
    buf+=dc.decode(value,{stream:true});const ls=buf.split('\n');buf=ls.pop();
    for(const l of ls){if(!l.startsWith('data:'))continue;
-    let j;try{j=JSON.parse(l.slice(5))}catch(e){continue}
-    if(j.error)throw new Error(j.error.message);
-    try{const k=j.candidates&&j.candidates[0]||{};
-     out+=((k.content&&k.content.parts)||[]).map(x=>x.text||'').join('');
-     ((k.groundingMetadata&&k.groundingMetadata.groundingChunks)||[]).forEach(g=>g.web&&src.set(g.web.uri,g.web.title));
-     el.innerHTML=md(out);$('msgs').scrollTop=$('msgs').scrollHeight}catch(e){}}
-  }
-  if(!out)out='(Boş yanıt alındı.)';
-  out+=note;
-  const mi=out.match(/\[RESIM:\s*([^\]]+)\]/i);
-  if(mi){
-   out=out.replace(mi[0],'').trim();
-   el.innerHTML=md(out);
-   const ip=await genImg(mi[1].trim(), el, true, modelMsg);
-   out+='\n\n🖼 *Görsel oluşturuldu: '+ip+'*';
-   shown=true;
-  }
-  if(src.size)out+='\n\n**Doğrulanmış Kaynaklar:** '+[...src].slice(0,5).map(([u,t])=>`[${t||'kaynak'}](${u})`).join(' · ');
-  
-  modelMsg.text = out;
-  modelMsg.parts = [{text:out}];
- }catch(e){
-  if(e.name=='AbortError'){
-   if(out){modelMsg.text=out;modelMsg.parts=[{text:out}]}
-   else c.msgs.pop();
-  }else{
-   c.msgs.pop();files=sf;chips();inp.value=text;
-   el.className='a err';el.textContent='Hata: '+e.message;
-  }
- }
- busy=false;$('go').textContent='➤';save();
- if(!el.classList.contains('err')&&!shown)render();
-}
-
-function openSet(){$('key').value=S.cfg.key;$('model').value=S.cfg.model;tg(false);dl.showModal()}
-function saveSet(){if(!BUILT)S.cfg.key=$('key').value.trim();S.cfg.model=$('model').value.trim()||'gemini-2.5-flash';save();dl.close()}
-const grow=()=>{inp.style.height='auto';inp.style.height=inp.scrollHeight+'px'};
-inp.oninput=grow;
-inp.onkeydown=e=>{if(e.key=='Enter'&&!e.shiftKey&&!matchMedia('(pointer:coarse)').matches){e.preventDefault();send()}};
-$('go').onclick=send;
-$('img').onclick=()=>{imgMode=!imgMode;$('img').classList.toggle('on',imgMode);if(imgMode)inp.placeholder='Nasıl bir görsel tasarlamamı istersin?';else inp.placeholder='Linay Pro\'ya bir şeyler sor…'};
-$('web').onclick=()=>{S.cfg.search=!S.cfg.search;$('web').classList.toggle('on',S.cfg.search);save()};
-
-const SR=window.SpeechRecognition||window.webkitSpeechRecognition;let rec;
-$('mic').onclick=()=>{
- if(!SR)return alert('Tarayıcınız ses tanımayı desteklemiyor.');
- if(rec){rec.stop();return}
- rec=new SR();rec.lang='tr-TR';
- rec.onresult=e=>{inp.value+=(inp.value?' ':'')+e.results[0][0].transcript;grow()};
- rec.onend=()=>{rec=null;$('mic').classList.remove('on')};rec.start();$('mic').classList.add('on');
-};
-
-$('msgs').addEventListener('click',e=>{
- const b=e.target.closest('button[data-a]');if(!b)return;
- const codeBlock=b.closest('.code');
- const code=codeBlock.querySelector('code').innerText;
- if(b.dataset.a=='cp'){
-  navigator.clipboard.writeText(code);b.textContent='Kopyalandı!';setTimeout(()=>b.textContent='Kopyala',1200);
- }else if(b.dataset.a=='dl'){
-  const lang=(codeBlock.querySelector('.ch span').innerText.trim()||'txt').toLowerCase();
-  const ext=lang==='html'||lang==='svg'?lang:lang==='python'||lang==='py'?'py':lang==='javascript'||lang==='js'?'js':'txt';
-  const blob=new Blob([code],{type:'text/plain;charset=utf-8'});
-  const url=URL.createObjectURL(blob);
-  const a=document.createElement('a');a.href=url;a.download=`linay-pro-kod.${ext}`;a.click();
-  URL.revokeObjectURL(url);
- }else{
-  $('pvf').srcdoc=code;$('pv').showModal();
- }
-});
-
-if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js');
-render();if(!KEY()&&!PROXY)setTimeout(openSet,300);
-</script></body></html>
+    let j;try{j=JSON.parse(l.slice
