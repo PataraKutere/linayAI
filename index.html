@@ -74,7 +74,7 @@ header b{font-weight:600;font-size:1.05em}
 .img-actions a:hover{background:var(--bd);border-color:var(--ac)}
 
 /* Karşılama Ekranı */
-#hello{text-align:center;color:var(--fg);margin-top:10vh}
+#hello{text-align:center;color:var(--fg);margin-top:12vh}
 #hello h2{font-weight:600;font-size:24px;margin:16px 12px 6px;letter-spacing:-0.5px}
 #hello p{color:var(--mu);font-size:15px;margin-bottom:28px}
 #chips{display:flex;gap:8px;flex-wrap:wrap;padding:0 16px;max-width:800px;margin:0 auto;width:100%;justify-content:center}
@@ -151,7 +151,7 @@ dialog a{color:var(--ac)}dialog small{color:var(--mu)}
  <input id="key" type="password" placeholder="API Anahtarı (Opsiyonel)" autocomplete="off">
  <small>Codex veya Proxy kullanıyorsanız boş bırakabilirsiniz.</small></div>
  <label style="display:block;margin-top:14px">Aktif Model</label>
- <input id="model" list="ml"><datalist id="ml"><option value="gemini-3.8-flash"><option value="gemini-flash-lite-latest"></datalist>
+ <input id="model" list="ml"><datalist id="ml"><option value="gemini-1.5-flash"><option value="gemini-1.5-pro"><option value="gemini-2.0-flash"></datalist>
  <div style="display:flex;gap:8px;justify-content:space-between;margin-top:24px">
   <button onclick="if(confirm('Tüm sohbet geçmişi silinsin mi?')){S.chats=[];S.cur=null;save();render();dl.close()}">Sohbetleri Temizle</button>
   <button class="nb" onclick="saveSet()" style="padding:8px 20px;">Kaydet</button>
@@ -162,8 +162,15 @@ dialog a{color:var(--ac)}dialog small{color:var(--mu)}
 <script src="config.js"></script>
 <script>
 const $=id=>document.getElementById(id),dl=$('dl'),inp=$('inp');
-let S=JSON.parse(localStorage.getItem('ai1')||'null')||{chats:[],cur:null,cfg:{key:'',model:'gemini-3.8-flash',search:false,v:6}};
-if(S.cfg.v!==6){S.cfg.v=6;S.cfg.model='gemini-3.8-flash';S.cfg.search=false}
+
+// Güvenli State Yönetimi (Boş/bozuk localStorage çökmelerini engeller)
+let S;
+try {
+  S = JSON.parse(localStorage.getItem('ai1')) || {chats:[], cur:null, cfg:{key:'', model:'gemini-1.5-flash', search:false, v:8}};
+} catch(e) {
+  S = {chats:[], cur:null, cfg:{key:'', model:'gemini-1.5-flash', search:false, v:8}};
+}
+
 const RAW=String(window.LINAY_PROXY||window.LINAY_KEY||'').trim();
 const PROXY=/^https?:\/\//i.test(RAW)?RAW.replace(/\/+$/,''):'';
 const BUILT=PROXY?'':String(window.LINAY_KEY||'').trim();
@@ -185,7 +192,7 @@ const save=()=>{
 };
 
 const cur=()=>S.chats.find(c=>c.id===S.cur);
-const FB='gemini-3.8-flash';
+const FB='gemini-1.5-flash';
 const CARDS='<div class="cards">'+[['💻','Mimari Kod Yaz','Python ile profesyonel bir veri analiz scripti yaz'],['🎨','Sinematik Görsel','Cyberpunk sokaklarında neon ışıklı bir spor araba'],['🧠','Teknik Analiz','Kuantum şifreleme algoritmaları nasıl çalışır?'],['✍️','Kurumsal E-posta','Yatırımcı toplantısı için profesyonel davet metni yaz']].map(([i,t,p])=>`<div data-p="${p}"><b>${i}</b>${t}</div>`).join('')+'</div>';
 function logo(n,id){return `<svg width="${n}" height="${n}" viewBox="0 0 64 64"><circle cx="28" cy="32" r="22" fill="#d9b86a"/><path d="M48 14l2.2 5.8L56 22l-5.8 2.2L48 30l-2.2-5.8L40 22l5.8-2.2z" fill="#d9b86a"/></svg>`}
 const esc=s=>s.replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
@@ -249,7 +256,8 @@ function add(role, html, last, imgPrompt, messageObj){
 }
 
 function render(){
- const c=cur();$('ttl').textContent=c?c.title:'Linay';$('web').classList.toggle('on',S.cfg.search);$('list').innerHTML='';
+ const c=cur();$('ttl').textContent=c?c.title:'Linay';$('web').classList.toggle('on',S.cfg.search);
+ $('list').innerHTML='';
  const q=($('q').value||'').toLowerCase();
  
  const filteredChats = S.chats.slice().reverse().filter(x=>!q||(x.title+' '+x.msgs.map(m=>m.text||m.t||'').join(' ')).toLowerCase().includes(q));
@@ -269,14 +277,17 @@ function render(){
  });
  
  const m=$('msgs');m.innerHTML='';
- if(!c||!c.msgs.length)m.innerHTML='<div id="hello">'+logo(72,'mx')+"<h2>Merhaba, Hoş Geldiniz!</h2><p>Bugün hangi projeyi veya fikri hayata geçirelim?</p>"+CARDS+'</div>';
- else c.msgs.forEach((x,i)=>{
-  if(x.role=='user'){
-   add('user',esc(x.t||'')+(x.att&&x.att.length?`<div class="att">📎 ${esc(x.att.join(', '))}</div>`:''));
-  } else {
-   add('model',md(x.text),i==c.msgs.length-1, x.imagePrompt, x);
-  }
- });
+ if(!c||!c.msgs.length){
+  m.innerHTML='<div id="hello">'+logo(72,'mx')+"<h2>Linay AI Asistan</h2><p>Bugün hangi projeyi veya fikri hayata geçirelim?</p>"+CARDS+'</div>';
+ } else {
+  c.msgs.forEach((x,i)=>{
+   if(x.role=='user'){
+    add('user',esc(x.t||'')+(x.att&&x.att.length?`<div class="att">📎 ${esc(x.att.join(', '))}</div>`:''));
+   } else {
+    add('model',md(x.text),i==c.msgs.length-1, x.imagePrompt, x);
+   }
+  });
+ }
  m.querySelectorAll('.cards div').forEach(d=>d.onclick=()=>{inp.value=d.dataset.p;inp.focus();grow()});
  m.scrollTop=m.scrollHeight;
 }
@@ -296,7 +307,7 @@ function regen(){if(busy)return;const c=cur();if(!c)return;while(c.msgs.length&&
 
 async function enPrompt(t){
  try{
-  const r=await fetch(`${PROXY||'https://generativelanguage.googleapis.com'}/v1beta/models/${FB}:streamGenerateContent?alt=sse`,{method:'POST',headers:HDR(),signal:AbortSignal.timeout(20000),
+  const r=await fetch(`${PROXY||'https://generativelanguage.googleapis.com'}/v1beta/models/${FB}:streamGenerateContent?alt=sse`,{method:'POST',headers:HDR(),signal:AbortSignal.timeout(15000),
    body:JSON.stringify({systemInstruction:{parts:[{text:"Enhance this user request into a highly detailed, cinematic, professional 8K photorealistic image generation prompt in English, adding studio lighting and precise textures. Return ONLY the translated prompt."}]},contents:[{role:'user',parts:[{text:t}]}]})});
   if(!r.ok)return t;
   let o='';(await r.text()).split('\n').forEach(l=>{if(l.startsWith('data:'))try{const j=JSON.parse(l.slice(5));o+=(j.candidates[0].content.parts||[]).map(x=>x.text||'').join('')}catch(e){}});
@@ -354,12 +365,12 @@ async function send(){
    contents:c.msgs.slice(0, -1).map(m=>({role:m.role,parts:m.parts}))};
   const tries=[[S.cfg.model,S.cfg.search]];
   if(S.cfg.search)tries.push([S.cfg.model,false]);
-  [FB,'gemini-flash-lite-latest','gemini-2.0-flash'].forEach(x=>{if(x!=S.cfg.model)tries.push([x,false])});
+  [FB,'gemini-1.5-pro','gemini-2.0-flash'].forEach(x=>{if(x!=S.cfg.model)tries.push([x,false])});
   let r,note='';
   for(const [mdl,se] of tries){
    const b2={...body};if(se)b2.tools=[{google_search:{}}];
    const ac=new AbortController(),onab=()=>ac.abort();ctl.signal.addEventListener('abort',onab);
-   const to=setTimeout(()=>ac.abort(),45000);
+   const to=setTimeout(()=>ac.abort(),35000);
    try{
     r=await fetch(`${PROXY||'https://generativelanguage.googleapis.com'}/v1beta/models/${mdl}:streamGenerateContent?alt=sse`,
      {method:'POST',signal:ac.signal,headers:PROXY?{'Content-Type':'application/json'}:{'Content-Type':'application/json','x-goog-api-key':KEY()},body:JSON.stringify(b2)});
@@ -380,4 +391,76 @@ async function send(){
    const {done,value}=await rd.read();if(done)break;
    buf+=dc.decode(value,{stream:true});const ls=buf.split('\n');buf=ls.pop();
    for(const l of ls){if(!l.startsWith('data:'))continue;
-    let j;try{j=JSON.parse(l.slice
+    let j;try{j=JSON.parse(l.slice(5))}catch(e){continue}
+    if(j.error)throw new Error(j.error.message);
+    try{const k=j.candidates&&j.candidates[0]||{};
+     out+=((k.content&&k.content.parts||[]).map(x=>x.text||'').join(''));
+     ((k.groundingMetadata&&k.groundingMetadata.groundingChunks||[]).forEach(g=>g.web&&src.set(g.web.uri,g.web.title));
+     el.innerHTML=md(out);$('msgs').scrollTop=$('msgs').scrollHeight}catch(e){}}
+  }
+  if(!out)out='(Boş yanıt alındı.)';
+  out+=note;
+  const mi=out.match(/\[RESIM:\s*([^\]]+)\]/i);
+  if(mi){
+   out=out.replace(mi[0],'').trim();
+   el.innerHTML=md(out);
+   const ip=out.includes('Resim oluşturuldu') ? '' : await genImg(mi[1].trim(), el, true, modelMsg);
+   if(ip) out+='\n\n🖼 *Görsel oluşturuldu: '+ip+'*';
+   shown=true;
+  }
+  if(src.size)out+='\n\n**Doğrulanmış Kaynaklar:** '+[...src].slice(0,5).map(([u,t])=>`[${t||'kaynak'}](${u})`).join(' · ');
+  
+  modelMsg.text = out;
+  modelMsg.parts = [{text:out}];
+ }catch(e){
+  if(e.name=='AbortError'){
+   if(out){modelMsg.text=out;modelMsg.parts=[{text:out}]}
+   else c.msgs.pop();
+  }else{
+   c.msgs.pop();files=sf;chips();inp.value=text;
+   el.className='a err';el.textContent='Hata: '+e.message;
+  }
+ }
+ busy=false;$('go').textContent='➤';save();
+ if(!el.classList.contains('err')&&!shown)render();
+}
+
+function openSet(){$('key').value=S.cfg.key;$('model').value=S.cfg.model;tg(false);dl.showModal()}
+function saveSet(){if(!BUILT)S.cfg.key=$('key').value.trim();S.cfg.model=$('model').value.trim()||'gemini-1.5-flash';save();dl.close()}
+const grow=()=>{inp.style.height='auto';inp.style.height=inp.scrollHeight+'px'};
+inp.oninput=grow;
+inp.onkeydown=e=>{if(e.key=='Enter'&&!e.shiftKey&&!matchMedia('(pointer:coarse)').matches){e.preventDefault();send()}};
+$('go').onclick=send;
+$('img').onclick=()=>{imgMode=!imgMode;$('img').classList.toggle('on',imgMode);if(imgMode)inp.placeholder='Nasıl bir görsel tasarlamamı istersin?';else inp.placeholder='Linay\'a bir şeyler sor…'};
+$('web').onclick=()=>{S.cfg.search=!S.cfg.search;$('web').classList.toggle('on',S.cfg.search);save()};
+
+const SR=window.SpeechRecognition||window.webkitSpeechRecognition;let rec;
+$('mic').onclick=()=>{
+ if(!SR)return alert('Tarayıcınız ses tanımayı desteklemiyor.');
+ if(rec){rec.stop();return}
+ rec=new SR();rec.lang='tr-TR';
+ rec.onresult=e=>{inp.value+=(inp.value?' ':'')+e.results[0][0].transcript;grow()};
+ rec.onend=()=>{rec=null;$('mic').classList.remove('on')};rec.start();$('mic').classList.add('on');
+};
+
+$('msgs').addEventListener('click',e=>{
+ const b=e.target.closest('button[data-a]');if(!b)return;
+ const codeBlock=b.closest('.code');
+ const code=codeBlock.querySelector('code').innerText;
+ if(b.dataset.a=='cp'){
+  navigator.clipboard.writeText(code);b.textContent='Kopyalandı!';setTimeout(()=>b.textContent='Kopyala',1200);
+ }else if(b.dataset.a=='dl'){
+  const lang=(codeBlock.querySelector('.ch span').innerText.trim()||'txt').toLowerCase();
+  const ext=lang==='html'||lang==='svg'?lang:lang==='python'||lang==='py'?'py':lang==='javascript'||lang==='js'?'js':'txt';
+  const blob=new Blob([code],{type:'text/plain;charset=utf-8'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');a.href=url;a.download=`linay-kod.${ext}`;a.click();
+  URL.revokeObjectURL(url);
+ }else{
+  $('pvf').srcdoc=code;$('pv').showModal();
+ }
+});
+
+if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js');
+render();if(!KEY()&&!PROXY)setTimeout(openSet,300);
+</script></body></html>
