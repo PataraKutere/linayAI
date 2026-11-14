@@ -6,7 +6,7 @@
 <link rel="apple-touch-icon" href="icon-192.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Linay">
-<title>Linay</title>
+<title>Linay - Akıllı Asistan</title>
 <style>
 :root{color-scheme:dark;--bg:#0d0d0f;--fg:#d6d3cc;--mu:#8a8892;--card:#151518;--bd:#26262b;--ac:#8c74cf;--ub:#1e1e23}
 *{box-sizing:border-box}html,body{height:100%;margin:0}
@@ -14,64 +14,60 @@ body{background:var(--bg);color:var(--fg);font:16px/1.55 system-ui,-apple-system
 button,select,textarea,input{font:inherit;color:inherit}
 button{background:none;border:0;cursor:pointer;padding:6px 8px;border-radius:8px}
 button:hover{background:var(--ub)}
-#side{width:270px;background:var(--card);border-right:1px solid var(--bd);display:flex;flex-direction:column;padding:10px;gap:6px;flex-shrink:0}
+#side{width:280px;background:#101013;border-right:1px solid var(--bd);display:flex;flex-direction:column;padding:12px;gap:8px;flex-shrink:0}
 #list{flex:1;overflow:auto}
-.ci{display:flex;align-items:center;border-radius:8px}.ci.on{background:var(--ub)}
-.ci span{flex:1;padding:8px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;cursor:pointer;font-size:14px}
-.nb{background:var(--ac);color:#fff;text-align:center;padding:10px}.nb:hover{background:var(--ac);opacity:.9}
+.ci{display:flex;align-items:center;border-radius:10px;margin-bottom:2px}.ci.on{background:var(--ub)}
+.ci span{flex:1;padding:8px 10px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;cursor:pointer;font-size:14px}
+.nb{background:linear-gradient(135deg,#8c74cf,#6a56b8);color:#fff;text-align:center;padding:11px;font-weight:500;border-radius:12px}
+.nb:hover{opacity:.9}
 main{flex:1;display:flex;flex-direction:column;min-width:0}
-header{display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--bd)}
-header b{flex:1;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+header{display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid var(--bd)}
+header b{flex:1;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-weight:600}
 header select{background:var(--card);border:1px solid var(--bd);border-radius:8px;padding:5px}
 #menu{display:none}
-#msgs{flex:1;overflow:auto;padding:16px 12px}
-.w{max-width:760px;margin:0 auto 14px}
-.u{background:var(--ub);padding:10px 14px;border-radius:14px;margin-left:auto;width:fit-content;max-width:90%;white-space:pre-wrap;word-break:break-word}
-.a{word-break:break-word}.a h4{margin:12px 0 4px}.a ul{margin:6px 0;padding-left:22px}.a a{color:var(--ac)}
+#msgs{flex:1;overflow:auto;padding:20px 12px}
+.w{max-width:780px;margin:0 auto 16px;width:100%}
+.u{background:var(--ub);padding:12px 16px;border-radius:18px 18px 4px 18px;margin-left:auto;width:fit-content;max-width:90%;white-space:pre-wrap;word-break:break-word}
+.a{word-break:break-word;line-height:1.7}.a p{margin:8px 0}
+.a h1,.a h2,.a h3{margin:16px 0 6px;font-weight:600}.a h1{font-size:1.4em}.a h2{font-size:1.2em}.a h3{font-size:1.05em}
+.a ul{margin:6px 0;padding-left:22px}.a a{color:var(--ac)}
 .a code{background:var(--ub);padding:1px 5px;border-radius:5px;font-size:.9em}
-.code{position:relative;margin:8px 0}.code button{position:absolute;right:6px;top:6px;font-size:12px;background:var(--bd)}
-.code pre{margin:0;background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:12px;overflow-x:auto;font-size:13px}
-.code code{background:none;padding:0}
-.act{opacity:.6;font-size:14px}.err{color:#e8707a;white-space:pre-wrap}
-.att{font-size:13px;color:var(--mu);margin-top:4px}
-#hello{text-align:center;color:var(--fg);margin-top:14vh}#hello h2{font-weight:500;font-size:20px;margin:14px 12px 0;line-height:1.35}
-#chips{display:flex;gap:6px;flex-wrap:wrap;padding:0 12px;max-width:784px;margin:0 auto;width:100%}
-#chips span{background:var(--ub);border-radius:10px;padding:3px 10px;font-size:13px;cursor:pointer}
-#bar{display:flex;align-items:flex-end;gap:4px;margin:8px auto 10px;padding:6px;max-width:760px;width:calc(100% - 20px);background:var(--card);border:1px solid var(--bd);border-radius:18px}
-#inp{flex:1;border:0;outline:0;background:none;resize:none;max-height:160px;padding:8px 4px}
-#bar button{font-size:19px;padding:6px 9px}
-#bar .on{background:var(--ac);color:#fff}
-#go{background:var(--ac);color:#fff}
-dialog{background:var(--card);color:var(--fg);border:1px solid var(--bd);border-radius:14px;max-width:420px;width:92%}
-dialog input{width:100%;padding:8px;margin:4px 0 12px;background:var(--bg);border:1px solid var(--bd);border-radius:8px}
-dialog a{color:var(--ac)}dialog small{color:var(--mu)}
-#shade{display:none}
-@media(max-width:760px){
- #side{position:fixed;inset:0 auto 0 0;z-index:5;transform:translateX(-100%);transition:.2s;padding-top:calc(10px + env(safe-area-inset-top))}
- #side.open{transform:none}
- #shade.open{display:block;position:fixed;inset:0;background:#0006;z-index:4}
- #menu{display:block}
-}
-body{font-family:Inter,system-ui,-apple-system,sans-serif}
-#side{background:#101013;width:280px}
-.nb{background:linear-gradient(135deg,#8c74cf,#6a56b8);border-radius:12px;padding:11px;font-weight:500}
-#q{width:100%;padding:9px 12px;background:var(--card);border:1px solid var(--bd);border-radius:10px;outline:0}
-.ci{border-radius:10px}.ci:hover{background:var(--ub)}
-header{border:0;padding:12px 16px}header b{font-weight:600}
-.u{background:var(--ub);border-radius:18px 18px 4px 18px;padding:11px 16px}
-.a{line-height:1.7}.a p{margin:8px 0}.a h1,.a h2,.a h3{margin:16px 0 6px;font-weight:600}.a h1{font-size:1.4em}.a h2{font-size:1.2em}.a h3{font-size:1.05em}
-.a table{border-collapse:collapse;display:block;overflow-x:auto}.a th,.a td{border:1px solid var(--bd);padding:6px 10px}
+.a table{border-collapse:collapse;display:block;overflow-x:auto;margin:10px 0}.a th,.a td{border:1px solid var(--bd);padding:6px 10px}
 .a blockquote{border-left:3px solid var(--ac);margin:8px 0;padding:2px 14px;color:var(--mu)}
 .code{border:1px solid var(--bd);border-radius:12px;overflow:hidden;margin:12px 0;background:#0b0b0d}
-.code .ch{display:flex;justify-content:space-between;align-items:center;padding:3px 6px 3px 14px;background:var(--card);font-size:12px;color:var(--mu)}
-.code .ch button{position:static;font-size:12px;background:none;color:var(--mu)}
-.code pre{border:0;border-radius:0;background:#0b0b0d;padding:14px}.code code.hljs{background:none;padding:0}
-#bar{border-radius:26px;padding:8px 10px;box-shadow:0 6px 30px #000a;border-color:#33333a}
-#go{border-radius:50%;width:40px;height:40px;padding:0;font-size:16px}
-.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;max-width:640px;margin:28px auto 0}
-.cards div{background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:14px;text-align:left;cursor:pointer;font-size:14px;line-height:1.4;transition:.15s}
-.cards div:hover{border-color:var(--ac);transform:translateY(-2px)}.cards b{display:block;font-size:22px;margin-bottom:4px}
-#pv{width:94%;max-width:900px;height:80vh;padding:0}#pvf{width:100%;height:calc(100% - 44px);border:0;background:#fff}
+.code .ch{display:flex;justify-content:space-between;align-items:center;padding:4px 8px 4px 14px;background:var(--card);font-size:12px;color:var(--mu)}
+.code .ch button{font-size:12px;background:none;color:var(--mu)}
+.code pre{border:0;border-radius:0;background:#0b0b0d;padding:14px;margin:0;overflow-x:auto}.code code.hljs{background:none;padding:0}
+.act{opacity:.6;font-size:13px;display:flex;gap:6px;margin-top:6px}
+.err{color:#e8707a;white-space:pre-wrap}
+.att{font-size:13px;color:var(--mu);margin-top:6px}
+#hello{text-align:center;color:var(--fg);margin-top:12vh}
+#hello h2{font-weight:500;font-size:22px;margin:16px 12px 0;line-height:1.35}
+#chips{display:flex;gap:6px;flex-wrap:wrap;padding:0 12px;max-width:784px;margin:0 auto;width:100%}
+#chips span{background:var(--ub);border-radius:10px;padding:4px 12px;font-size:13px;cursor:pointer;border:1px solid var(--bd)}
+#bar{display:flex;align-items:flex-end;gap:6px;margin:10px auto 12px;padding:8px 12px;max-width:780px;width:calc(100% - 24px);background:var(--card);border:1px solid #33333a;border-radius:26px;box-shadow:0 6px 30px #000a}
+#inp{flex:1;border:0;outline:0;background:none;resize:none;max-height:160px;padding:8px 4px}
+#bar button{font-size:18px;padding:6px 10px;border-radius:50%}
+#bar button.sq{border-radius:10px}
+#bar .on{background:var(--ac);color:#fff}
+#go{background:var(--ac);color:#fff;width:40px;height:40px;display:flex;align-items:center;justify-content:center;padding:0;font-size:15px;flex-shrink:0}
+dialog{background:var(--card);color:var(--fg);border:1px solid var(--bd);border-radius:16px;max-width:440px;width:92%;padding:20px}
+dialog input{width:100%;padding:9px 12px;margin:6px 0 14px;background:var(--bg);border:1px solid var(--bd);border-radius:10px;outline:0}
+dialog a{color:var(--ac)}dialog small{color:var(--mu)}
+#shade{display:none}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;max-width:680px;margin:28px auto 0}
+.cards div{background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:16px;text-align:left;cursor:pointer;font-size:14px;line-height:1.4;transition:.15s}
+.cards div:hover{border-color:var(--ac);transform:translateY(-2px)}.cards b{display:block;font-size:22px;margin-bottom:6px}
+#pv{width:94%;max-width:960px;height:82vh;padding:0}#pvf{width:100%;height:calc(100% - 48px);border:0;background:#fff}
+.img-card{margin:12px 0;background:var(--card);border:1px solid var(--bd);border-radius:14px;overflow:hidden;max-width:420px}
+.img-card img{width:100%;height:auto;display:block;cursor:pointer}
+.img-foot{display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:#101013;font-size:13px;border-top:1px solid var(--bd)}
+@media(max-width:760px){
+ #side{position:fixed;inset:0 auto 0 0;z-index:5;transform:translateX(-100%);transition:.2s;padding-top:calc(12px + env(safe-area-inset-top))}
+ #side.open{transform:none}
+ #shade.open{display:block;position:fixed;inset:0;background:#0007;z-index:4}
+ #menu{display:block}
+}
 </style>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
@@ -80,47 +76,51 @@ header{border:0;padding:12px 16px}header b{font-weight:600}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.9/purify.min.js"></script>
 </head><body>
 <aside id="side">
- <button class="nb" onclick="nc()">+ Yeni sohbet</button>
- <input id="q" placeholder="Sohbetlerde ara" oninput="render()">
+ <button class="nb" onclick="nc()">+ Yeni Sohbet</button>
+ <input id="q" placeholder="Sohbetlerde ara..." oninput="render()">
  <div id="list"></div>
- <button onclick="openSet()">⚙ Ayarlar</button>
+ <div style="display:flex;gap:6px">
+  <button style="flex:1" onclick="exportChat()" class="sq">📥 Dışa Aktar</button>
+  <button style="flex:1" onclick="openSet()" class="sq">⚙ Ayarlar</button>
+ </div>
 </aside>
 <div id="shade" onclick="tg()"></div>
 <main>
  <header>
-  <button id="menu" onclick="tg()">☰</button><svg width="24" height="24" viewBox="0 0 64 64"><defs><mask id="mh"><rect width="64" height="64" fill="#fff"/><circle cx="40" cy="26" r="20" fill="#000"/></mask></defs><circle cx="28" cy="32" r="22" fill="#d9b86a" mask="url(#mh)"/><path d="M48 14l2.2 5.8L56 22l-5.8 2.2L48 30l-2.2-5.8L40 22l5.8-2.2z" fill="#d9b86a"/></svg><b id="ttl">Linay</b>
-  
+  <button id="menu" onclick="tg()">☰</button>
+  <svg width="24" height="24" viewBox="0 0 64 64"><defs><mask id="mh"><rect width="64" height="64" fill="#fff"/><circle cx="40" cy="26" r="20" fill="#000"/></mask></defs><circle cx="28" cy="32" r="22" fill="#d9b86a" mask="url(#mh)"/><path d="M48 14l2.2 5.8L56 22l-5.8 2.2L48 30l-2.2-5.8L40 22l5.8-2.2z" fill="#d9b86a"/></svg>
+  <b id="ttl">Linay</b>
  </header>
  <div id="msgs"></div>
  <div id="chips"></div>
  <div id="bar">
-  <button onclick="$('f').click()" title="Dosya / fotoğraf">📎</button>
-  <button id="web" title="İnternette ara">🌐</button>
-  <button id="img" title="Resim oluştur">🎨</button>
-  <textarea id="inp" rows="1" placeholder="Bir şey sor…"></textarea>
-  <button id="mic" title="Sesle yaz">🎤</button>
-  <button id="go">➤</button>
+  <button onclick="$('f').click()" title="Dosya / Fotoğraf" class="sq">📎</button>
+  <button id="web" title="İnternette Ara" class="sq">🌐</button>
+  <button id="img" title="Resim Oluştur" class="sq">🎨</button>
+  <textarea id="inp" rows="1" placeholder="Linay'a bir şeyler sor…"></textarea>
+  <button id="mic" title="Sesli Yaz" class="sq">🎤</button>
+  <button id="go" title="Gönder">➤</button>
  </div>
  <input type="file" id="f" hidden multiple accept="image/*,.pdf,.txt,.md,.csv,.json,.js,.py,.html,.css,.java,.c,.cpp">
 </main>
 <dialog id="dl">
- <h3 style="margin-top:0">Ayarlar</h3>
- <div id="keybox"><label>Gemini API anahtarı</label>
- <input id="key" type="password" placeholder="API anahtarı" autocomplete="off">
- <small>Ücretsiz: <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a>. Anahtar sadece bu cihazda saklanır.</small></div>
+ <h3 style="margin-top:0">Linay Ayarları</h3>
+ <div id="keybox"><label>Gemini API Anahtarı</label>
+ <input id="key" type="password" placeholder="API Anahtarı" autocomplete="off">
+ <small>Ücretsiz: <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a></small></div>
  <label style="display:block;margin-top:12px">Model</label>
- <input id="model" list="ml"><datalist id="ml"><option value="gemini-flash-lite-latest"><option value="gemini-flash-latest"><option value="gemini-3.8-flash"></datalist>
- <div style="display:flex;gap:8px;justify-content:space-between">
-  <button onclick="if(confirm('Tüm sohbetler silinsin mi?')){S.chats=[];S.cur=null;save();render();dl.close()}">Sohbetleri sil</button>
-  <button class="nb" onclick="saveSet()">Kaydet</button>
+ <input id="model" list="ml"><datalist id="ml"><option value="gemini-flash-lite-latest"><option value="gemini-flash-latest"><option value="gemini-2.5-flash"></datalist>
+ <div style="display:flex;gap:8px;justify-content:space-between;margin-top:20px">
+  <button onclick="if(confirm('Tüm sohbetler silinsin mi?')){S.chats=[];S.cur=null;save();render();dl.close()}">Sohbetleri Sil</button>
+  <button class="nb" onclick="saveSet()" style="padding:8px 16px;border-radius:10px">Kaydet</button>
  </div>
 </dialog>
-<dialog id="pv"><div style="display:flex;justify-content:space-between;align-items:center;padding:6px 14px"><b>Önizleme</b><button onclick="$('pv').close()">✕</button></div><iframe id="pvf" sandbox="allow-scripts"></iframe></dialog>
+<dialog id="pv"><div style="display:flex;justify-content:space-between;align-items:center;padding:8px 14px"><b>Kod Önizleme</b><button onclick="$('pv').close()">✕</button></div><iframe id="pvf" sandbox="allow-scripts"></iframe></dialog>
+<dialog id="imgprev" style="max-width:90vw;max-height:90vh;padding:10px;text-align:center"><div style="display:flex;justify-content:flex-end;margin-bottom:6px"><button onclick="$('imgprev').close()">✕ Kapat</button></div><img id="modalimg" style="max-width:100%;max-height:78vh;border-radius:10px;display:block;margin:0 auto"></dialog>
 <script src="config.js"></script>
 <script>
 const $=id=>document.getElementById(id),dl=$('dl'),inp=$('inp');
-let S=JSON.parse(localStorage.getItem('ai1')||'null')||{chats:[],cur:null,cfg:{key:'',model:'gemini-flash-lite-latest',mode:'gen',search:false,v:2}};
-if(S.cfg.v!==2){S.cfg.v=2;S.cfg.model='gemini-flash-lite-latest';S.cfg.search=false}
+let S=JSON.parse(localStorage.getItem('linay_data')||'null')||{chats:[],cur:null,cfg:{key:'',model:'gemini-flash-lite-latest',search:false,v:2}};
 const RAW=String(window.LINAY_PROXY||window.LINAY_KEY||'').trim();
 const PROXY=/^https?:\/\//i.test(RAW)?RAW.replace(/\/+$/,''):'';
 const BUILT=PROXY?'':String(window.LINAY_KEY||'').trim();
@@ -129,12 +129,12 @@ const HDR=()=>PROXY?{'Content-Type':'application/json'}:{'Content-Type':'applica
 let imgMode=false;
 const IMG_RE=/(resim|resm\w*|görsel|fotoğraf|foto|logo|poster|illüstrasyon|çizim|image|picture)\w*\s+(yap|çiz|oluştur|üret|hazırla|tasarla|generate|create|make)|(^|\s)çiz(er\s*misin)?([\s.!?]|$)|\b(draw|generate|create|make)\b.{0,15}\b(image|picture|photo|logo|drawing)\b/i;
 let files=[],busy=false,ctl=null;
-const GEN="Sen Linay'sın: kod yazma, analiz, yazı yazma, öğrenme, günlük sorular ve resim üretme konularında yardım eden, net, dürüst ve sıcak bir yapay zekâ asistanısın. Kullanıcının dilinde (Türkçe/İngilizce) yanıtla. Kod yazarken tam ve çalışır kod ver, dil etiketli kod bloğu kullan, kısaca açıkla; web sayfası, oyun veya arayüz istenirse tek dosyalık HTML ver. Gerektiğinde başlık, madde ve tablo kullan ama gereksiz uzatma. Emin olmadığın şeyi uydurma, bilmiyorsan söyle. Kullanıcı resim, logo veya çizim isterse resim çizemediğini ASLA söyleme: yanıtına tam olarak şu satırı yaz: [RESIM: ayrıntılı İngilizce prompt] ve altına kısa bir cümle ekle.";
-const save=()=>{try{localStorage.setItem('ai1',JSON.stringify({...S,chats:S.chats.map(c=>({...c,msgs:c.msgs.map(m=>({...m,parts:m.parts.map(p=>p.inlineData?{text:'[Ek dosya gönderilmişti]'}:p)}))}))}))}catch(e){}};
+const GEN="Sen Linay'sın: Berat Demir tarafından geliştirilen; kod yazma, analiz, yazı yazma, öğrenme, günlük sorular ve resim üretme konularında kusursuz yardım eden, net, dürüst ve sıcak bir yapay zekâ asistanısın. Kullanıcının dilinde (Türkçe/İngilizce) yanıtla. Kod yazarken tam ve çalışır kod ver, dil etiketli kod bloğu kullan, kısaca açıkla; web sayfası, oyun veya arayüz istenirse tek dosyalık HTML ver. Gerektiğinde başlık, madde ve tablo kullan. Kullanıcı resim, logo veya çizim isterse asla resim çizemediğini söyleme; yanıtına tam olarak şu satırı ekle: [RESIM: ayrıntılı İngilizce prompt] ve altına kısa bir açıklama yap.";
+const save=()=>{try{localStorage.setItem('linay_data',JSON.stringify(S))}catch(e){}};
 const cur=()=>S.chats.find(c=>c.id===S.cur);
 const FB='gemini-flash-lite-latest';
-const CARDS='<div class="cards">'+[['💻','Kod yaz','Python ile basit bir hesap makinesi yaz ve açıkla'],['🎨','Resim oluştur','Gün batımında sahilde yürüyen bir astronot resmi yap'],['🧠','Bir şey öğren','Kuantum bilgisayarlar nasıl çalışır? Basitçe anlat'],['✍️','Yazı yaz','Patronuma izin isteyen kısa ve kibar bir e-posta yaz']].map(([i,t,p])=>`<div data-p="${p}"><b>${i}</b>${t}</div>`).join('')+'</div>';
-function logo(n,id){return `<svg width="${n}" height="${n}" viewBox="0 0 64 64"><defs><mask id="${id}"><rect width="64" height="64" fill="#fff"/><circle cx="40" cy="26" r="20" fill="#000"/></mask></defs><circle cx="28" cy="32" r="22" fill="#d9b86a" mask="url(#${id})"/><path d="M48 14l2.2 5.8L56 22l-5.8 2.2L48 30l-2.2-5.8L40 22l5.8-2.2z" fill="#d9b86a"/></svg>`}
+const CARDS='<div class="cards">'+[['💻','Kod yaz','Python ile şifre üreteci yaz ve açıkla'],['🎨','Resim oluştur','Cyberpunk tarzı neon ışıklı İstanbul silueti'],['🧠','Bir şey öğren','Kuantum bilgisayarlar nedir? Basitçe açıkla'],['✍️','Yazı yaz','Yaratıcı bir bilim kurgu hikayesi yaz']].map(([i,t,p])=>`<div data-p="${p}"><b>${i}</b>${t}</div>`).join('')+'</div>';
+function logo(n){return `<svg width="${n}" height="${n}" viewBox="0 0 64 64"><defs><mask id="mx"><rect width="64" height="64" fill="#fff"/><circle cx="40" cy="26" r="20" fill="#000"/></mask></defs><circle cx="28" cy="32" r="22" fill="#d9b86a" mask="url(#mx)"/><path d="M48 14l2.2 5.8L56 22l-5.8 2.2L48 30l-2.2-5.8L40 22l5.8-2.2z" fill="#d9b86a"/></svg>`}
 const esc=s=>s.replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
 function md0(t){
  const b=[];
@@ -155,13 +155,13 @@ if(MD){
 }
 function md(t){if(!MD)return md0(t);try{return DOMPurify.sanitize(marked.parse(t,{breaks:true}))}catch(e){return md0(t)}}
 function cp(b){navigator.clipboard.writeText(b.nextElementSibling.innerText);b.textContent='Kopyalandı';setTimeout(()=>b.textContent='Kopyala',1200)}
-const say=t=>{speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(t.replace(/[`*#]/g,''));u.lang=/[çğıöşüÇĞİÖŞÜ]/.test(t)?'tr-TR':'en-US';speechSynthesis.speak(u)};
+const say=t=>{speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(t.replace(/[`*#]/g,''));u.lang='tr-TR';speechSynthesis.speak(u)};
 function tg(o){$('side').classList.toggle('open',o);$('shade').classList.toggle('open',o)}
 function nc(){S.cur=null;render();tg(false);inp.focus()}
 function add(role,html,last){
  const w=document.createElement('div');w.className='w';
  const d=document.createElement('div');d.className=role=='user'?'u':'a';d.innerHTML=html;w.appendChild(d);
- if(role!='user'){const a=document.createElement('div');a.className='act';a.innerHTML='<button>🔊</button><button>📋</button>'+(last?'<button>🔄</button>':'');
+ if(role!='user'){const a=document.createElement('div');a.className='act';a.innerHTML='<button title="Seslendir">🔊 Ses</button><button title="Kopyala">📋 Kopyala</button>'+(last?'<button title="Yeniden üret">🔄 Yenile</button>':'');
   a.children[0].onclick=()=>say(d.innerText);a.children[1].onclick=()=>navigator.clipboard.writeText(d.innerText);if(last)a.children[2].onclick=regen;w.appendChild(a)}
  $('msgs').appendChild(w);return d;
 }
@@ -169,16 +169,16 @@ function render(){
  const c=cur();$('ttl').textContent=c?c.title:'Linay';$('web').classList.toggle('on',S.cfg.search);
  $('list').innerHTML='';
  const q=($('q').value||'').toLowerCase();S.chats.slice().reverse().filter(x=>!q||(x.title+' '+x.msgs.map(m=>m.text||m.t||'').join(' ')).toLowerCase().includes(q)).forEach(x=>{const r=document.createElement('div');r.className='ci'+(x.id==S.cur?' on':'');
-  r.innerHTML='<span></span><button>✕</button>';r.firstChild.textContent=x.title;
+  r.innerHTML='<span></span><button title="Sil">✕</button>';r.firstChild.textContent=x.title;
   r.firstChild.onclick=()=>{S.cur=x.id;render();tg(false)};
   r.lastChild.onclick=()=>{S.chats=S.chats.filter(y=>y.id!=x.id);if(S.cur==x.id)S.cur=null;save();render()};
   $('list').appendChild(r)});
  const m=$('msgs');m.innerHTML='';
- if(!c||!c.msgs.length)m.innerHTML='<div id="hello">'+logo(80,'mx')+"<h2>Berat'ın yüce beynine başvur.</h2>"+CARDS+'</div>';
+ if(!c||!c.msgs.length)m.innerHTML='<div id="hello">'+logo(82)+"<h2>Linay'a hoş geldin, ne yapmak istersin?</h2>"+CARDS+'</div>';
  else c.msgs.forEach((x,i)=>x.role=='user'?add('user',esc(x.t||'')+(x.att&&x.att.length?`<div class="att">📎 ${esc(x.att.join(', '))}</div>`:'')):add('model',md(x.text),i==c.msgs.length-1));
  m.querySelectorAll('.cards div').forEach(d=>d.onclick=()=>{inp.value=d.dataset.p;inp.focus();grow()});m.scrollTop=m.scrollHeight;
 }
-function chips(){$('chips').innerHTML='';files.forEach((f,i)=>{const s=document.createElement('span');s.textContent='📎 '+f.name+' ✕';s.onclick=()=>{files.splice(i,1);chips()};$('chips').appendChild(s)})}
+function chips(){$('chips').innerHTML='';files.forEach((f,i)=>{const s=document.createElement('span');s.textContent='📎 '+f.name+' ✕';s.onclick=()=>{files.splice(i,1);chips()};$('chips').appendChild(s)}) }
 $('f').onchange=async e=>{
  for(const f of e.target.files){
   if(f.size>15e6){alert(f.name+' çok büyük (en fazla 15 MB)');continue}
@@ -190,26 +190,22 @@ $('f').onchange=async e=>{
 function regen(){if(busy)return;const c=cur();if(!c)return;while(c.msgs.length&&c.msgs[c.msgs.length-1].role=='model')c.msgs.pop();const u=c.msgs.pop();if(!u)return;inp.value=u.t||'';send()}
 async function enPrompt(t){
  try{
-  const r=await fetch(`${PROXY||'https://generativelanguage.googleapis.com'}/v1beta/models/${FB}:streamGenerateContent?alt=sse`,{method:'POST',headers:HDR(),signal:AbortSignal.timeout(15000),
-   body:JSON.stringify({systemInstruction:{parts:[{text:"Kullanıcının isteğini bir yapay zeka resim üretici için tek paragraflık, ayrıntılı bir İngilizce prompta çevir. Sadece promptu yaz, başka hiçbir şey yazma."}]},contents:[{role:'user',parts:[{text:t}]}]})});
+  const r=await fetch(`${PROXY||'https://generativelanguage.googleapis.com'}/v1beta/models/${FB}:streamGenerateContent?alt=sse`,{method:'POST',headers:HDR(),signal:AbortSignal.timeout(12000),
+   body:JSON.stringify({systemInstruction:{parts:[{text:"Translate and enhance this image prompt into a detailed English prompt suitable for AI image generators. Output ONLY the prompt."}]},contents:[{role:'user',parts:[{text:t}]}]})});
   if(!r.ok)return t;
   let o='';(await r.text()).split('\n').forEach(l=>{if(l.startsWith('data:'))try{const j=JSON.parse(l.slice(5));o+=(j.candidates[0].content.parts||[]).map(x=>x.text||'').join('')}catch(e){}});
   return o.trim()||t;
  }catch(e){return t}
 }
 async function genImg(text,el,raw){
- el.innerHTML='<span style="color:var(--mu)">Resim hazırlanıyor… (10-40 sn)</span>';
- const p=raw?text:await enPrompt(text);let src=null;
- if(PROXY){try{
-  const r=await fetch(PROXY+'/image',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt:p}),signal:AbortSignal.timeout(60000)});
-  if(r.ok){const j=await r.json();if(j.image)src='data:image/jpeg;base64,'+j.image}
- }catch(e){}}
- const dl=!!src;
- if(!src)src='https://image.pollinations.ai/prompt/'+encodeURIComponent(p).replace(/[!'()*]/g,c=>'%'+c.charCodeAt(0).toString(16).toUpperCase())+'?width=1024&height=1024&nologo=true&seed='+Math.floor(Math.random()*1e6);
- el.innerHTML=`<img src="${src}" alt="" style="max-width:100%;border-radius:12px;display:block">`+(dl?`<a download="linay.jpg" href="${src}">İndir</a>`:'')+`<div class="att">${esc(p)}</div>`;
- el.querySelector('img').onerror=()=>{el.innerHTML='Resim oluşturulamadı, biraz sonra tekrar dene.'};
+ el.innerHTML='<span style="color:var(--mu)">Görsel oluşturuluyor…</span>';
+ const p=raw?text:await enPrompt(text);
+ let src='https://image.pollinations.ai/prompt/'+encodeURIComponent(p).replace(/[!'()*]/g,c=>'%'+c.charCodeAt(0).toString(16).toUpperCase())+'?width=1024&height=1024&nologo=true&seed='+Math.floor(Math.random()*1e6);
+ el.innerHTML=`<div class="img-card"><img src="${src}" alt="Linay Görsel" onclick="openImgModal('${src}')"><div class="img-foot"><span>🎨 AI Görsel</span><a href="${src}" download="linay-gorsel.jpg" target="_blank" style="color:var(--ac);text-decoration:none">İndir 📥</a></div></div><div class="att">${esc(p)}</div>`;
+ el.querySelector('img').onerror=()=>{el.innerHTML='Görsel oluşturulamadı, lütfen tekrar deneyin.'};
  return p;
 }
+function openImgModal(url){$('modalimg').src=url;$('imgprev').showModal()}
 async function send(){
  if(busy){ctl&&ctl.abort();return}
  const text=inp.value.trim();if(!text&&!files.length)return;
@@ -223,7 +219,7 @@ async function send(){
  if(text&&(imgMode||IMG_RE.test(text))){
   imgMode=false;$('img').classList.remove('on');
   const p=await genImg(text,el);
-  c.msgs.push({role:'model',parts:[{text:'[Resim oluşturuldu: '+p+']'}],text:'🖼 Resim oluşturuldu: '+p});
+  c.msgs.push({role:'model',parts:[{text:'[Görsel oluşturuldu: '+p+']'}],text:'🖼 Görsel oluşturuldu: '+p});
   busy=false;$('go').textContent='➤';save();return;
  }
  let out='',src=new Map(),shown=false;
@@ -244,10 +240,10 @@ async function send(){
    }catch(e){
     clearTimeout(to);
     if(ctl.signal.aborted)throw e;
-    r={ok:false,status:408,msg:'Yanıt çok gecikti, Google şu an yoğun olabilir.'};continue;
+    r={ok:false,status:408,msg:'Yanıt zaman aşımına uğradı.'};continue;
    }
    clearTimeout(to);
-   if(r.ok){if(mdl!=S.cfg.model||se!=S.cfg.search)note="\n\n*(Yoğunluk veya kota nedeniyle "+(mdl!=S.cfg.model?mdl+" modeliyle":"internet araması olmadan")+" yanıtlandı.)*";break}
+   if(r.ok){if(mdl!=S.cfg.model||se!=S.cfg.search)note="\n\n*(Yoğunluk nedeniyle alternatif modla yanıtlandı.)*";break}
    let m=r.status+'';try{m=(await r.json()).error.message}catch(e){}
    if(!(/^(408|429|500|503|504)$/.test(r.status)||/quota|demand|overload|unavailable/i.test(m)))throw new Error(m);
    r.msg=m;
@@ -265,18 +261,25 @@ async function send(){
      ((k.groundingMetadata&&k.groundingMetadata.groundingChunks)||[]).forEach(g=>g.web&&src.set(g.web.uri,g.web.title));
      el.innerHTML=md(out);$('msgs').scrollTop=$('msgs').scrollHeight}catch(e){}}
   }
-  if(!out)out='(Boş yanıt geldi, tekrar dene.)';
+  if(!out)out='(Boş yanıt alındı.)';
   out+=note;
   const mi=out.match(/\[RESIM:\s*([^\]]+)\]/i);
-  if(mi){out=out.replace(mi[0],'').trim();el.innerHTML=md(out);const ie=add('model','');const ip=await genImg(mi[1].trim(),ie,true);out+='\n\n🖼 *Resim oluşturuldu: '+ip+'*';shown=true}
+  if(mi){out=out.replace(mi[0],'').trim();el.innerHTML=md(out);const ie=add('model','');const ip=await genImg(mi[1].trim(),ie,true);out+='\n\n🖼 *Görsel oluşturuldu: '+ip+'*';shown=true}
   if(src.size)out+='\n\n**Kaynaklar:** '+[...src].slice(0,5).map(([u,t])=>`[${t||'kaynak'}](${u})`).join(' · ');
   c.msgs.push({role:'model',parts:[{text:out}],text:out});
  }catch(e){
   if(e.name=='AbortError'){if(out)c.msgs.push({role:'model',parts:[{text:out}],text:out});else c.msgs.pop()}
-  else{c.msgs.pop();files=sf;chips();inp.value=text;el.className='a err';el.textContent='Hata: '+e.message+(/key not valid|API key/i.test(e.message)?"\n\nİpucu: Anahtar geçersiz ya da Google tarafından kapatılmış olabilir. AI Studio'dan yeni anahtar al.":/quota|demand/i.test(e.message)?"\n\nİpucu: Ayarlar'dan başka bir model dene (örn. gemini-flash-lite-latest) ya da yarın tekrar dene.":'')}
+  else{c.msgs.pop();files=sf;chips();inp.value=text;el.className='a err';el.textContent='Hata: '+e.message}
  }
  busy=false;$('go').textContent='➤';save();
  if(!el.classList.contains('err')&&!shown)render();
+}
+function exportChat(){
+ const c=cur();if(!c||!c.msgs.length)return alert('Aktarılacak aktif bir sohbet yok!');
+ let mdText=`# ${c.title}\n\n`;
+ c.msgs.forEach(m=>{mdText+=m.role=='user'?`**Sen:** ${m.t}\n\n`:`**Linay:** ${m.text}\n\n---\n\n`});
+ const blob=new Blob([mdText],{type:'text/markdown;charset=utf-8'});
+ const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=(c.title||'linay-sohbet')+'.md';a.click();
 }
 function openSet(){$('keybox').style.display=(BUILT||PROXY)?'none':'';$('key').value=S.cfg.key;$('model').value=S.cfg.model;tg(false);dl.showModal()}
 function saveSet(){if(!BUILT)S.cfg.key=$('key').value.trim();S.cfg.model=$('model').value.trim()||'gemini-flash-lite-latest';save();dl.close()}
@@ -284,13 +287,13 @@ const grow=()=>{inp.style.height='auto';inp.style.height=inp.scrollHeight+'px'};
 inp.oninput=grow;
 inp.onkeydown=e=>{if(e.key=='Enter'&&!e.shiftKey&&!matchMedia('(pointer:coarse)').matches){e.preventDefault();send()}};
 $('go').onclick=send;
-$('img').onclick=()=>{imgMode=!imgMode;$('img').classList.toggle('on',imgMode);if(imgMode)inp.placeholder='Nasıl bir resim istiyorsun?';else inp.placeholder='Bir şey sor…'};
+$('img').onclick=()=>{imgMode=!imgMode;$('img').classList.toggle('on',imgMode);if(imgMode)inp.placeholder='Nasıl bir görsel istiyorsun?';else inp.placeholder="Linay'a bir şeyler sor…"};
 $('web').onclick=()=>{S.cfg.search=!S.cfg.search;$('web').classList.toggle('on',S.cfg.search);save()};
 const SR=window.SpeechRecognition||window.webkitSpeechRecognition;let rec;
 $('mic').onclick=()=>{
- if(!SR)return alert('Bu tarayıcı sesle yazmayı desteklemiyor (Chrome veya Safari dene).');
+ if(!SR)return alert('Tarayıcınız ses tanımayı desteklemiyor.');
  if(rec){rec.stop();return}
- rec=new SR();rec.lang=navigator.language.startsWith('tr')?'tr-TR':'en-US';
+ rec=new SR();rec.lang='tr-TR';
  rec.onresult=e=>{inp.value+=(inp.value?' ':'')+e.results[0][0].transcript;grow()};
  rec.onend=()=>{rec=null;$('mic').classList.remove('on')};rec.start();$('mic').classList.add('on');
 };
