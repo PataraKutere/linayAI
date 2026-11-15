@@ -24,16 +24,16 @@
 <div id="shade" onclick="tg()"></div>
 <main>
  <header>
-  <button id="menu" onclick="tg()">☰</button><svg width="24" height="24" viewBox="0 0 64 64"><defs><mask id="mh"><rect width="64" height="64" fill="#fff"/><circle cx="40" cy="26" r="20" fill="#000"/></mask></defs><circle cx="28" cy="32" r="22" fill="#e32736" mask="url(#mh)"/><path d="M48 14l2.2 5.8L56 22l-5.8 2.2L48 30l-2.2-5.8L40 22l5.8-2.2z" fill="#c5a7ff"/></svg><b id="ttl">Linay</b>
+  <button id="menu" onclick="tg()">☰</button><span id="brandLogo"></span><b id="ttl">Linay</b>
  </header>
  <div id="msgs"></div>
  <div id="chips"></div>
  <div id="bar">
-  <button onclick="$('f').click()" title="Dosya / fotoğraf">📎</button>
-  <button id="web" title="İnternette ara">🌐</button>
-  <button id="img" title="Resim oluştur">🎨</button>
+  <button onclick="$('f').click()" title="Dosya / fotoğraf"><svg viewBox="0 0 24 24"><path d="m8 12.5 7.2-7.2a3.2 3.2 0 0 1 4.5 4.5l-9.2 9.2a5 5 0 0 1-7.1-7.1l9-9"/></svg></button>
+  <button id="web" title="İnternette ara"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0-18"/></svg></button>
+  <button id="img" title="Resim oluştur"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="4"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg></button>
   <textarea id="inp" rows="1" placeholder="Bir şey sor…"></textarea>
-  <button id="mic" title="Sesle yaz">🎤</button>
+  <button id="mic" title="Sesle yaz"><svg viewBox="0 0 24 24"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10v2a7 7 0 0 0 14 0v-2M12 19v3m-4 0h8"/></svg></button>
   <button id="go">➤</button>
  </div>
  <input type="file" id="f" hidden multiple accept="image/*,.pdf,.txt,.md,.csv,.json,.js,.py,.html,.css,.java,.c,.cpp,.docx,.xlsx,.tsv">
@@ -73,7 +73,8 @@ const save=()=>{try{localStorage.setItem('ai1',JSON.stringify({...S,chats:S.chat
 const cur=()=>S.chats.find(c=>c.id===S.cur);
 const FB='gemini-flash-lite-latest';
 const CARDS='<div class="cards">'+[['💻','Kod yaz','Python ile basit bir hesap makinesi yaz ve açıkla'],['🎨','Resim oluştur','Gökyüzünde gururla dalgalanan Türk bayrağını, kızıl gün doğumu ışıklarıyla sinematik bir fotoğraf olarak oluştur'],['🧠','Bir şey öğren','Galatasaray Spor Kulübünün kuruluşundan bugüne tarihini, başarılarını ve efsane futbolcularını anlat'],['✍️','Yazı yaz','Profesyonel ve kibar bir e-posta yaz']].map(([i,t,p])=>`<div data-p="${p}"><b>${i}</b>${t}</div>`).join('')+'</div>';
-function logo(n,id){return `<svg width="${n}" height="${n}" viewBox="0 0 64 64"><defs><mask id="${id}"><rect width="64" height="64" fill="#fff"/><circle cx="40" cy="26" r="20" fill="#000"/></mask></defs><circle cx="28" cy="32" r="22" fill="#c5a7ff" mask="url(#${id})"/><path d="M48 14l2.2 5.8L56 22l-5.8 2.2L48 30l-2.2-5.8L40 22l5.8-2.2z" fill="#c5a7ff"/></svg>`}
+function logo(n,id){return '<svg width="'+n+'" height="'+n+'" viewBox="0 0 100 100" aria-label="Sunglasses man"><circle cx="50" cy="50" r="48" fill="#241116" stroke="#e32736" stroke-width="2"/><path d="M22 43Q18 14 49 13Q82 12 79 45L75 34Q60 24 35 34Z" fill="#17171b"/><path d="M29 38Q29 26 50 25Q72 26 72 40L69 63Q65 79 50 80Q35 79 31 63Z" fill="#d99b7b"/><path d="M29 43Q40 38 48 44L47 54Q39 58 31 52Z M52 44Q62 38 71 43L69 53Q61 58 53 54Z" fill="#090a0d" stroke="#555" stroke-width="1.5"/><path d="M47 47L53 47M20 91Q25 73 42 70L50 80L58 70Q77 73 82 91Z" fill="#27282e"/><path d="M25 83Q33 75 41 76L50 85L59 76Q69 75 76 83L70 91H31Z" fill="#e8b99a"/><path d="M37 72Q44 78 50 85Q57 78 63 72" fill="none" stroke="#d99d7e" stroke-width="5" stroke-linecap="round"/></svg>'}
+$('brandLogo').innerHTML=logo(32,'brand');
 const esc=s=>s.replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
 function md0(t){
  const b=[];
