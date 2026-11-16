@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 
 const BASE=(process.env.LINAY_WORKER_URL||"https://snowy-meadow-02d9.28berat28.workers.dev").replace(/\/+$/,"");
 const ORIGIN="https://patarakutere.github.io";
-const USER="linay-ci-tests";
+const USER="linay-ci-tests-"+(process.env.GITHUB_RUN_ID||"local");
 
 async function get(path){
   const r=await fetch(BASE+path,{headers:{Origin:ORIGIN}});
