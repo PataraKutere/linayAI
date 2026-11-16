@@ -57,7 +57,7 @@ async function searchWeb(query,env){
   if(r.ok){const xml=await r.text(),items=[...xml.matchAll(/<item>([\s\S]*?)<\/item>/gi)];const rss=items.slice(0,12).map(([_,item])=>({title:rssTag(item,"title"),url:rssTag(item,"link"),snippet:rssTag(item,"description"),source:"Bing"})).filter(x=>x.title&&safeUrl(x.url));const good=relevantResults(q,rss);if(good.length)return {provider:"Bing RSS",results:good.slice(0,7)}}
  }catch(e){}
   const isFootball=/(france|fransa)/i.test(q)&&/(turkiye|türkiye|turkey)/i.test(q)&&/(football|futbol|match|maç|score|skor)/i.test(q);
-  const variants=isFootball?[q,q+" UEFA Nations League result",'"France" "Türkiye" "15 November 2026" score','site:tff.org France Türkiye 15 November 2026 result']:[q];
+  const variants=isFootball?[q,q+" UEFA Nations League result",q+" final score","site:tff.org "+q]:[q];
   const collected=[];
   for(const query of variants){
    const u=new URL("https://news.google.com/rss/search");u.searchParams.set("q",query);u.searchParams.set("hl","en-US");u.searchParams.set("gl","US");u.searchParams.set("ceid","US:en");
@@ -265,7 +265,7 @@ export default {async fetch(req,env,ctx){
  const origin=req.headers.get("Origin")||"";if(req.method==="OPTIONS")return new Response(null,{headers:CORS});
  if(origin.toLowerCase()!==ALLOWED_ORIGIN.toLowerCase())return new Response("forbidden",{status:403,headers:CORS});
  const url=new URL(req.url),path=url.pathname;
- if(path==="/health"&&req.method==="GET")return json({ok:true,service:"LinayAI",model:MODEL,searchProviders:["SearXNG (optional)","Brave (optional)","Bing","DuckDuckGo","Wikipedia"],memory:!!env.DB,rag:!!env.VECTOR,agents:true,version:"2.0"});
+ if(path==="/health"&&req.method==="GET")return json({ok:true,service:"LinayAI",model:MODEL,searchProviders:["SearXNG (optional)","Brave (optional)","Bing RSS","Google News RSS","Bing","DuckDuckGo","Wikipedia"],memory:!!env.DB,rag:!!env.VECTOR,agents:true,version:"2.0"});
  if(path==="/chat"&&req.method==="POST"){try{return await handleChat(req,env,ctx)}catch(e){return json({error:e.message||"Sunucu hatası"},500)}}
  if(path==="/memory"&&req.method==="GET"){try{const userId=safeId(url.searchParams.get("userId"));const row=await env.DB.prepare("SELECT content FROM memories WHERE user_id=? ORDER BY created_at DESC LIMIT 1").bind(userId).first();return json({content:row?.content||""})}catch(e){return json({error:e.message},500)}}
  if(path==="/memory"&&req.method==="POST"){
