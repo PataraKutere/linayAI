@@ -240,10 +240,17 @@ function chips(){$('chips').innerHTML='';files.forEach((f,i)=>{const s=document.
 $('f').onchange=async e=>{
  for(const f of e.target.files){
   if(f.size>15e6){alert(f.name+' çok büyük (en fazla 15 MB)');continue}
-  if(/^image\/|pdf$/.test(f.type)){const d=await new Promise(r=>{const x=new FileReader();x.onload=()=>r(x.result.split(',')[1]);x.readAsDataURL(f)});files.push({name:f.name,part:{inlineData:{mimeType:f.type,data:d}}})}
-  else if(/\.docx$/i.test(f.name)&&window.mammoth){const z=await mammoth.extractRawText({arrayBuffer:await f.arrayBuffer()});files.push({name:f.name,part:{text:`[Word belgesi: ${f.name}]\n${z.value.slice(0,100000)}`}})}
-  else if(/\.xlsx$/i.test(f.name)&&window.XLSX){const wb=XLSX.read(await f.arrayBuffer(),{type:'array'});const t=wb.SheetNames.map(n=>`## ${n}\n${XLSX.utils.sheet_to_csv(wb.Sheets[n])}`).join('\n\n');files.push({name:f.name,part:{text:`[Excel çalışma kitabı: ${f.name}]\n${t.slice(0,100000)}`}})}
-  else{const t=await f.text();files.push({name:f.name,part:{text:`[Dosya: ${f.name}]\n${t.slice(0,100000)}`}})}
+  if(f.type==='application/pdf'||/\.pdf$/i.test(f.name)){
+   if(!window.pdfjsLib){alert('PDF okuyucu yüklenemedi.');continue}
+   pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+   const pdf=await pdfjsLib.getDocument({data:await f.arrayBuffer()}).promise;let pages=[];
+   for(let n=1;n<=Math.min(pdf.numPages,80);n++){const page=await pdf.getPage(n),tc=await page.getTextContent();pages.push(tc.items.map(x=>x.str).join(' '))}
+   const t=pages.join('\n').slice(0,100000);files.push({name:f.name,docText:t,part:{text:'[PDF belgesi: '+f.name+']\n'+t}})
+  }
+  else if(/^image\//.test(f.type)){const d=await new Promise(r=>{const x=new FileReader();x.onload=()=>r(x.result.split(',')[1]);x.readAsDataURL(f)});files.push({name:f.name,part:{inlineData:{mimeType:f.type,data:d}}})}
+  else if(/\.docx$/i.test(f.name)&&window.mammoth){const z=await mammoth.extractRawText({arrayBuffer:await f.arrayBuffer()});const t=z.value.slice(0,100000);files.push({name:f.name,docText:t,part:{text:'[Word belgesi: '+f.name+']\n'+t}})}
+  else if(/\.xlsx$/i.test(f.name)&&window.XLSX){const wb=XLSX.read(await f.arrayBuffer(),{type:'array'});const t=wb.SheetNames.map(n=>'## '+n+'\n'+XLSX.utils.sheet_to_csv(wb.Sheets[n])).join('\n\n').slice(0,100000);files.push({name:f.name,docText:t,part:{text:'[Excel çalışma kitabı: '+f.name+']\n'+t}})}
+  else{const t=(await f.text()).slice(0,100000);files.push({name:f.name,docText:t,part:{text:'[Dosya: '+f.name+']\n'+t}})}
  }
  e.target.value='';chips();
 };
