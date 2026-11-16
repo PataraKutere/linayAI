@@ -53,8 +53,11 @@ const docBody=await doc.json();
 assert.equal(doc.ok,true,"RAG indexing failed: "+JSON.stringify(docBody));
 const listed=await get("/documents?userId="+encodeURIComponent(USER));
 assert.ok((listed.body.documents||[]).some(x=>x.id===docBody.document.id),"Indexed document not listed");
+await new Promise(resolve=>setTimeout(resolve,1800));
+const retrieved=await chat("What exact marker is stored in the Linay CI RAG test document? Reply with the marker only.");
+assert.match(retrieved.answer,/violet-cedar-7319/i,"Semantic RAG retrieval failed: "+retrieved.answer);
 await fetch(BASE+"/documents/"+encodeURIComponent(docBody.document.id)+"?userId="+encodeURIComponent(USER),{method:"DELETE",headers:{Origin:ORIGIN}});
-console.log("PASS document RAG indexing");
+console.log("PASS document RAG indexing + retrieval");
 
 const agent=await chat("Use the calculator tool explicitly to calculate 125 multiplied by 48. Then explain the result briefly.",{agent:true});
 assert.ok(agent.answer.length>0,"Agent returned an empty answer");
@@ -65,7 +68,9 @@ console.log("PASS agent mode");
 const web=await chat("Find current information about the latest major technology news and cite sources.",{search:true});
 assert.notEqual(web.search,"failed","Independent web search and its fallback both failed");
 assert.ok(web.answer.length>0,"Web search response empty");
-console.log("PASS web search: "+web.search);
+const sourceList=JSON.parse(decodeURIComponent(web.sources));
+assert.ok(sourceList.length>0,"Search response did not expose source links");
+console.log("PASS web search + citations: "+web.search);
 
 const metrics=await get("/metrics");
 assert.ok(metrics.body.groups,"Metrics groups missing");
