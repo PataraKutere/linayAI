@@ -172,6 +172,22 @@ if(S.cfg.v!==5){S.cfg.v=5;S.cfg.model='gpt-oss-120b'}if(typeof S.cfg.memory!=='s
 const USER_ID=localStorage.getItem('linay_uid')||(()=>{const id=crypto.randomUUID();localStorage.setItem('linay_uid',id);return id})();
 const RAW=String(window.LINAY_PROXY||window.LINAY_KEY||'').trim();
 const PROXY=/^https?:\/\//i.test(RAW)?RAW.replace(/\/+$/,''):'';
+async function apiFetch(url,options={},retries=1){
+ let last;
+ for(let attempt=0;attempt<=retries;attempt++){
+  try{return await fetch(url,{...options,cache:"no-store"})}
+  catch(error){
+   last=error;
+   if(error?.name==="AbortError"||error?.name==="TimeoutError"||attempt===retries)break;
+   await new Promise(resolve=>setTimeout(resolve,350*(attempt+1)));
+  }
+ }
+ if(last instanceof TypeError&&/fetch|network/i.test(String(last.message||last))){
+  const reason=navigator.onLine===false?"Cihaz çevrimdışı görünüyor. ":"";
+  throw new Error(reason+"LinayAI sunucusuna bağlanılamadı. workers.dev erişimi, internet bağlantısı veya tarayıcı güvenlik/CORS engeli kontrol edilmeli. Sunucu: "+url);
+ }
+ throw last||new Error("API bağlantısı kurulamadı.");
+}
 let imgMode=false;
 const IMG_RE=/(resim|resm\w*|görsel|fotoğraf|foto|logo|poster|illüstrasyon|çizim|image|picture)\w*\s+(yap|çiz|oluştur|üret|hazırla|tasarla|generate|create|make)|(^|\s)çiz(er\s*misin)?([\s.!?]|$)|\b(draw|generate|create|make)\b.{0,15}\b(image|picture|photo|logo|drawing)\b/i;
 let files=[],busy=false,ctl=null,privateChat=false;
@@ -258,7 +274,7 @@ function regen(){if(busy)return;const c=cur();if(!c)return;while(c.msgs.length&&
 async function enPrompt(t){
  try{
   const messages=[{role:'system',content:"Kullanıcının isteğini bir yapay zeka resim üretici için tek paragraflık, ayrıntılı bir İngilizce prompta çevir. Sadece promptu yaz."},{role:'user',content:t}];
-  const r=await fetch(PROXY+'/chat',{method:'POST',headers:{'Content-Type':'application/json'},signal:AbortSignal.timeout(30000),body:JSON.stringify({messages})});
+  const r=await apiFetch(PROXY+'/chat',{method:'POST',headers:{'Content-Type':'application/json'},signal:AbortSignal.timeout(120000),body:JSON.stringify({messages})});
   if(!r.ok)return t;const rd=r.body.getReader(),dc=new TextDecoder();let buf='',o='';
   for(;;){const {done,value}=await rd.read();if(done)break;buf+=dc.decode(value,{stream:true});const ls=buf.split('\n');buf=ls.pop();for(const l of ls){if(!l.startsWith('data:'))continue;const raw=l.slice(5).trim();if(!raw||raw==='[DONE]')continue;try{const j=JSON.parse(raw);o+=j.choices?.[0]?.delta?.content||''}catch(e){}}}
   return o.trim()||t;
@@ -268,7 +284,7 @@ async function genImg(text,el,raw){
  el.innerHTML='<span style="color:var(--mu)">Resim hazırlanıyor… (10-40 sn)</span>';
  const p=raw?text:await enPrompt(text);let src=null,werr='';
  if(PROXY){try{
-  const r=await fetch(PROXY+'/image',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt:p}),signal:AbortSignal.timeout(90000)});
+  const r=await apiFetch(PROXY+'/image',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt:p}),signal:AbortSignal.timeout(90000)});
   const j=await r.json().catch(()=>({}));
   if(r.ok&&j.image)src='data:'+(j.type||'image/jpeg')+';base64,'+j.image;else werr=j.error||('HTTP '+r.status);
  }catch(e){werr=String(e.message||e)}}
@@ -345,7 +361,7 @@ async function send(){
  try{
   let docNotice='';
   for(const f of sf.filter(x=>x.docText)){
-   try{const dr=await fetch(PROXY+'/documents',{method:'POST',headers:{'Content-Type':'application/json'},signal:ctl.signal,body:JSON.stringify({userId:USER_ID,name:f.name,text:f.docText})});const dj=await dr.json();if(!dr.ok)throw new Error(dj.error||'Belge indekslenemedi');docNotice+='\n\n📚 '+f.name+' belge hafızasına eklendi ('+dj.document.chunks+' parça).'}
+   try{const dr=await apiFetch(PROXY+'/documents',{method:'POST',headers:{'Content-Type':'application/json'},signal:ctl.signal,body:JSON.stringify({userId:USER_ID,name:f.name,text:f.docText})});const dj=await dr.json();if(!dr.ok)throw new Error(dj.error||'Belge indekslenemedi');docNotice+='\n\n📚 '+f.name+' belge hafızasına eklendi ('+dj.document.chunks+' parça).'}
    catch(de){docNotice+='\n\n⚠️ '+f.name+' belge hafızasına eklenemedi: '+de.message}
   }
   const system=GEN+' KİMLİK KURALI: Adın Linay. Kendini yalnızca Linay veya LinayAI olarak tanıt. Asla Sıfır, ChatGPT, Gemini veya başka bir ad kullanma. Kullanıcı adını sorarsa kısa biçimde “Ben LinayAI.” de. '+' Şu an: '+new Date().toLocaleString('tr-TR',{timeZone:'Europe/Istanbul'})+' (Europe/Istanbul). KISA VE DOĞRU CEVAP KURALLARI: Kullanıcının son mesajını önceki konuşma bağlamıyla birlikte yorumla; yazım hatalarını makul biçimde düzelt. Kullanıcı yalnızca kısa selam verirse kısa selamla karşılık ver, gereksiz soru listesi veya uzun açıklama üretme. Önceki asistan yanıtlarını kesin bilgi kabul etme; kullanıcı hata gösterirse yeniden değerlendir, hatayı tekrarlama ve açıkça düzelt. Bilmediğin bilgiyi uydurma; emin değilsen bunu söyle veya tek netleştirici soru sor. Mantık ve matematik sorularında yalnızca verilen bilgilerden çıkan sonucu ver; varsayım ekleme. Bulmacanın koşullarını değiştirme, cevabı ilk cümlede açıkla ve açıklamanı sonuçla tutarlı tut. Cevap göndermeden önce kendi içinde çelişki veya hesap hatası olup olmadığını kontrol et. Saat/tarih ve konum sorularında şehir ya da ülkeyi doğru belirle; konum belirsizse İstanbul varsayma, netleştir. Güncel bilgi gerekiyorsa web araması yapılmadıysa bunu açıkça söyle ve kesin konuşma. '+(S.cfg.memory?'\\n\\nKULLANICI HAFIZASI:\\n'+S.cfg.memory+'\\nYalnızca ilgili olduğunda kullan.':'');
@@ -353,7 +369,7 @@ async function send(){
    const content=[];for(const p of (m.parts||[])){if(p.text)content.push({type:'text',text:p.text});if(p.inlineData?.data)content.push({type:'image_url',image_url:{url:'data:'+(p.inlineData.mimeType||'application/octet-stream')+';base64,'+p.inlineData.data}})}
    return {role:m.role==='model'?'assistant':'user',content:content.length?content:[{type:'text',text:m.t||''}]};
   })];
-  const r=await fetch(PROXY+'/chat',{method:'POST',headers:{'Content-Type':'application/json'},signal:ctl.signal,body:JSON.stringify({messages,search:useSearch,agent:!!S.cfg.agent,userId:USER_ID})});
+  const r=await apiFetch(PROXY+'/chat',{method:'POST',headers:{'Content-Type':'application/json'},signal:ctl.signal,body:JSON.stringify({messages,search:useSearch,agent:!!S.cfg.agent,userId:USER_ID})});
   if(!r.ok){let msg='HTTP '+r.status;try{const j=await r.json();msg=j.error||msg}catch{}throw new Error(msg)}
   const provider=r.headers.get('X-Linay-Provider')||'Cloudflare Workers AI';
   const searchState=r.headers.get('X-Linay-Search')||'off';let citations=[];try{citations=JSON.parse(decodeURIComponent(r.headers.get('X-Linay-Sources')||'%5B%5D'))}catch(e){}
@@ -376,12 +392,12 @@ async function send(){
  busy=false;$('go').textContent='➤';save();if(!el.classList.contains('err')&&!shown)render();
 }
 function exportChat(){const c=cur();if(!c||!c.msgs.length){alert('Dışa aktarılacak sohbet yok.');return}const payload={title:c.title,exportedAt:new Date().toISOString(),messages:c.msgs.map(m=>({role:m.role,text:m.text||m.t||''}))};const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=(c.title||'linay-sohbet').replace(/[^a-z0-9-_ğüşöçıİĞÜŞÖÇ]/gi,'-')+'.json';a.click();URL.revokeObjectURL(url)}
-async function openSet(){$('keybox').style.display='block';$('memory').value=S.cfg.memory||'';$('metricsBox').textContent='';tg(false);dl.showModal();loadDocs();try{const r=await fetch(PROXY+'/memory?userId='+encodeURIComponent(USER_ID));const j=await r.json();if(j.content){S.cfg.memory=j.content;$('memory').value=j.content;save()}}catch(e){}}
-async function loadDocs(){try{const r=await fetch(PROXY+'/documents?userId='+encodeURIComponent(USER_ID));const j=await r.json();$('doclist').innerHTML=(j.documents||[]).map(d=>'<div style="display:flex;justify-content:space-between;gap:8px;padding:5px 0;border-bottom:1px solid #ffffff16"><span>'+esc(d.name)+'</span><button data-doc="'+d.id+'">Sil</button></div>').join('')||'Henüz belge yüklenmedi.';$('doclist').querySelectorAll('[data-doc]').forEach(b=>b.onclick=()=>deleteDoc(b.dataset.doc))}catch(e){$('doclist').textContent='Belge listesi alınamadı.'}}
-async function deleteDoc(id){if(!confirm('Bu belge hafızadan silinsin mi?'))return;const r=await fetch(PROXY+'/documents/'+encodeURIComponent(id)+'?userId='+encodeURIComponent(USER_ID),{method:'DELETE'});if(r.ok)loadDocs();else alert('Belge silinemedi.')}
-async function showMetrics(){const box=$('metricsBox');box.textContent='Sistem bilgileri alınıyor…';try{const [h,m]=await Promise.all([fetch(PROXY+'/health'),fetch(PROXY+'/metrics')]);const a=await h.json(),b=await m.json();box.textContent='API: '+(a.ok?'Çalışıyor':'Hata')+' · Ana model: '+a.model+' · Hafıza: '+(a.memory?'Açık':'Kapalı')+' · RAG: '+(a.rag?'Açık':'Kapalı')+' · Belgeler: '+(b.documents??'?')+'\\n'+(b.groups||[]).map(x=>x.kind+' / '+x.provider+': '+x.count+' işlem, ort. '+x.avg_ms+' ms'+(x.ok?'':' (hata)')).join('\\n')}catch(e){box.textContent='Durum alınamadı: '+e.message}}
+async function openSet(){$('keybox').style.display='block';$('memory').value=S.cfg.memory||'';$('metricsBox').textContent='';tg(false);dl.showModal();loadDocs();try{const r=await apiFetch(PROXY+'/memory?userId='+encodeURIComponent(USER_ID));const j=await r.json();if(j.content){S.cfg.memory=j.content;$('memory').value=j.content;save()}}catch(e){}}
+async function loadDocs(){try{const r=await apiFetch(PROXY+'/documents?userId='+encodeURIComponent(USER_ID));const j=await r.json();$('doclist').innerHTML=(j.documents||[]).map(d=>'<div style="display:flex;justify-content:space-between;gap:8px;padding:5px 0;border-bottom:1px solid #ffffff16"><span>'+esc(d.name)+'</span><button data-doc="'+d.id+'">Sil</button></div>').join('')||'Henüz belge yüklenmedi.';$('doclist').querySelectorAll('[data-doc]').forEach(b=>b.onclick=()=>deleteDoc(b.dataset.doc))}catch(e){$('doclist').textContent='Belge listesi alınamadı.'}}
+async function deleteDoc(id){if(!confirm('Bu belge hafızadan silinsin mi?'))return;const r=await apiFetch(PROXY+'/documents/'+encodeURIComponent(id)+'?userId='+encodeURIComponent(USER_ID),{method:'DELETE'});if(r.ok)loadDocs();else alert('Belge silinemedi.')}
+async function showMetrics(){const box=$('metricsBox');box.textContent='Sistem bilgileri alınıyor…';try{const [h,m]=await Promise.all([apiFetch(PROXY+'/health'),apiFetch(PROXY+'/metrics')]);const a=await h.json(),b=await m.json();box.textContent='API: '+(a.ok?'Çalışıyor':'Hata')+' · Ana model: '+a.model+' · Hafıza: '+(a.memory?'Açık':'Kapalı')+' · RAG: '+(a.rag?'Açık':'Kapalı')+' · Belgeler: '+(b.documents??'?')+'\\n'+(b.groups||[]).map(x=>x.kind+' / '+x.provider+': '+x.count+' işlem, ort. '+x.avg_ms+' ms'+(x.ok?'':' (hata)')).join('\\n')}catch(e){box.textContent='Durum alınamadı: '+e.message}}
 $('metricsBtn').onclick=showMetrics;
-async function saveSet(){S.cfg.memory=$('memory').value.trim().slice(0,6000);save();try{const r=await fetch(PROXY+'/memory',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:USER_ID,content:S.cfg.memory})});if(!r.ok)throw new Error('Sunucu hafızası kaydedilemedi')}catch(e){alert('Cihaz hafızası kaydedildi; sunucu senkronizasyonu başarısız: '+e.message)}dl.close()}
+async function saveSet(){S.cfg.memory=$('memory').value.trim().slice(0,6000);save();try{const r=await apiFetch(PROXY+'/memory',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:USER_ID,content:S.cfg.memory})});if(!r.ok)throw new Error('Sunucu hafızası kaydedilemedi')}catch(e){alert('Cihaz hafızası kaydedildi; sunucu senkronizasyonu başarısız: '+e.message)}dl.close()}
 const grow=()=>{inp.style.height='auto';inp.style.height=inp.scrollHeight+'px'};
 inp.oninput=grow;
 inp.onkeydown=e=>{if(e.key=='Enter'&&!e.shiftKey&&!matchMedia('(pointer:coarse)').matches){e.preventDefault();send()}};
