@@ -41,10 +41,10 @@ async function searchWeb(query,env){
  const q=String(query||"").trim().slice(0,400);if(!q)throw new Error("Arama sorgusu boş.");
  const headers={"User-Agent":"LinayAI/1.0 (+https://patarakutere.github.io/linayAI/)"};
  if(env.SEARXNG_URL){
-  try{const u=new URL("/search",env.SEARXNG_URL);u.searchParams.set("q",q);u.searchParams.set("format","json");u.searchParams.set("language","tr-TR");const r=await fetch(u,{headers,signal:AbortSignal.timeout(9000)});if(r.ok){const j=await r.json();const a=(j.results||[]).slice(0,7).map(x=>({title:cleanHtml(x.title),url:x.url,snippet:cleanHtml(x.content),source:x.engine||"SearXNG"})).filter(x=>safeUrl(x.url));if(a.length)return {provider:"SearXNG",results:a}}}catch(e){}
+  try{const u=new URL("/search",env.SEARXNG_URL);u.searchParams.set("q",q);u.searchParams.set("format","json");u.searchParams.set("language","tr-TR");const r=await fetch(u,{headers,signal:AbortSignal.timeout(9000)});if(r.ok){const j=await r.json();const a=(j.results||[]).slice(0,7).map(x=>({title:cleanHtml(x.title),url:x.url,snippet:cleanHtml(x.content),source:x.engine||"SearXNG"})).filter(x=>safeUrl(x.url));const good=relevantResults(q,a);if(good.length)return {provider:"SearXNG",results:good.slice(0,7)}}}catch(e){}
  }
  if(env.BRAVE_SEARCH_API_KEY){
-  try{const u=new URL("https://api.search.brave.com/res/v1/web/search");u.searchParams.set("q",q);u.searchParams.set("count","7");const r=await fetch(u,{headers:{...headers,"X-Subscription-Token":env.BRAVE_SEARCH_API_KEY},signal:AbortSignal.timeout(9000)});if(r.ok){const j=await r.json();const a=(j.web?.results||[]).slice(0,7).map(x=>({title:cleanHtml(x.title),url:x.url,snippet:cleanHtml(x.description),source:"Brave"})).filter(x=>safeUrl(x.url));if(a.length)return {provider:"Brave Search",results:a}}}catch(e){}
+  try{const u=new URL("https://api.search.brave.com/res/v1/web/search");u.searchParams.set("q",q);u.searchParams.set("count","7");const r=await fetch(u,{headers:{...headers,"X-Subscription-Token":env.BRAVE_SEARCH_API_KEY},signal:AbortSignal.timeout(9000)});if(r.ok){const j=await r.json();const a=(j.web?.results||[]).slice(0,7).map(x=>({title:cleanHtml(x.title),url:x.url,snippet:cleanHtml(x.description),source:"Brave"})).filter(x=>safeUrl(x.url));const good=relevantResults(q,a);if(good.length)return {provider:"Brave Search",results:good.slice(0,7)}}}catch(e){}
  }
  try{
  try{
