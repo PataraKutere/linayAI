@@ -144,7 +144,7 @@ async function agentRun(env,userId,messages){
  }
  const context=messages.concat([{role:"system",content:"Araç gözlemleri (yalnızca bunlara dayan): "+JSON.stringify(observations).slice(0,12000)+"\nKullanıcıya sonuçları açıkla. Araç başarısızsa bunu belirt."}]);
  const out=await runPlain(env,context,1800);
- return {answer:out?.response||out?.choices?.[0]?.message?.content||"Ajan yanıt üretemedi.",steps,observations};
+ return {answer:modelText(out)||"Ajan yanıt üretemedi.",steps,observations};
 }
 async function handleChat(req,env,ctx){
  const body=await req.json(),messages=Array.isArray(body.messages)?body.messages:[];if(!messages.length)return json({error:"Mesaj bulunamadı"},400);
