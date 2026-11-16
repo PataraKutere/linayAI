@@ -50,7 +50,7 @@ async function searchWeb(query,env){
 async function embed(env,text){const r=await env.AI.run(EMBED_MODEL,{text:[String(text).slice(0,7000)]});const v=r?.data?.[0]||r?.result?.data?.[0];if(!Array.isArray(v))throw new Error("Embedding modeli geçerli vektör döndürmedi.");return v}
 async function ragSearch(env,userId,query){
  if(!env.VECTOR||!env.DB)return [];
- try{const v=await embed(env,query);const r=await env.VECTOR.query(v,{topK:5,returnMetadata:true,filter:{userId:{$eq:userId}}});const ids=(r.matches||[]).map(x=>x.id);if(!ids.length)return [];
+ try{const v=await embed(env,query);const r=await env.VECTOR.query(v,{topK:5,returnMetadata:"all",filter:{userId:{$eq:userId}}});const ids=(r.matches||[]).map(x=>x.id);if(!ids.length)return [];
   const rows=await env.DB.prepare("SELECT id,content,document_id FROM chunks WHERE user_id=? AND id IN ("+ids.map(()=>"?").join(",")+")").bind(userId,...ids).all();
   const map=new Map((rows.results||[]).map(x=>[x.id,x]));return ids.map(id=>map.get(id)).filter(Boolean).slice(0,5);
  }catch(e){return []}
