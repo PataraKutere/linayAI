@@ -181,7 +181,7 @@ export default {async fetch(req,env,ctx){
  const origin=req.headers.get("Origin")||"";if(req.method==="OPTIONS")return new Response(null,{headers:CORS});
  if(origin.toLowerCase()!==ALLOWED_ORIGIN.toLowerCase())return new Response("forbidden",{status:403,headers:CORS});
  const url=new URL(req.url),path=url.pathname;
- if(path==="/health"&&req.method==="GET")return json({ok:true,service:"LinayAI",model:MODEL,searchProviders:["SearXNG (optional)","Brave (optional)","DuckDuckGo","Wikipedia"],memory:!!env.DB,rag:!!env.VECTOR,agents:true,version:"2.0"});
+ if(path==="/health"&&req.method==="GET")return json({ok:true,service:"LinayAI",model:MODEL,searchProviders:["SearXNG (optional)","Brave (optional)","Bing","DuckDuckGo","Wikipedia"],memory:!!env.DB,rag:!!env.VECTOR,agents:true,version:"2.0"});
  if(path==="/chat"&&req.method==="POST"){try{return await handleChat(req,env,ctx)}catch(e){return json({error:e.message||"Sunucu hatası"},500)}}
  if(path==="/memory"&&req.method==="GET"){try{const userId=safeId(url.searchParams.get("userId"));const row=await env.DB.prepare("SELECT content FROM memories WHERE user_id=? ORDER BY created_at DESC LIMIT 1").bind(userId).first();return json({content:row?.content||""})}catch(e){return json({error:e.message},500)}}
  if(path==="/memory"&&req.method==="POST"){
