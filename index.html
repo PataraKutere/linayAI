@@ -108,6 +108,11 @@ dialog label{color:#e0d3ed}dialog a{color:#c5a1f1}
 .ci span{min-width:0}
 .media-gallery{display:flex;flex-wrap:wrap;gap:8px;margin-top:9px;max-width:100%}
 .media-gallery img{display:block;max-width:min(100%,360px);max-height:360px;object-fit:contain;border-radius:12px;border:1px solid #ffffff1c;background:#09070d}
+#brandLogo{cursor:pointer;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0}
+.nb.ghost{background:#ffffff08;border:1px solid #ffffff1a;box-shadow:none;color:#ded2ef}
+#pullHint{position:fixed;z-index:1000;top:8px;left:50%;transform:translate(-50%,-60px);padding:8px 14px;border-radius:20px;background:#211632;color:#eee;border:1px solid #ffffff25;font-size:12px;transition:transform .15s;pointer-events:none}
+#pullHint.show{transform:translate(-50%,0)}
+#msgs{overscroll-behavior-y:auto}
 </style>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
@@ -118,6 +123,7 @@ dialog label{color:#e0d3ed}dialog a{color:#c5a1f1}
 </head><body>
 <aside id="side">
  <button class="nb" onclick="nc()">+ Yeni sohbet</button>
+ <button class="nb ghost" onclick="startPrivateChat()">◉ Gizli sohbet</button>
  <input id="q" placeholder="Sohbetlerde ara" oninput="render()">
  <div id="list"></div>
  <button onclick="openSet()">⚙ Ayarlar</button>
@@ -125,8 +131,9 @@ dialog label{color:#e0d3ed}dialog a{color:#c5a1f1}
 <div id="shade" onclick="tg()"></div>
 <main>
  <header>
-  <button id="menu" onclick="tg()" aria-label="Menüyü aç veya kapat">☰</button><span id="brandLogo"></span><b id="ttl">LinayAI</b><span class="header-spacer"></span><div class="header-actions"><button onclick="openSet()">Ayarlar</button><button onclick="exportChat()">Dışa aktar ↓</button></div>
+  <button id="menu" onclick="tg()" aria-label="Menüyü aç veya kapat">☰</button><span id="brandLogo" onclick="nc()" title="Yeni sohbet" role="button" tabindex="0" aria-label="Yeni sohbet"></span><b id="ttl">LinayAI</b><span class="header-spacer"></span><div class="header-actions"><button onclick="openSet()">Ayarlar</button><button onclick="exportChat()">Dışa aktar ↓</button></div>
  </header>
+ <div id="pullHint">Yenilemek için bırak…</div>
  <div id="msgs"></div>
  <div id="chips"></div>
  <div id="bar">
@@ -145,10 +152,7 @@ dialog label{color:#e0d3ed}dialog a{color:#c5a1f1}
  <div id="keybox"><label>Gemini API anahtarı</label>
  <input id="key" type="password" placeholder="API anahtarı" autocomplete="off">
  <small>Ücretsiz: <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a>. Anahtar sadece bu cihazda saklanır.</small></div>
- <label style="display:block;margin-top:12px">Yanıt biçimi</label>
- <select id="replyStyle"><option value="balanced">Dengeli — kısa ve anlaşılır</option><option value="detailed">Detaylı — daha kapsamlı açıklama</option></select>
- <small>Linay uygun modeli arka planda otomatik seçer; teknik model adlarıyla uğraşmana gerek yok.</small>
- <label style="display:block;margin-top:12px">Linay hafızası</label>
+  <label style="display:block;margin-top:12px">Linay hafızası</label>
  <textarea id="memory" rows="4" placeholder="Linay’in sonraki sohbetlerde hatırlamasını istediğin bilgileri buraya yaz…"></textarea>
  <small>Bu bilgiler bu cihazın tarayıcısında saklanır ve yeni sohbetlerde kullanılır.</small>
  <div style="display:flex;gap:8px;justify-content:space-between">
@@ -170,20 +174,21 @@ const KEY=()=>BUILT||S.cfg.key;
 const HDR=()=>PROXY?{'Content-Type':'application/json'}:{'Content-Type':'application/json','x-goog-api-key':KEY()};
 let imgMode=false;
 const IMG_RE=/(resim|resm\w*|görsel|fotoğraf|foto|logo|poster|illüstrasyon|çizim|image|picture)\w*\s+(yap|çiz|oluştur|üret|hazırla|tasarla|generate|create|make)|(^|\s)çiz(er\s*misin)?([\s.!?]|$)|\b(draw|generate|create|make)\b.{0,15}\b(image|picture|photo|logo|drawing)\b/i;
-let files=[],busy=false,ctl=null;
+let files=[],busy=false,ctl=null,privateChat=false;
 const GEN="Sen Linay'sın: kod yazma, analiz, yazı yazma, öğrenme, günlük sorular ve resim üretme konularında yardım eden, net, dürüst ve sıcak bir yapay zekâ asistanısın. Kullanıcının dilinde (Türkçe/İngilizce) yanıtla. Kod yazarken tam ve çalışır kod ver, dil etiketli kod bloğu kullan, kısaca açıkla; web sayfası, oyun veya arayüz istenirse tek dosyalık HTML ver. Gerektiğinde başlık, madde ve tablo kullan ama gereksiz uzatma. Emin olmadığın şeyi uydurma, bilmiyorsan söyle. Kullanıcı resim, logo veya çizim isterse resim çizemediğini ASLA söyleme: yanıtına tam olarak şu satırı yaz: [RESIM: ayrıntılı İngilizce prompt] ve altına kısa bir cümle ekle.";
-const save=()=>{try{localStorage.setItem('ai1',JSON.stringify({...S,chats:S.chats.map(c=>({...c,msgs:c.msgs.map(m=>({...m,parts:(m.parts||[]).map(p=>p.inlineData?{text:'[Ek dosya gönderilmişti]'}:p)}))}))}))}catch(e){}};
+const save=()=>{try{localStorage.setItem('ai1',JSON.stringify({...S,chats:S.chats.filter(c=>!c.hidden).map(c=>({...c,msgs:c.msgs.map(m=>({...m,parts:(m.parts||[]).map(p=>p.inlineData?{text:'[Ek dosya gönderilmişti]'}:p)}))}))}))}catch(e){}};
 let mediaDBPromise;
 function mediaDB(){if(!('indexedDB'in window))return Promise.reject(new Error('Kalıcı görsel saklama desteklenmiyor.'));if(!mediaDBPromise)mediaDBPromise=new Promise((resolve,reject)=>{const r=indexedDB.open('linay-media',1);r.onupgradeneeded=()=>{if(!r.result.objectStoreNames.contains('images'))r.result.createObjectStore('images')};r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error)});return mediaDBPromise}
 function mediaPut(id,value){return mediaDB().then(db=>new Promise((resolve,reject)=>{const t=db.transaction('images','readwrite');t.objectStore('images').put(value,id);t.oncomplete=resolve;t.onerror=()=>reject(t.error)}))}
 function mediaGet(id){return mediaDB().then(db=>new Promise((resolve,reject)=>{const r=db.transaction('images','readonly').objectStore('images').get(id);r.onsuccess=()=>resolve(r.result||'');r.onerror=()=>reject(r.error)}))}
-function showMedia(el,items){if(!items||!items.length)return;const box=document.createElement('div');box.className='media-gallery';el.appendChild(box);items.forEach(async item=>{try{const src=await mediaGet(item.id);if(!src)return;const im=document.createElement('img');im.src=src;im.alt=item.name||'Sohbet görseli';box.appendChild(im)}catch(e){}})}
+function showMedia(el,items){if(!items||!items.length)return;const box=document.createElement('div');box.className='media-gallery';el.appendChild(box);items.forEach(async item=>{try{const src=item.src||await mediaGet(item.id);if(!src)return;const im=document.createElement('img');im.src=src;im.alt=item.name||'Sohbet görseli';box.appendChild(im)}catch(e){}})}
 const cur=()=>S.chats.find(c=>c.id===S.cur);
 const FB='gemini-flash-lite-latest';
 const QUICK='<div class="quick-actions"><button data-p="Gökyüzünde dalgalanan Türk bayrağının etkileyici, sinematik bir görselini oluştur">✦ Resim oluştur</button><button data-p="Benimle yaratıcı fikirler üzerine beyin fırtınası yap">✧ Fikir üret</button><button data-p="Bugün yapmam gerekenler için uygulanabilir bir plan hazırla">▤ Plan yap</button></div>';
 const CARDS='<div class="cards">'+[['▧','Resim üretici','Metinden etkileyici görseller oluştur','Gökyüzünde dalgalanan Türk bayrağını sinematik bir fotoğraf olarak oluştur'],['◉','Bir şey öğren','Merak ettiğin konuyu sade ve anlaşılır öğren','Galatasaray Spor Kulübünün kuruluşundan bugüne tarihini ve başarılarını anlat'],['⌘','Kod asistanı','Kod yaz, hataları bul ve projeler geliştir','Python ile basit bir hesap makinesi yaz ve açıkla']].map(([i,t,d,p])=>`<div data-p="${p}"><span class="card-icon">${i}</span><b>${t}</b><small>${d}</small></div>`).join('')+'</div>';
 function logo(n,id){return '<svg width="'+n+'" height="'+n+'" viewBox="0 0 100 100" role="img" aria-label="LinayAI simgesi"><defs><radialGradient id="lg'+id+'" cx="32%" cy="24%" r="78%"><stop offset="0" stop-color="#e1d2ff"/><stop offset=".4" stop-color="#9568d8"/><stop offset="1" stop-color="#39234f"/></radialGradient></defs><rect x="4" y="4" width="92" height="92" rx="29" fill="#130d1d" stroke="#7955a6" stroke-width="3"/><circle cx="50" cy="50" r="29" fill="url(#lg'+id+')"/><path d="M50 12 59 39 88 50 59 59 50 88 41 59 12 50 41 39Z" fill="#e4d5ff"/><circle cx="50" cy="50" r="8" fill="#fff"/></svg>'}
 $('brandLogo').innerHTML=logo(32,'brand');
+$('brandLogo').onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();nc()}};
 const esc=s=>s.replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
 function md0(t){
  const b=[];
@@ -203,23 +208,27 @@ if(MD){
  DOMPurify.addHook('afterSanitizeAttributes',n=>{if(n.tagName=='A'){n.setAttribute('target','_blank');n.setAttribute('rel','noopener')}});
 }
 function md(t){if(!MD)return md0(t);try{return DOMPurify.sanitize(marked.parse(t,{breaks:true}))}catch(e){return md0(t)}}
-const say=t=>{speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(t.replace(/[`*#]/g,''));u.lang=/[çğıöşüÇĞİÖŞÜ]/.test(t)?'tr-TR':'en-US';speechSynthesis.speak(u)};
+let activeUtterance=null,speakingButton=null,speechChatId=null;
+function stopSpeech(){const b=speakingButton;speakingButton=null;activeUtterance=null;speechChatId=null;try{if(window.speechSynthesis)speechSynthesis.cancel()}catch(e){}if(b)b.textContent='🔊'}
+const say=(t,btn,chatId)=>{if(btn&&btn===speakingButton){stopSpeech();return}stopSpeech();if(!window.speechSynthesis)return;const u=new SpeechSynthesisUtterance(t.replaceAll(String.fromCharCode(96),'').replace(/[*#]/g,''));u.lang=/[çğıöşüÇĞİÖŞÜ]/.test(t)?'tr-TR':'en-US';activeUtterance=u;speakingButton=btn||null;speechChatId=chatId;if(btn)btn.textContent='⏹';u.onend=()=>{if(activeUtterance===u)stopSpeech()};u.onerror=()=>{if(activeUtterance===u)stopSpeech()};speechSynthesis.speak(u)};
+window.addEventListener('pagehide',stopSpeech);
 function tg(force){const side=$('side'),shade=$('shade');if(matchMedia('(max-width:760px)').matches){const open=typeof force==='boolean'?force:!side.classList.contains('open');side.classList.toggle('open',open);shade.classList.toggle('open',open)}else{const closed=typeof force==='boolean'?!force:!side.classList.contains('closed');side.classList.toggle('closed',closed)}}
-function nc(){S.cur=null;render();tg(false);inp.focus()}
+function nc(){stopSpeech();privateChat=false;S.cur=null;render();tg(false);inp.focus()}
+function startPrivateChat(){stopSpeech();privateChat=true;S.cur=null;render();tg(false);inp.focus()}
 function add(role,html,last,media){
  const w=document.createElement('div');w.className='w';
  const d=document.createElement('div');d.className=role=='user'?'u':'a';d.innerHTML=html;w.appendChild(d);if(media&&media.length)showMedia(d,media);
  if(role!='user'){const a=document.createElement('div');a.className='act';a.innerHTML='<button>🔊</button><button>📋</button>'+(last?'<button>🔄</button>':'');
-  a.children[0].onclick=()=>say(d.innerText);a.children[1].onclick=()=>navigator.clipboard.writeText(d.innerText);if(last)a.children[2].onclick=regen;w.appendChild(a)}
+  a.children[0].onclick=()=>say(d.innerText,a.children[0],cur()?.id);a.children[1].onclick=()=>navigator.clipboard.writeText(d.innerText);if(last)a.children[2].onclick=regen;w.appendChild(a)}
  $('msgs').appendChild(w);return d;
 }
 function render(){
- const c=cur();$('ttl').textContent=c?c.title:'LinayAI';$('web').classList.toggle('on',S.cfg.search);
+ const c=cur();$('ttl').textContent=privateChat?'Gizli sohbet':(c?c.title:'LinayAI');$('web').classList.toggle('on',S.cfg.search);
  $('list').innerHTML='';
  const q=($('q').value||'').toLowerCase();S.chats.slice().reverse().filter(x=>!q||(x.title+' '+x.msgs.map(m=>m.text||m.t||'').join(' ')).toLowerCase().includes(q)).forEach(x=>{const r=document.createElement('div');r.className='ci'+(x.id==S.cur?' on':'');
   r.innerHTML='<span></span><button>✕</button>';r.firstChild.textContent=x.title;
-  r.firstChild.onclick=()=>{S.cur=x.id;render();tg(false)};
-  r.lastChild.onclick=()=>{S.chats=S.chats.filter(y=>y.id!=x.id);if(S.cur==x.id)S.cur=null;save();render()};
+  r.firstChild.onclick=()=>{stopSpeech();privateChat=false;S.cur=x.id;render();tg(false)};
+  r.lastChild.onclick=()=>{if(speechChatId===x.id)stopSpeech();S.chats=S.chats.filter(y=>y.id!=x.id);if(S.cur==x.id)S.cur=null;save();render()};
   $('list').appendChild(r)});
  const m=$('msgs');m.innerHTML='';
  if(!c||!c.msgs.length){m.innerHTML='<div id="hello"><div class="zy-orb" aria-hidden="true"></div><h2>Beratın yüce beynine başvur</h2>'+QUICK+'</div>'; $("features").innerHTML=CARDS;}
@@ -266,16 +275,16 @@ async function send(){
  const text=inp.value.trim();if(!text&&!files.length)return;
  if(!KEY()&&!PROXY){openSet();return}
  let c=cur();
- if(!c){c={id:Date.now(),title:(text||files[0].name).slice(0,40),msgs:[]};S.chats.push(c);S.cur=c.id}
- const sf=files;const imageFiles=sf.filter(f=>f.part&&f.part.inlineData&&String(f.part.inlineData.mimeType||'').startsWith('image/'));const media=imageFiles.map((f,i)=>({id:'up-'+c.id+'-'+Date.now()+'-'+i,name:f.name}));await Promise.all(media.map((m,i)=>{const f=imageFiles[i].part.inlineData;return mediaPut(m.id,'data:'+f.mimeType+';base64,'+f.data)}));const parts=sf.map(f=>f.part);if(text)parts.push({text});const um={role:'user',parts,t:text,att:sf.map(f=>f.name),media};c.msgs.push(um);files=[];chips();inp.value='';grow();render();
+ if(!c){c={id:Date.now(),title:(text||files[0].name).slice(0,40),msgs:[],hidden:privateChat};S.chats.push(c);S.cur=c.id}
+ const sf=files;const imageFiles=sf.filter(f=>f.part&&f.part.inlineData&&String(f.part.inlineData.mimeType||'').startsWith('image/'));const media=imageFiles.map((f,i)=>({id:'up-'+c.id+'-'+Date.now()+'-'+i,name:f.name,src:privateChat?'data:'+f.part.inlineData.mimeType+';base64,'+f.part.inlineData.data:undefined}));if(!privateChat)await Promise.all(media.map((m,i)=>{const f=imageFiles[i].part.inlineData;return mediaPut(m.id,'data:'+f.mimeType+';base64,'+f.data)}));const parts=sf.map(f=>f.part);if(text)parts.push({text});const um={role:'user',parts,t:text,att:sf.map(f=>f.name),media};c.msgs.push(um);files=[];chips();inp.value='';grow();render();
  const el=add('model','<span style="color:var(--mu)">Linay düşünüyor…</span>');busy=true;$('go').textContent='■';ctl=new AbortController();
  if(text&&(imgMode||(!sf.length&&text.length<200&&IMG_RE.test(text)))){
   imgMode=false;$('img').classList.remove('on');
-  const generated=await genImg(text,el),mediaId='gen-'+c.id+'-'+Date.now();await mediaPut(mediaId,generated.src);c.msgs.push({role:'model',parts:[{text:'[Resim oluşturuldu: '+generated.prompt+']'}],text:'🖼 Resim oluşturuldu: '+generated.prompt,media:[{id:mediaId,name:'Oluşturulan resim'}]});busy=false;$('go').textContent='➤';save();render();return;
+  const generated=await genImg(text,el),mediaId='gen-'+c.id+'-'+Date.now();if(!privateChat)await mediaPut(mediaId,generated.src);c.msgs.push({role:'model',parts:[{text:'[Resim oluşturuldu: '+generated.prompt+']'}],text:'🖼 Resim oluşturuldu: '+generated.prompt,media:[{id:mediaId,name:'Oluşturulan resim',src:privateChat?generated.src:undefined}]});busy=false;$('go').textContent='➤';save();render();return;
  }
  let out='',src=new Map(),shown=false,generatedMedia=[];
  try{
-  const body={systemInstruction:{parts:[{text:GEN+(S.cfg.replyStyle==='detailed'?' Yanıtlarında gerektiğinde ayrıntılı açıklama, örnek ve adım adım anlatım kullan.':' Yanıtlarını dengeli, net ve gereksiz uzatmadan ver.')+' Bugün: '+new Date().toLocaleDateString('tr-TR')+(S.cfg.memory?'\n\nKULLANICI HAFIZASI (önceki sohbetlerden kaydedilmiş bilgiler):\n'+S.cfg.memory+'\nBu bilgileri yalnızca ilgili olduğunda kullan; kullanıcıya her seferinde tekrar etme.':'')}]}, 
+  const body={systemInstruction:{parts:[{text:GEN+' Bugün: '+new Date().toLocaleDateString('tr-TR')+(S.cfg.memory?'\n\nKULLANICI HAFIZASI (önceki sohbetlerden kaydedilmiş bilgiler):\n'+S.cfg.memory+'\nBu bilgileri yalnızca ilgili olduğunda kullan; kullanıcıya her seferinde tekrar etme.':'')}]}, 
    contents:c.msgs.map(m=>({role:m.role,parts:m.parts}))};
   const tries=[[S.cfg.model,S.cfg.search]];
   if(S.cfg.search)tries.push([S.cfg.model,false]);
@@ -294,7 +303,7 @@ async function send(){
     r={ok:false,status:408,msg:e.name=='AbortError'?'Yanıt çok gecikti.':'Bağlantı kurulamadı ('+e.message+'). İnterneti, API anahtarını veya proxy adresini kontrol et.'};continue;
    }
    clearTimeout(to);
-   if(r.ok){if(mdl!=S.cfg.model||se!=S.cfg.search)note="\n\n*(Yoğunluk nedeniyle alternatif modelle yanıtlandı.)*";break}
+   if(r.ok){if(mdl!=S.cfg.model)note+="\n\n*(Yoğunluk nedeniyle alternatif model kullanıldı.)*";if(S.cfg.search&&!se)note+="\n\n*(Web araması şu an kullanılamadı; bu yanıt güncel web sonuçları kullanılmadan hazırlandı.)*";break}
    let m=r.status+'';try{m=(await r.json()).error.message}catch(e){}
    if(!(/^(404|408|429|500|503|504)$/.test(r.status)||/quota|demand|overload|unavailable/i.test(m)))throw new Error(m);
    r.msg=m;
@@ -333,6 +342,8 @@ inp.oninput=grow;
 inp.onkeydown=e=>{if(e.key=='Enter'&&!e.shiftKey&&!matchMedia('(pointer:coarse)').matches){e.preventDefault();send()}};
 $('go').onclick=send;
 $('img').onclick=()=>{imgMode=!imgMode;$('img').classList.toggle('on',imgMode);if(imgMode)inp.placeholder='Nasıl bir resim istiyorsun?';else inp.placeholder='Bir şey sor…'};
+$('web').title="Web'de ara — Google Arama ile güncel kaynakları yanıta ekle";
+$('web').setAttribute('aria-label',"Web'de ara");
 $('web').onclick=()=>{S.cfg.search=!S.cfg.search;$('web').classList.toggle('on',S.cfg.search);save()};
 const SR=window.SpeechRecognition||window.webkitSpeechRecognition;let rec;
 $('mic').onclick=()=>{
@@ -359,6 +370,9 @@ $('msgs').addEventListener('click',e=>{
   $('pvf').srcdoc=code;$('pv').showModal();
  }
 });
+let pullStartY=0,pullArmed=false,pullBusy=false;
+document.addEventListener('touchstart',e=>{if(e.touches.length!==1)return;const t=e.touches[0],m=$('msgs');pullStartY=t.clientY;pullArmed=t.clientY<145&&m.scrollTop<=0&&!pullBusy},{passive:true});
+document.addEventListener('touchend',e=>{if(!pullArmed)return;pullArmed=false;const t=e.changedTouches[0];if(t.clientY-pullStartY>95&&!pullBusy){pullBusy=true;$('pullHint').classList.add('show');setTimeout(()=>location.reload(),180)}},{passive:true});
 if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
 render();if(!KEY()&&!PROXY)setTimeout(openSet,300);
 </script></body></html>
