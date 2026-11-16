@@ -1,6 +1,13 @@
-name: LinayAI live quality tests
+name: LinayAI quality checks
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - "worker.js"
+      - "index.html"
+      - "tests/**"
+      - ".github/workflows/linay-ai-tests.yml"
   workflow_dispatch:
   schedule:
     - cron: "30 3 * * *"
@@ -13,7 +20,23 @@ permissions:
   contents: read
 
 jobs:
+  static-checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Check Worker syntax
+        run: node --input-type=module --check < worker.js
+      - name: Check test syntax
+        run: node --check tests/worker-smoke.mjs
+      - name: Check inline browser scripts
+        run: |
+          node --input-type=module -e 'import fs from "node:fs"; const html=fs.readFileSync("index.html","utf8"); const scripts=[...html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/gi)].map(x=>x[1]).filter(x=>x.trim()); for (const [i,src] of scripts.entries()) new Function(src); console.log("PASS "+scripts.length+" inline scripts");'
+
   smoke-tests:
+    if: github.event_name != 'push'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
