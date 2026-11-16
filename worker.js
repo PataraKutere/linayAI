@@ -104,7 +104,7 @@ async function agentRun(env,userId,messages){
  for(;steps<4;steps++){
   const planner=[...messages,{role:"system",content:"Sen Linay araç kullanan ajansın. Gerekiyorsa tam olarak tek JSON nesnesi üret: {\"tool\":\"search_web|read_url|calculator|current_time|knowledge_search|final\",\"args\":{\"query\":\"...\",\"url\":\"...\",\"expression\":\"...\"},\"answer\":\"...\"}. Araçları yalnızca gerektiğinde kullan. En fazla dört araç adımı. Web araması isteniyorsa search_web kullan; kaynakları uydurma. Sonuca ulaştıysan tool=final ile cevap ver. Gözlemler: "+JSON.stringify(observations).slice(0,10000)}];
   const p=await env.AI.run(MODEL,{messages:planner,max_tokens:500,temperature:0.1});
-  const raw=p?.response||p?.choices?.[0]?.message?.content||"";const match=String(raw).match(/\{[\s\S]*\}/);if(!match)break;
+  const raw=p?.choices?.[0]?.message?.content||p?.response||p?.result?.choices?.[0]?.message?.content||"";const match=String(raw).match(/\{[\s\S]*\}/);if(!match)break;
   let action;try{action=JSON.parse(match[0])}catch{break}
   if(action.tool==="final")return {answer:String(action.answer||""),steps,observations};
   if(!tools.includes(action.tool))break;
