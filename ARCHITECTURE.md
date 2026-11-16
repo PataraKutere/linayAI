@@ -27,9 +27,10 @@
 
 1. SearXNG, when SEARXNG_URL is configured as a Worker secret.
 2. Brave Search, when BRAVE_SEARCH_API_KEY is configured as a Worker secret.
-3. DuckDuckGo HTML search (no API key).
-4. Wikipedia search as a final independent fallback.
-5. Gemini Google Search grounding is attempted by the chat route if independent providers fail.
+3. Bing HTML search.
+4. DuckDuckGo HTML search (no API key).
+5. Wikipedia search as a final independent fallback.
+6. Gemini Google Search grounding is attempted by the chat route if independent providers fail.
 
 A provider is not described as successful unless it returns actual results. The Worker reports failure if all providers fail.
 
