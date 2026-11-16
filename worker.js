@@ -66,7 +66,7 @@ async function saveDocument(env,userId,name,text){
  for(let i=0;i<chunks.length;i+=4){
   const batch=chunks.slice(i,i+4),vectors=[];
   for(const c of batch){const v=await embed(env,c.content);vectors.push({id:c.id,values:v,metadata:{userId,documentId:id}});await env.DB.prepare("INSERT INTO chunks(id,user_id,document_id,content) VALUES(?,?,?,?)").bind(c.id,userId,id,c.content).run()}
-  await env.VECTOR.upsert(vectors);
+  const mutation=await env.VECTOR.upsert(vectors);await log(env,"vector-upsert","Vectorize",true,0,JSON.stringify(mutation).slice(0,300));
  }
  return {id,name:String(name||"Belge").slice(0,180),chunks:chunks.length};
 }
