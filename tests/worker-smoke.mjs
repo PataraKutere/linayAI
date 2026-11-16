@@ -38,7 +38,7 @@ assert.match(place.answer,/second|2nd/i,"Overtaking test failed: "+place.answer)
 console.log("PASS position reasoning");
 
 const math=await chat("What is 125 multiplied by 48? Reply with the result.");
-assert.match(math.answer,/6[,. ]?000/,"Arithmetic test failed: "+math.answer);
+assert.match(math.answer,/6[\s,.]?000/,"Arithmetic test failed: "+math.answer);
 console.log("PASS arithmetic");
 
 const memoryText="Linay CI memory marker: blue-orchid-4821";
