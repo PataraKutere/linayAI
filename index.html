@@ -24,7 +24,7 @@
 <div id="shade" onclick="tg()"></div>
 <main>
  <header>
-  <button id="menu" onclick="tg()">☰</button><span id="brandLogo"></span><b id="ttl">Linay</b>
+  <button id="menu" onclick="tg()">☰</button><span id="brandLogo"></span><b id="ttl">LinayAI</b>
  </header>
  <div id="msgs"></div>
  <div id="chips"></div>
@@ -73,7 +73,7 @@ const save=()=>{try{localStorage.setItem('ai1',JSON.stringify({...S,chats:S.chat
 const cur=()=>S.chats.find(c=>c.id===S.cur);
 const FB='gemini-flash-lite-latest';
 const CARDS='<div class="cards">'+[['💻','Kod yaz','Python ile basit bir hesap makinesi yaz ve açıkla'],['🎨','Resim oluştur','Gökyüzünde gururla dalgalanan Türk bayrağını, kızıl gün doğumu ışıklarıyla sinematik bir fotoğraf olarak oluştur'],['🧠','Bir şey öğren','Galatasaray Spor Kulübünün kuruluşundan bugüne tarihini, başarılarını ve efsane futbolcularını anlat'],['✍️','Yazı yaz','Profesyonel ve kibar bir e-posta yaz']].map(([i,t,p])=>`<div data-p="${p}"><b>${i}</b>${t}</div>`).join('')+'</div>';
-function logo(n,id){return '<svg width="'+n+'" height="'+n+'" viewBox="0 0 100 100" aria-label="Sunglasses man"><circle cx="50" cy="50" r="48" fill="#241116" stroke="#e32736" stroke-width="2"/><path d="M22 43Q18 14 49 13Q82 12 79 45L75 34Q60 24 35 34Z" fill="#17171b"/><path d="M29 38Q29 26 50 25Q72 26 72 40L69 63Q65 79 50 80Q35 79 31 63Z" fill="#d99b7b"/><path d="M29 43Q40 38 48 44L47 54Q39 58 31 52Z M52 44Q62 38 71 43L69 53Q61 58 53 54Z" fill="#090a0d" stroke="#555" stroke-width="1.5"/><path d="M47 47L53 47M20 91Q25 73 42 70L50 80L58 70Q77 73 82 91Z" fill="#27282e"/><path d="M25 83Q33 75 41 76L50 85L59 76Q69 75 76 83L70 91H31Z" fill="#e8b99a"/><path d="M37 72Q44 78 50 85Q57 78 63 72" fill="none" stroke="#d99d7e" stroke-width="5" stroke-linecap="round"/></svg>'}
+function logo(n,id){return '<svg width="'+n+'" height="'+n+'" viewBox="0 0 100 100" aria-label="Sunglasses man"><circle cx="50" cy="50" r="48" fill="#241116" stroke="#e32736" stroke-width="2"/><path d="M22 43Q18 14 49 13Q82 12 79 45L75 34Q60 24 35 34Z" fill="#17171b"/><path d="M29 38Q29 26 50 25Q72 26 72 40L69 63Q65 79 50 80Q35 79 31 63Z" fill="#d99b7b"/><path d="M29 43Q40 38 48 44L47 54Q39 58 31 52Z M52 44Q62 38 71 43L69 53Q61 58 53 54Z" fill="#090a0d" stroke="#555" stroke-width="1.5"/><path d="M47 47L53 47M20 91Q25 73 42 70L50 80L58 70Q77 73 82 91Z" fill="#27282e"/><path d="M25 83Q33 75 41 76L50 85L59 76Q69 75 76 83L70 91H31Z" fill="#e8b99a"/><path d="M37 72Q44 78 50 85Q57 78 63 72" fill="none" stroke="#d99d7e" stroke-width="5" stroke-linecap="round"/><path d="M39 78Q44 82 48 88M45 75Q50 80 53 87M52 75Q57 79 60 84" fill="none" stroke="#f2c8ac" stroke-width="3" stroke-linecap="round"/></svg>'}
 $('brandLogo').innerHTML=logo(32,'brand');
 const esc=s=>s.replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
 function md0(t){
