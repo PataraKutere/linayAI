@@ -282,7 +282,16 @@ async function send(){
   {names:['paris'],zone:'Europe/Paris',label:'Paris'},
   {names:['moskova'],zone:'Europe/Moscow',label:'Moskova'},
   {names:['dubai'],zone:'Asia/Dubai',label:'Dubai'},
-  {names:['bahreyn','bahrain','manama','manama'],zone:'Asia/Bahrain',label:'Bahreyn'},
+  {names:['bahreyn','bahrain','manama'],zone:'Asia/Bahrain',label:'Bahreyn'},
+  {names:['katar','qatar','doha'],zone:'Asia/Qatar',label:'Katar'},
+  {names:['suudi arabistan','riyad','riyadh'],zone:'Asia/Riyadh',label:'Riyad'},
+  {names:['kuveyt','kuwait'],zone:'Asia/Kuwait',label:'Kuveyt'},
+  {names:['muskat','muscat','umman','oman'],zone:'Asia/Muscat',label:'Muskat'},
+  {names:['bakü','baku','azerbaycan'],zone:'Asia/Baku',label:'Bakü'},
+  {names:['tiflis','tbilisi','gürcistan'],zone:'Asia/Tbilisi',label:'Tiflis'},
+  {names:['delhi','yeni delhi','hindistan'],zone:'Asia/Kolkata',label:'Yeni Delhi'},
+  {names:['bangkok','tayland'],zone:'Asia/Bangkok',label:'Bangkok'},
+  {names:['singapur'],zone:'Asia/Singapore',label:'Singapur'},
   {names:['new york','newyork'],zone:'America/New_York',label:'New York'}
  ];
  let target=zones.find(z=>z.names.some(n=>clean.includes(n)));
@@ -292,9 +301,15 @@ async function send(){
  if(!files.length&&/^(sa|selamünaleyküm|selamun aleykum)$/i.test(clean))localAnswer='Aleykümselam.';
  else if(!files.length&&/^(selam|merhaba|hey|hello)$/i.test(clean))localAnswer='Selam! Nasıl yardımcı olayım?';
  else if(!files.length&&(asksClock||isClockFollowup)){
-  target=target||zones[0];
-  const now=new Intl.DateTimeFormat('tr-TR',{timeZone:target.zone,hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).format(new Date());
-  localAnswer=target.label+'’de şu an saat '+now+'.';
+  if(!target){
+   const hasLocationHint=/\\b(de|da|nde|nda|in|at)\\b/i.test(clean)||clean.split(/\\s+/).length>2;
+   if(hasLocationHint)localAnswer='Hangi şehir veya ülkeyi kastediyorsun? Yanlış saat vermemek için konumu netleştireyim.';
+   else target=zones[0];
+  }
+  if(target){
+   const now=new Intl.DateTimeFormat('tr-TR',{timeZone:target.zone,hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).format(new Date());
+   localAnswer=target.label+'’de şu an saat '+now+'.';
+  }
  }
  if(localAnswer!==null){
   let cc=currentChat;if(!cc){cc={id:Date.now(),title:text.slice(0,40),msgs:[],hidden:privateChat};S.chats.push(cc);S.cur=cc.id;}
