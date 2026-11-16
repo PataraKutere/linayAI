@@ -1,7 +1,7 @@
 const ALLOWED_ORIGIN="https://patarakutere.github.io";
 const MODEL="@cf/openai/gpt-oss-120b";
-const FALLBACK_MODELS=["@cf/meta/llama-3.1-8b-instruct"];
-const VISION_MODEL="@cf/google/gemma-4-26b-a4b-it";
+const FALLBACK_MODELS=["@cf/qwen/qwen3.8-27b"];
+const VISION_MODEL="@cf/qwen/qwen3.8-27b";
 const EMBED_MODEL="@cf/baai/bge-m3";
 const GEMINI_MODEL="gemini-flash-lite-latest";
 const CORS={"Access-Control-Allow-Origin":ALLOWED_ORIGIN,"Access-Control-Allow-Headers":"Content-Type, X-Linay-Admin","Access-Control-Allow-Methods":"GET, POST, DELETE, OPTIONS","Access-Control-Expose-Headers":"X-Linay-Provider, X-Linay-Search, X-Linay-Trace, X-Linay-Sources, X-Linay-Agent-Steps","Vary":"Origin"};
