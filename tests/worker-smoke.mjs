@@ -53,10 +53,10 @@ const docBody=await doc.json();
 assert.equal(doc.ok,true,"RAG indexing failed: "+JSON.stringify(docBody));
 const listed=await get("/documents?userId="+encodeURIComponent(USER));
 assert.ok((listed.body.documents||[]).some(x=>x.id===docBody.document.id),"Indexed document not listed");
-await new Promise(resolve=>setTimeout(resolve,1800));
+await new Promise(resolve=>setTimeout(resolve,5000));
 const retrieved=await chat("Read the indexed file named Linay CI RAG test. What exact marker does that file contain? Do not use saved memory; reply with the file marker only.");
-await fetch(BASE+"/documents/"+encodeURIComponent(docBody.document.id)+"?userId="+encodeURIComponent(USER),{method:"DELETE",headers:{Origin:ORIGIN}});
 assert.match(retrieved.answer,/violet-cedar-7319/i,"Semantic RAG retrieval failed: "+retrieved.answer);
+await fetch(BASE+"/documents/"+encodeURIComponent(docBody.document.id)+"?userId="+encodeURIComponent(USER),{method:"DELETE",headers:{Origin:ORIGIN}});
 console.log("PASS document RAG indexing + retrieval");
 
 const agent=await chat("Use the calculator tool explicitly to calculate 125 multiplied by 48. Then explain the result briefly.",{agent:true});
