@@ -164,7 +164,7 @@ dialog label{color:#e0d3ed}dialog a{color:#c5a1f1}
 <script>
 const $=id=>document.getElementById(id),dl=$('dl'),inp=$('inp');
 let S=JSON.parse(localStorage.getItem('ai1')||'null')||{chats:[],cur:null,cfg:{key:'',model:'gemini-flash-lite-latest',mode:'gen',search:false,v:2}};
-if(S.cfg.v!==4){S.cfg.v=4;S.cfg.model='gpt-oss-120b';S.cfg.search=false}if(typeof S.cfg.memory!=='string')S.cfg.memory='';
+if(S.cfg.v!==4){S.cfg.v=4;S.cfg.model='gpt-oss-120b'}if(typeof S.cfg.memory!=='string')S.cfg.memory='';
 const RAW=String(window.LINAY_PROXY||window.LINAY_KEY||'').trim();
 const PROXY=/^https?:\/\//i.test(RAW)?RAW.replace(/\/+$/,''):'';
 let imgMode=false;
