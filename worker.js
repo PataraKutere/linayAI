@@ -109,10 +109,13 @@ function calc(expr){
 async function runPlain(env,messages,maxTokens=1200){
  let last;
  for(const model of [MODEL,...FALLBACK_MODELS]){
-  try{const value=await env.AI.run(model,{messages,max_tokens:maxTokens,temperature:0.15});return Object.assign({},value,{__linayModel:model})}
-  catch(e){last=e;await log(env,"agent-model-fallback",model,false,0,e.message||e)}
+  try{
+   const value=await env.AI.run(model,{messages,max_tokens:maxTokens,temperature:0.15});
+   if(!modelText(value)){last=new Error("Model boş yanıt döndürdü.");await log(env,"agent-model-fallback",model,false,0,last.message);continue}
+   return Object.assign({},value,{__linayModel:model});
+  }catch(e){last=e;await log(env,"agent-model-fallback",model,false,0,e.message||e)}
  }
- if(env.GEMINI_API_KEY){const g=await gemini(env,messages,false);return {response:g.text,__linayModel:"Gemini Backup"}}
+ if(env.GEMINI_API_KEY){try{const g=await gemini(env,messages,false);if(g.text)return {response:g.text,__linayModel:"Gemini Backup"};last=new Error("Gemini boş yanıt döndürdü.")}catch(e){last=e}}
  throw last||new Error("Ajan için hiçbir model kullanılamadı.");
 }
 function modelText(value){return value?.choices?.[0]?.message?.content||value?.response||value?.result?.choices?.[0]?.message?.content||value?.value?.choices?.[0]?.message?.content||""}
