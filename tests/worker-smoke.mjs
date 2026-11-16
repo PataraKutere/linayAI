@@ -34,7 +34,7 @@ const sportsSearchResponse=await fetch(BASE+"/search?q="+encodeURIComponent("Fra
 assert.equal(sportsSearchResponse.ok,true,"Sports search endpoint failed: "+sportsSearchResponse.status);
 const sportsSearch=await sportsSearchResponse.json();
 assert.ok((sportsSearch.results||[]).length>0,"Sports search returned no relevant results: "+JSON.stringify(sportsSearch));
-assert.ok(sportsSearch.results.some(x=>/\\b\\d{1,2}\\s*[-–:]\\s*\\d{1,2}\\b/.test(x.title+" "+x.snippet)||/tff.org|sofascore|flashscore/i.test(x.url)),"Sports results do not contain a match score: "+JSON.stringify(sportsSearch.results));
+assert.ok(sportsSearch.results.some(x=>/\b\\d{1,2}\s*[-–:]\s*\\d{1,2}\b/.test(x.title+" "+x.snippet)||/tff.org|sofascore|flashscore/i.test(x.url)),"Sports results do not contain a match score: "+JSON.stringify(sportsSearch.results));
 console.log("PASS independent sports search relevance");
 
 
