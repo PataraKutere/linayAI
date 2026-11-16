@@ -30,6 +30,15 @@ assert.equal(health.body.rag,true,"Vectorize binding missing");
 assert.equal(health.body.agents,true,"Agent route missing");
 console.log("PASS health + bindings");
 
+const sportsSearchResponse=await fetch(BASE+"/search?q="+encodeURIComponent("France Türkiye football match 15 November 2026 final score result"),{headers:{Origin:ORIGIN}});
+assert.equal(sportsSearchResponse.ok,true,"Sports search endpoint failed: "+sportsSearchResponse.status);
+const sportsSearch=await sportsSearchResponse.json();
+assert.ok((sportsSearch.results||[]).length>0,"Sports search returned no relevant results: "+JSON.stringify(sportsSearch));
+assert.ok(sportsSearch.results.some(x=>/\\b\\d{1,2}\\s*[-–:]\\s*\\d{1,2}\\b/.test(x.title+" "+x.snippet)||/tff.org|sofascore|flashscore/i.test(x.url)),"Sports results do not contain a match score: "+JSON.stringify(sportsSearch.results));
+console.log("PASS independent sports search relevance");
+
+
+
 const cats=await chat("All cats are animals. Some animals can swim. Does it follow that all cats can swim?");
 assert.match(cats.answer,/not follow|does not follow|cannot conclude|not necessarily|does not imply|not enough information|no\b/i,"Logic test failed: "+cats.answer);
 console.log("PASS logical entailment");
