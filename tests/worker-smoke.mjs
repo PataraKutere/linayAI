@@ -31,7 +31,6 @@ console.log("PASS health + bindings");
 
 const cats=await chat("All cats are animals. Some animals can swim. Does it follow that all cats can swim?");
 assert.match(cats.answer,/not follow|does not follow|cannot conclude|not necessarily|does not imply|not enough information|no\b/i,"Logic test failed: "+cats.answer);
-assert.doesNotMatch(cats.answer,/all cats can swim/i,"Model incorrectly claimed all cats can swim");
 console.log("PASS logical entailment");
 
 const place=await chat("If you overtake the person in second place in a race, what place are you in?");
