@@ -19,7 +19,7 @@ async function chat(question,{search=false,agent=false}={}){
   if(!r.ok){const e=await r.json().catch(()=>({}));throw new Error("Chat failed "+r.status+": "+(e.error||""))}
   const reader=r.body.getReader(),decoder=new TextDecoder();let buffer="",answer="";
   for(;;){const {done,value}=await reader.read();if(done)break;buffer+=decoder.decode(value,{stream:true});const lines=buffer.split("\n");buffer=lines.pop();for(const line of lines){if(!line.startsWith("data:"))continue;const raw=line.slice(5).trim();if(!raw||raw==="[DONE]")continue;const j=JSON.parse(raw);answer+=j.choices?.[0]?.delta?.content||""}}
-  return {answer,provider:r.headers.get("X-Linay-Provider")||"",search:r.headers.get("X-Linay-Search")||"",sources:r.headers.get("X-Linay-Sources")||"[]"};
+  return {answer,provider:r.headers.get("X-Linay-Provider")||"",search:r.headers.get("X-Linay-Search")||"",sources:r.headers.get("X-Linay-Sources")||"[]",agentSteps:Number(r.headers.get("X-Linay-Agent-Steps")||0)};
 }
 
 const health=await get("/health");
@@ -56,9 +56,10 @@ assert.ok((listed.body.documents||[]).some(x=>x.id===docBody.document.id),"Index
 await fetch(BASE+"/documents/"+encodeURIComponent(docBody.document.id)+"?userId="+encodeURIComponent(USER),{method:"DELETE",headers:{Origin:ORIGIN}});
 console.log("PASS document RAG indexing");
 
-const agent=await chat("Use your tools if needed: calculate 125 multiplied by 48 and explain briefly.",{agent:true});
+const agent=await chat("Use the calculator tool explicitly to calculate 125 multiplied by 48. Then explain the result briefly.",{agent:true});
 assert.ok(agent.answer.length>0,"Agent returned an empty answer");
 assert.match(agent.provider,/Agent/i,"Agent mode header missing");
+assert.ok(agent.agentSteps>=1,"Agent did not execute a tool: "+agent.agentSteps);
 console.log("PASS agent mode");
 
 const web=await chat("Find current information about the latest major technology news and cite sources.",{search:true});
