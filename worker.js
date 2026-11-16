@@ -71,7 +71,7 @@ function sseFromText(text,provider,searchState,trace){
 async function callModel(env,messages,vision=false){
  const models=vision?[VISION_MODEL]:[MODEL,...FALLBACK_MODELS];let last;
  for(const model of models){const start=Date.now();try{const opts={messages,stream:true,max_tokens:2048,temperature:0.25};if(!vision&&model===MODEL)opts.reasoning_effort="low";const stream=await env.AI.run(model,opts);return {stream,provider:"Workers AI · "+model,latency:Date.now()-start}}catch(e){last=e;await log(env,"model-fallback",model,false,Date.now()-start,e.message||e)}}
- if(!vision&&env.GEMINI_API_KEY){try{const r=await gemini(env,messages,false);return {response:r,provider:"Gemini Backup",latency:0}}catch(e){last=e}}
+ if(!vision&&env.GEMINI_API_KEY){try{const r=await gemini(env,messages,false);return {text:r.text,sources:r.sources,provider:"Gemini Backup",latency:0}}catch(e){last=e}}
  throw last||new Error("Hiçbir model yanıt veremedi.");
 }
 function toGemini(messages){const system=messages.filter(m=>m.role==="system").map(m=>contentText(m)).join("\n");const contents=messages.filter(m=>m.role!=="system").map(m=>({role:m.role==="assistant"?"model":"user",parts:[{text:contentText(m)}]}));return {systemInstruction:system?{parts:[{text:system}]}:undefined,contents}}
@@ -88,7 +88,7 @@ async function readPage(raw){
  const u=safeUrl(raw);if(!u)throw new Error("Bu bağlantı güvenlik nedeniyle açılamıyor.");
  const r=await fetch(u,{headers:{"User-Agent":"LinayAI/1.0","Accept":"text/html,text/plain,application/pdf"},redirect:"follow",signal:AbortSignal.timeout(10000)});
  if(!r.ok)throw new Error("Sayfa HTTP "+r.status);
- const type=r.headers.get("content-type")||"";if(!/text\/html|text\/plain|application\/pdf/i.test(type))throw new Error("Bu dosya türü sayfa okuma için desteklenmiyor.");
+ const type=r.headers.get("content-type")||"";if(!/text\/html|text\/plain/i.test(type))throw new Error("Bu dosya türü sayfa okuma için desteklenmiyor.");
  const t=await r.text();return {url:u.href,title:u.hostname,text:cleanHtml(t).slice(0,9000)};
 }
 function calc(expr){
@@ -127,7 +127,7 @@ async function handleChat(req,env,ctx){
  let searchState="off",searchContext="",searchProvider="",searchSources=[];
  if(body.search===true){
   try{const sr=await searchWeb(question,env);searchProvider=sr.provider;searchSources=sr.results;searchState="success";searchContext="\n\nWEB SEARCH RESULTS — Use these results, compare dates and sources, cite each factual paragraph with [n]. Do not claim you opened pages unless you did.\n"+sr.results.map((x,i)=>"["+ (i+1)+"] "+x.title+"\nURL: "+x.url+"\nSnippet: "+x.snippet).join("\n\n")}
-  catch(e){searchState="failed";searchContext="\n\nThe independent web search failed. Do not pretend to have verified current facts. Tell the user web search failed. Error: "+e.message}
+  catch(e){try{if(env.GEMINI_API_KEY){const g=await gemini(env,messages,true);searchState="gemini-backup";searchProvider="Gemini Google Search";searchContext="\n\nIndependent search unavailable; Gemini Google Search fallback findings:\n"+g.text+"\nSources:\n"+(g.sources||[]).map(x=>x.title+" "+x.uri).join("\n");searchSources=(g.sources||[]).map(x=>({title:x.title||"Source",url:x.uri,snippet:"Google Search grounding"})).filter(x=>safeUrl(x.url));}else throw e}catch(g){searchState="failed";searchContext="\n\nAll web search providers failed. Do not pretend to have verified current facts. Tell the user web search failed. Error: "+String(g.message||g)}}
  }
  const mem=await loadMemory(env,userId),rag=await ragSearch(env,userId,question);
  const sys="LinayAI: Be accurate, concise and honest. For logic, distinguish what follows from what does not follow. Never invent current facts or sources. If sources are supplied, cite them using their numbered URLs. "+(mem.memories.length?"\nUSER SAVED MEMORY:\n"+mem.memories.map(x=>x.content).join("\n"):"")+(mem.recent.length?"\nRECENT SERVER CONTEXT:\n"+mem.recent.map(x=>x.role+": "+x.content).join("\n"):"")+(rag.length?"\nRELEVANT USER DOCUMENT EXCERPTS:\n"+rag.map(x=>x.content).join("\n---\n"):"")+searchContext;
