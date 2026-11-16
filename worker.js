@@ -140,10 +140,17 @@ async function handleChat(req,env,ctx){
  try{
   const result=await callModel(env,enriched,vision);
   const trace=uid();
-  if(result.response){const j=await result.response.json().catch(()=>({}));return json(j)}
+  if(result.text){const answer=result.text+(result.sources?.length?"\n\nSources: "+result.sources.map(x=>x.title+" — "+x.uri).join(" | "):"");ctx.waitUntil(log(env,"chat",result.provider,true,Date.now()-start,"backup"));return sseFromText(answer,result.provider,searchState,uid())}
   const stream=result.stream;
-  ctx.waitUntil((async()=>{try{await log(env,body.search?"web-chat":"chat",result.provider,true,Date.now()-start,searchProvider||searchState);if(question)await env.DB?.prepare("INSERT INTO conversations(id,user_id,role,content) VALUES(?,?,?,?)").bind(uid(),userId,"user",question).run()}catch(e){}})());
-  return new Response(stream,{headers:{...CORS,"Content-Type":"text/event-stream; charset=utf-8","Cache-Control":"no-cache","X-Linay-Provider":result.provider,"X-Linay-Search":searchState+(searchProvider?":"+searchProvider:""),"X-Linay-Trace":trace}});
+  const pair=stream.tee();
+  ctx.waitUntil((async()=>{try{
+   let raw="",buf="",reader=pair[1].getReader(),dec=new TextDecoder();
+   for(;;){const z=await reader.read();if(z.done)break;buf+=dec.decode(z.value,{stream:true});const ls=buf.split("\n");buf=ls.pop();for(const line of ls){if(!line.startsWith("data:"))continue;const v=line.slice(5).trim();if(!v||v==="[DONE]")continue;try{const j=JSON.parse(v);raw+=j.choices?.[0]?.delta?.content||""}catch(e){}}}
+   await log(env,body.search?"web-chat":"chat",result.provider,true,Date.now()-start,searchProvider||searchState);
+   if(question)await env.DB?.prepare("INSERT INTO conversations(id,user_id,role,content) VALUES(?,?,?,?)").bind(uid(),userId,"user",question).run();
+   if(raw)await env.DB?.prepare("INSERT INTO conversations(id,user_id,role,content) VALUES(?,?,?,?)").bind(uid(),userId,"assistant",raw.slice(0,6000)).run();
+  }catch(e){}})());
+  return new Response(pair[0],{headers:{...CORS,"Content-Type":"text/event-stream; charset=utf-8","Cache-Control":"no-cache","X-Linay-Provider":result.provider,"X-Linay-Search":searchState+(searchProvider?":"+searchProvider:""),"X-Linay-Trace":trace}});
  }catch(e){await log(env,"chat","all-models",false,Date.now()-start,e.message);return json({error:"Tüm modeller başarısız oldu: "+e.message},503)}
 }
 export default {async fetch(req,env,ctx){
