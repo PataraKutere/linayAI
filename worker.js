@@ -155,7 +155,7 @@ async function agentRun(env,userId,messages){
    if(action.tool==="knowledge_search"){result=await ragSearch(env,userId,action.args?.query||contentText(lastUser(messages)));observations.push({tool:action.tool,results:result})}
   }catch(e){observations.push({tool:action.tool,error:String(e.message||e)})}
  }
- const context=messages.concat([{role:"system",content:"Araç gözlemleri (yalnızca bunlara dayan): "+JSON.stringify(observations).slice(0,12000)+"\nKullanıcıya sonuçları açıkla. Araç başarısızsa bunu belirt."}]);
+ const context=[{role:"system",content:messages.filter(m=>m.role==="system").map(m=>contentText(m)).join("\n")+"\n\nAraç gözlemleri (yalnızca bunlara dayan): "+JSON.stringify(observations).slice(0,12000)+"\nKullanıcıya sonuçları açıkla. Araç başarısızsa bunu belirt."},...messages.filter(m=>m.role!=="system")];
  const out=await runPlain(env,context,1800);
  return {answer:modelText(out)||"Ajan yanıt üretemedi.",steps,observations};
 }
