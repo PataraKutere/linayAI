@@ -34,10 +34,10 @@ function relevantResults(query,results){
  const stop=new Set(["what","which","where","when","that","this","with","from","have","does","your","the","and","for","about","find","current","latest","information","search","please","maçı","macı","mac","kaç","bitti","score","result","results","football","futbol","match","final","kasim","november","nov","2026"]);
  const terms=[...new Set(searchNorm(query).split(/\s+/).filter(x=>x.length>2&&!stop.has(x)))];
  if(!terms.length)return results;
- let filtered=results.map(x=>{const hay=searchNorm([x.title,x.snippet,x.url].join(" "));return {...x,_score:terms.filter(t=>hay.includes(t)).length,_hay:hay}}).filter(x=>x._score>=Math.min(2,terms.length));
+ let filtered=results.map(x=>{const hay=searchNorm([x.title,x.snippet,x.url].join(" "));return {...x,_score:terms.filter(t=>hay.includes(t)).length,_hay:hay,_raw:[x.title,x.snippet,x.url].join(" ")}}).filter(x=>x._score>=Math.min(2,terms.length));
  const football=/(france|fransa)/i.test(query)&&/(turkiye|türkiye|turkey)/i.test(query)&&/(football|futbol|match|maç|score|skor)/i.test(query);
  if(football)filtered=filtered.filter(x=>/\b\d{1,2}\s*[-–:]\s*\d{1,2}\b/.test(x._hay)||/uefa nations league|uefa|league a|ligue des nations/i.test(x._hay)&&/15 nov|15 november|15 kasim|15\.11\.2026|2026/i.test(x._hay));
- return filtered.sort((a,b)=>b._score-a._score).map(({_score,_hay,...x})=>x);
+ return filtered.sort((a,b)=>b._score-a._score).map(({_score,_hay,_raw,...x})=>x);
 }
 function rssTag(item,tag){const m=item.match(new RegExp("<"+tag+"[^>]*>([\\s\\S]*?)<\\/"+tag+">","i"));return m?cleanHtml(m[1].replace(/^<!\[CDATA\[|\]\]>$/g,"").trim()):""}
 async function searchWeb(query,env){
