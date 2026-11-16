@@ -4,7 +4,7 @@ const FALLBACK_MODELS=["@cf/qwen/qwen3.8-27b"];
 const VISION_MODEL="@cf/qwen/qwen3.8-27b";
 const EMBED_MODEL="@cf/baai/bge-m3";
 const GEMINI_MODEL="gemini-flash-lite-latest";
-const CORS={"Access-Control-Allow-Origin":ALLOWED_ORIGIN,"Access-Control-Allow-Headers":"Content-Type, X-Linay-Admin","Access-Control-Allow-Methods":"GET, POST, DELETE, OPTIONS","Access-Control-Expose-Headers":"X-Linay-Provider, X-Linay-Search, X-Linay-Trace, X-Linay-Sources, X-Linay-Agent-Steps","Vary":"Origin"};
+const CORS={"Access-Control-Allow-Origin":"*","Access-Control-Allow-Headers":"Accept, Content-Type, X-Linay-Admin","Access-Control-Allow-Methods":"GET, POST, DELETE, OPTIONS","Access-Control-Expose-Headers":"X-Linay-Provider, X-Linay-Search, X-Linay-Trace, X-Linay-Sources, X-Linay-Agent-Steps","Access-Control-Max-Age":"86400","Vary":"Origin"};
 const json=(data,status=200,extra={})=>new Response(JSON.stringify(data),{status,headers:{...CORS,"Content-Type":"application/json",...extra}});
 const uid=()=>crypto.randomUUID();
 const safeId=x=>String(x||"").replace(/[^a-zA-Z0-9_-]/g,"").slice(0,80)||"anonymous";
@@ -291,8 +291,7 @@ async function handleChat(req,env,ctx){
  }catch(e){await log(env,"chat","all-models",false,Date.now()-start,e.message);return json({error:"Tüm modeller başarısız oldu: "+e.message},503)}
 }
 export default {async fetch(req,env,ctx){
- const origin=req.headers.get("Origin")||"";if(req.method==="OPTIONS")return new Response(null,{headers:CORS});
- if(origin.toLowerCase()!==ALLOWED_ORIGIN.toLowerCase())return new Response("forbidden",{status:403,headers:CORS});
+ if(req.method==="OPTIONS")return new Response(null,{status:204,headers:CORS});
  const url=new URL(req.url),path=url.pathname;
  if(path==="/health"&&req.method==="GET")return json({ok:true,service:"LinayAI",model:MODEL,searchProviders:["ESPN Scoreboard","SearXNG (optional)","Brave (optional)","Bing RSS","Google News RSS","Bing","DuckDuckGo","Wikipedia"],memory:!!env.DB,rag:!!env.VECTOR,agents:true,version:"2.0"});
  if(path==="/chat"&&req.method==="POST"){try{return await handleChat(req,env,ctx)}catch(e){return json({error:e.message||"Sunucu hatası"},500)}}
