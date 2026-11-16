@@ -53,7 +53,7 @@ async function ragSearch(env,userId,query){
  try{
   const hasDocs=await env.DB.prepare("SELECT 1 AS present FROM documents WHERE user_id=? LIMIT 1").bind(userId).first();
   if(!hasDocs)return [];
-  const v=await embed(env,query);const r=await env.VECTOR.query(v,{topK:5,filter:{userId:userId}});const ids=(r.matches||[]).map(x=>x.id);await log(env,"rag-query","Vectorize",true,0,"matches="+ids.length);if(!ids.length)return [];
+  const v=await embed(env,query);const r=await env.VECTOR.query(v,{topK:5,namespace:userId});const ids=(r.matches||[]).map(x=>x.id);await log(env,"rag-query","Vectorize",true,0,"matches="+ids.length);if(!ids.length)return [];
   const rows=await env.DB.prepare("SELECT id,content,document_id FROM chunks WHERE user_id=? AND id IN ("+ids.map(()=>"?").join(",")+")").bind(userId,...ids).all();
   const map=new Map((rows.results||[]).map(x=>[x.id,x]));return ids.map(id=>map.get(id)).filter(Boolean).slice(0,5);
  }catch(e){await log(env,"rag-query","Vectorize",false,0,e.message||e);return []}
@@ -65,7 +65,7 @@ async function saveDocument(env,userId,name,text){
  const chunks=[];for(let i=0;i<clean.length;i+=850){const part=clean.slice(i,Math.min(clean.length,i+1050));if(part.trim())chunks.push({id:uid(),content:part})}
  for(let i=0;i<chunks.length;i+=4){
   const batch=chunks.slice(i,i+4),vectors=[];
-  for(const c of batch){const v=await embed(env,c.content);vectors.push({id:c.id,values:v,metadata:{userId,documentId:id}});await env.DB.prepare("INSERT INTO chunks(id,user_id,document_id,content) VALUES(?,?,?,?)").bind(c.id,userId,id,c.content).run()}
+  for(const c of batch){const v=await embed(env,c.content);vectors.push({id:c.id,values:v,namespace:userId,metadata:{documentId:id}});await env.DB.prepare("INSERT INTO chunks(id,user_id,document_id,content) VALUES(?,?,?,?)").bind(c.id,userId,id,c.content).run()}
   const mutation=await env.VECTOR.upsert(vectors);await log(env,"vector-upsert","Vectorize",true,0,JSON.stringify(mutation).slice(0,300));
  }
  return {id,name:String(name||"Belge").slice(0,180),chunks:chunks.length};
