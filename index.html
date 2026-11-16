@@ -269,8 +269,38 @@ async function genImg(text,el,raw){
 async function send(){
  if(busy){ctl&&ctl.abort();return}
  const text=inp.value.trim();if(!text&&!files.length)return;
- const asksClock=/saat kaç(?: oldu)?[?!. ]*$/i.test(text.trim());
- if(asksClock&&!files.length){const now=new Intl.DateTimeFormat('tr-TR',{timeZone:'Europe/Istanbul',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).format(new Date());let cc=cur();if(!cc){cc={id:Date.now(),title:text.slice(0,40),msgs:[],hidden:privateChat};S.chats.push(cc);S.cur=cc.id;}cc.msgs.push({role:'user',parts:[{text}],t:text,att:[],media:[]});const answer='İstanbul saatine göre şu an '+now+'.';cc.msgs.push({role:'model',parts:[{text:answer}],text:answer});inp.value='';grow();save();render();return;}
+ const currentChat=cur();
+ const previousUser=currentChat?.msgs?.slice().reverse().find(m=>m.role==='user')?.t||'';
+ const clean=text.toLocaleLowerCase('tr-TR').replace(/[’']/g,'').trim();
+ const zones=[
+  {names:['istanbul','Türkiye','turkiye'],zone:'Europe/Istanbul',label:'İstanbul'},
+  {names:['pekin','beijing','pelin'],zone:'Asia/Shanghai',label:'Pekin'},
+  {names:['tokyo'],zone:'Asia/Tokyo',label:'Tokyo'},
+  {names:['seul'],zone:'Asia/Seoul',label:'Seul'},
+  {names:['londra','london'],zone:'Europe/London',label:'Londra'},
+  {names:['berlin'],zone:'Europe/Berlin',label:'Berlin'},
+  {names:['paris'],zone:'Europe/Paris',label:'Paris'},
+  {names:['moskova'],zone:'Europe/Moscow',label:'Moskova'},
+  {names:['dubai'],zone:'Asia/Dubai',label:'Dubai'},
+  {names:['new york','newyork'],zone:'America/New_York',label:'New York'}
+ ];
+ let target=zones.find(z=>z.names.some(n=>clean.includes(n)));
+ const asksClock=/saat kaç|kaç saat|what time is it/i.test(clean);
+ const isClockFollowup=!asksClock&&zones.some(z=>z.names.some(n=>clean===n))&&/saat kaç/i.test(previousUser);
+ let localAnswer=null;
+ if(!files.length&&/^(sa|selamünaleyküm|selamun aleykum)$/i.test(clean))localAnswer='Aleykümselam.';
+ else if(!files.length&&/^(selam|merhaba|hey|hello)$/i.test(clean))localAnswer='Selam! Nasıl yardımcı olayım?';
+ else if(!files.length&&(asksClock||isClockFollowup)){
+  target=target||zones[0];
+  const now=new Intl.DateTimeFormat('tr-TR',{timeZone:target.zone,hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).format(new Date());
+  localAnswer=target.label+'’de şu an saat '+now+'.';
+ }
+ if(localAnswer!==null){
+  let cc=currentChat;if(!cc){cc={id:Date.now(),title:text.slice(0,40),msgs:[],hidden:privateChat};S.chats.push(cc);S.cur=cc.id;}
+  cc.msgs.push({role:'user',parts:[{text}],t:text,att:[],media:[]});
+  cc.msgs.push({role:'model',parts:[{text:localAnswer}],text:localAnswer});
+  inp.value='';grow();save();render();return;
+ }
  const freshQuery=/(en yeni|en son|son çıkan|güncel|son dakika|bugün|şu an|şuanda|latest|current|this week|today|2026|kaçta çıktı|ne zaman çıktı|çıkış tarihi|oynanıyor mu|kaç para|fiyatı|döviz|kur|hava durumu)/i.test(text);
  const useSearch=!!text&&(S.cfg.search||freshQuery);
  let c=cur();
