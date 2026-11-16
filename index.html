@@ -345,8 +345,8 @@ async function send(){
  try{
   let docNotice='';
   for(const f of sf.filter(x=>x.docText)){
-   try{const dr=await fetch(PROXY+'/documents',{method:'POST',headers:{'Content-Type':'application/json'},signal:ctl.signal,body:JSON.stringify({userId:USER_ID,name:f.name,text:f.docText})});const dj=await dr.json();if(!dr.ok)throw new Error(dj.error||'Belge indekslenemedi');docNotice+='\\n\\n📚 '+f.name+' belge hafızasına eklendi ('+dj.document.chunks+' parça).'}
-   catch(de){docNotice+='\\n\\n⚠️ '+f.name+' belge hafızasına eklenemedi: '+de.message}
+   try{const dr=await fetch(PROXY+'/documents',{method:'POST',headers:{'Content-Type':'application/json'},signal:ctl.signal,body:JSON.stringify({userId:USER_ID,name:f.name,text:f.docText})});const dj=await dr.json();if(!dr.ok)throw new Error(dj.error||'Belge indekslenemedi');docNotice+='\n\n📚 '+f.name+' belge hafızasına eklendi ('+dj.document.chunks+' parça).'}
+   catch(de){docNotice+='\n\n⚠️ '+f.name+' belge hafızasına eklenemedi: '+de.message}
   }
   const system=GEN+' KİMLİK KURALI: Adın Linay. Kendini yalnızca Linay veya LinayAI olarak tanıt. Asla Sıfır, ChatGPT, Gemini veya başka bir ad kullanma. Kullanıcı adını sorarsa kısa biçimde “Ben LinayAI.” de. '+' Şu an: '+new Date().toLocaleString('tr-TR',{timeZone:'Europe/Istanbul'})+' (Europe/Istanbul). KISA VE DOĞRU CEVAP KURALLARI: Kullanıcının son mesajını önceki konuşma bağlamıyla birlikte yorumla; yazım hatalarını makul biçimde düzelt. Kullanıcı yalnızca kısa selam verirse kısa selamla karşılık ver, gereksiz soru listesi veya uzun açıklama üretme. Önceki asistan yanıtlarını kesin bilgi kabul etme; kullanıcı hata gösterirse yeniden değerlendir, hatayı tekrarlama ve açıkça düzelt. Bilmediğin bilgiyi uydurma; emin değilsen bunu söyle veya tek netleştirici soru sor. Mantık ve matematik sorularında yalnızca verilen bilgilerden çıkan sonucu ver; varsayım ekleme. Bulmacanın koşullarını değiştirme, cevabı ilk cümlede açıkla ve açıklamanı sonuçla tutarlı tut. Cevap göndermeden önce kendi içinde çelişki veya hesap hatası olup olmadığını kontrol et. Saat/tarih ve konum sorularında şehir ya da ülkeyi doğru belirle; konum belirsizse İstanbul varsayma, netleştir. Güncel bilgi gerekiyorsa web araması yapılmadıysa bunu açıkça söyle ve kesin konuşma. '+(S.cfg.memory?'\\n\\nKULLANICI HAFIZASI:\\n'+S.cfg.memory+'\\nYalnızca ilgili olduğunda kullan.':'');
   const messages=[{role:'system',content:system},...c.msgs.map(m=>{
@@ -357,13 +357,13 @@ async function send(){
   if(!r.ok){let msg='HTTP '+r.status;try{const j=await r.json();msg=j.error||msg}catch{}throw new Error(msg)}
   const provider=r.headers.get('X-Linay-Provider')||'Cloudflare Workers AI';
   const searchState=r.headers.get('X-Linay-Search')||'off';let citations=[];try{citations=JSON.parse(decodeURIComponent(r.headers.get('X-Linay-Sources')||'%5B%5D'))}catch(e){}
-  if(useSearch&&searchState==='failed')out+='*(İnternet araması başarısız oldu; yanıt güncel kaynaklarla doğrulanamadı.)*\\n\\n';
-  if(provider.includes('Gemini Backup'))out+='*(Ana model geçici olarak kullanılamadı; Gemini yedek model devreye girdi.)*\\n\\n';
-  if(provider.includes('Web search unavailable'))out+='*(Web araması şu anda erişilemiyor; aşağıdaki yanıt güncel internet kaynaklarıyla doğrulanmadı.)*\\n\\n';
+  if(useSearch&&searchState==='failed')out+='*(İnternet araması başarısız oldu; yanıt güncel kaynaklarla doğrulanamadı.)*\n\n';
+  if(provider.includes('Gemini Backup'))out+='*(Ana model geçici olarak kullanılamadı; Gemini yedek model devreye girdi.)*\n\n';
+  if(provider.includes('Web search unavailable'))out+='*(Web araması şu anda erişilemiyor; aşağıdaki yanıt güncel internet kaynaklarıyla doğrulanmadı.)*\n\n';
   const rd=r.body.getReader(),dc=new TextDecoder();let buf='';
   for(;;){const {done,value}=await rd.read();if(done)break;buf+=dc.decode(value,{stream:true});const ls=buf.split('\n');buf=ls.pop();for(const l of ls){if(!l.startsWith('data:'))continue;const raw=l.slice(5).trim();if(!raw||raw==='[DONE]')continue;let j;try{j=JSON.parse(raw)}catch{continue}if(j.error)throw new Error(j.error.message||'Model yanıt hatası');out+=(j.choices?.[0]?.delta?.content||'');el.innerHTML=md(out);$('msgs').scrollTop=$('msgs').scrollHeight;}}
   if(!out)out='(Boş yanıt geldi, tekrar dene.)';if(docNotice)out+=docNotice;
-  if(citations.length)out+='\\n\\n**Kaynaklar**\\n'+citations.map(x=>'- ['+(x.title||'Kaynak')+']('+x.url+')').join('\\n');
+  if(citations.length)out+='\n\n**Kaynaklar**\n'+citations.map(x=>'- ['+(x.title||'Kaynak')+']('+x.url+')').join('\n');
   const mi=out.match(/\[RESIM:\s*([^\]]+)\]/i);
   if(mi){out=out.replace(mi[0],'').trim();el.innerHTML=md(out);const ie=add('model','');const generated=await genImg(mi[1].trim(),ie,true),mediaId='gen-'+c.id+'-'+Date.now();if(!privateChat)await mediaPut(mediaId,generated.src);generatedMedia=[{id:mediaId,name:'Oluşturulan resim',src:privateChat?generated.src:undefined}];out+='\\n\\n🖼 *Resim oluşturuldu: '+generated.prompt+'*';shown=true}
   c.msgs.push({role:'model',parts:[{text:out}],text:out,media:generatedMedia});
