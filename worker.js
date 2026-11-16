@@ -285,7 +285,17 @@ export default {async fetch(req,env,ctx){
   try{const r=await env.DB.prepare("SELECT kind,provider,ok,COUNT(*) AS count,ROUND(AVG(latency_ms)) AS avg_ms,MAX(created_at) AS last_seen FROM events WHERE created_at>=datetime('now','-7 days') GROUP BY kind,provider,ok ORDER BY count DESC LIMIT 30").all();const d=await env.DB.prepare("SELECT COUNT(*) AS documents FROM documents").first();return json({window:"7 days",groups:r.results||[],documents:d?.documents||0})}catch(e){return json({error:"Metrikler okunamadı: "+e.message},500)}
  }
  if(path==="/search"&&req.method==="GET"){
-  try{const r=await searchWeb(url.searchParams.get("q"),env);return json(r)}catch(e){return json({error:e.message},503)}
+  const q=String(url.searchParams.get("q")||"").slice(0,400);
+  try{return json(await searchWeb(q,env))}catch(e){
+   try{
+    if(!env.GEMINI_API_KEY)throw e;
+    const prompt=[{role:"system",content:"Search the web for the exact requested fact. Prefer official or reputable sources. Return factual findings grounded in Google Search and do not invent sources."},{role:"user",content:q}];
+    const g=await gemini(env,prompt,true);
+    const results=(g.sources||[]).map(x=>({title:x.title||"Source",url:x.uri,snippet:"Google Search grounding",source:"Gemini Google Search"})).filter(x=>safeUrl(x.url));
+    if(results.length)return json({provider:"Gemini Google Search",results,answer:g.text});
+    throw new Error("Google Search grounding returned no source links.");
+   }catch(backup){return json({error:"Independent search and Google Search fallback failed: "+String(backup.message||backup)},503)}
+  }
  }
  if(path==="/image"&&req.method==="POST"){
   if(!env.AI)return json({error:"Workers AI bağlantısı yok"},500);let prompt="";try{prompt=String((await req.json()).prompt||"").slice(0,1800)}catch{}if(!prompt)prompt="A beautiful landscape";const errs=[];
