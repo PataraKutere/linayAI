@@ -134,7 +134,7 @@ function sseFromText(text,provider,searchState,trace,sources=[],agentSteps=0){
 async function callModel(env,messages,vision=false){
  const models=vision?[VISION_MODEL]:[MODEL,...FALLBACK_MODELS];let last;
  for(const model of models){const start=Date.now();try{const opts={messages,stream:true,max_tokens:2048,temperature:0.25};if(!vision&&model===MODEL)opts.reasoning_effort="low";const stream=await env.AI.run(model,opts);return {stream,provider:"Workers AI · "+model,latency:Date.now()-start}}catch(e){last=e;await log(env,"model-fallback",model,false,Date.now()-start,e.message||e)}}
- if(!vision&&env.GEMINI_API_KEY){try{const r=await gemini(env,messages,false);return {text:r.text,sources:r.sources,provider:"Gemini Backup",latency:0}}catch(e){last=e}}
+ if(!vision&&env.GEMINI_API_KEY){try{const r=await gemini(env,messages,false);return {text:r.text,sources:r.sources,provider:"Gemini Backup"+(/4006|daily free allocation|neurons/i.test(last?.message||"")?" · Cloudflare AI ücretsiz günlük kotası doldu":""),latency:0}}catch(e){last=e}}
  throw last||new Error("Hiçbir model yanıt veremedi.");
 }
 function toGemini(messages){const system=messages.filter(m=>m.role==="system").map(m=>contentText(m)).join("\n");const contents=messages.filter(m=>m.role!=="system").map(m=>({role:m.role==="assistant"?"model":"user",parts:[{text:contentText(m)}]}));return {systemInstruction:system?{parts:[{text:system}]}:undefined,contents}}
@@ -170,7 +170,7 @@ async function runPlain(env,messages,maxTokens=1200){
    return Object.assign({},value,{__linayModel:model});
   }catch(e){last=e;await log(env,"agent-model-fallback",model,false,0,e.message||e)}
  }
- if(env.GEMINI_API_KEY){try{const g=await gemini(env,messages,false);if(g.text)return {response:g.text,__linayModel:"Gemini Backup"};last=new Error("Gemini boş yanıt döndürdü.")}catch(e){last=e}}
+ if(env.GEMINI_API_KEY){try{const g=await gemini(env,messages,false);if(g.text)return {response:g.text,__linayModel:"Gemini Backup"+(/4006|daily free allocation|neurons/i.test(last?.message||"")?" · Cloudflare AI ücretsiz günlük kotası doldu":"")};last=new Error("Gemini boş yanıt döndürdü.")}catch(e){last=e}}
  throw last||new Error("Ajan için hiçbir model kullanılamadı.");
 }
 function modelText(value){
@@ -193,7 +193,7 @@ async function agentRun(env,userId,messages){
   const p=await runPlain(env,planner,500);
   const raw=modelText(p);const match=String(raw).match(/\{[\s\S]*\}/);if(!match)break;
   let action;try{action=JSON.parse(match[0])}catch{break}
-  if(action.tool==="final")return {answer:String(action.answer||""),steps,observations};
+  if(action.tool==="final")return {answer:String(action.answer||""),steps,observations,model:p.__linayModel||MODEL};
   if(!tools.includes(action.tool))break;
   let result;
   try{
@@ -206,7 +206,7 @@ async function agentRun(env,userId,messages){
  }
  const context=[{role:"system",content:messages.filter(m=>m.role==="system").map(m=>contentText(m)).join("\n")+"\n\nAraç gözlemleri (yalnızca bunlara dayan): "+JSON.stringify(observations).slice(0,12000)+"\nKullanıcıya sonuçları açıkla. Araç başarısızsa bunu belirt."},...messages.filter(m=>m.role!=="system")];
  const out=await runPlain(env,context,1800);
- return {answer:modelText(out)||"Ajan yanıt üretemedi.",steps,observations};
+ return {answer:modelText(out)||"Ajan yanıt üretemedi.",steps,observations,model:out.__linayModel||MODEL};
 }
 async function handleChat(req,env,ctx){
  const body=await req.json(),messages=Array.isArray(body.messages)?body.messages:[];if(!messages.length)return json({error:"Mesaj bulunamadı"},400);
@@ -221,7 +221,7 @@ async function handleChat(req,env,ctx){
  const sys=originalSystem+"\n\nLinayAI: Be accurate, concise and honest. For logic, distinguish what follows from what does not follow. Never invent current facts or sources. If sources are supplied, cite them using their numbered URLs. "+(mem.memories.length?"\nUSER SAVED MEMORY:\n"+mem.memories.map(x=>x.content).join("\n"):"")+(mem.recent.length?"\nRECENT SERVER CONTEXT:\n"+mem.recent.map(x=>x.role+": "+x.content).join("\n"):"")+(rag.length?"\nIMPORTANT: THE USER DOCUMENT SEARCH FOUND THE FOLLOWING EXCERPTS FROM THE USER UPLOADED FILES. YOU CAN READ THESE EXCERPTS. Use them to answer questions about those files. Never claim you cannot access a file when an excerpt is provided.\nUSER DOCUMENT EXCERPTS:\n"+rag.map(x=>"[Document: "+(x.name||"uploaded file")+"]\n"+x.content).join("\n---\n"):"")+searchContext;
  const enriched=[{role:"system",content:sys},...messages.filter(m=>m.role!=="system")];
  if(body.agent===true){
-  try{const a=await agentRun(env,userId,enriched);const answer=a.answer+(searchSources.length?"\n\nKaynaklar:\n"+searchSources.map((x,i)=>"["+ (i+1)+"] ["+x.title+"]("+x.url+")").join("\n"):"");ctx.waitUntil((async()=>{await log(env,"agent", "Workers AI",true,Date.now()-start,"steps="+a.steps);if(question)await env.DB?.prepare("INSERT INTO conversations(id,user_id,role,content) VALUES(?,?,?,?)").bind(uid(),userId,"user",question).run();if(answer)await env.DB?.prepare("INSERT INTO conversations(id,user_id,role,content) VALUES(?,?,?,?)").bind(uid(),userId,"assistant",answer.slice(0,6000)).run()})());return sseFromText(answer,"Workers AI Agent · GPT-OSS",searchState,uid(),searchSources,a.steps)}
+  try{const a=await agentRun(env,userId,enriched);const answer=a.answer+(searchSources.length?"\n\nKaynaklar:\n"+searchSources.map((x,i)=>"["+ (i+1)+"] ["+x.title+"]("+x.url+")").join("\n"):"");ctx.waitUntil((async()=>{await log(env,"agent", "Workers AI",true,Date.now()-start,"steps="+a.steps);if(question)await env.DB?.prepare("INSERT INTO conversations(id,user_id,role,content) VALUES(?,?,?,?)").bind(uid(),userId,"user",question).run();if(answer)await env.DB?.prepare("INSERT INTO conversations(id,user_id,role,content) VALUES(?,?,?,?)").bind(uid(),userId,"assistant",answer.slice(0,6000)).run()})());return sseFromText(answer,"Workers AI Agent · "+(a.model||MODEL),searchState,uid(),searchSources,a.steps)}
   catch(e){await log(env,"agent","Workers AI",false,Date.now()-start,e.message);return json({error:"Ajan görevi tamamlayamadı: "+e.message},503)}
  }
  const vision=messages.some(m=>Array.isArray(m.content)&&m.content.some(p=>p.type==="image_url"));
@@ -230,7 +230,7 @@ async function handleChat(req,env,ctx){
    const plain=await runPlain(env,enriched,1800),answer=modelText(plain);
    if(!answer)throw new Error("Arama sonuçları geldi ancak model boş yanıt üretti.");
    await log(env,"web-chat",plain.__linayModel||MODEL,true,Date.now()-start,searchProvider||searchState);
-   return sseFromText(answer,plain.__linayModel==="Gemini Backup"?"Gemini Backup":"Workers AI · "+(plain.__linayModel||MODEL),searchState,uid(),searchSources);
+   return sseFromText(answer,String(plain.__linayModel||"").startsWith("Gemini Backup")?plain.__linayModel:"Workers AI · "+(plain.__linayModel||MODEL),searchState,uid(),searchSources);
   }
   const result=await callModel(env,enriched,vision);
   const trace=uid();
