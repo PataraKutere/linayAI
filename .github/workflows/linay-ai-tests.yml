@@ -1,14 +1,9 @@
-name: LinayAI automatic quality tests
+name: LinayAI live quality tests
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - "worker.js"
-      - "index.html"
-      - "tests/**"
-      - ".github/workflows/linay-ai-tests.yml"
   workflow_dispatch:
+  schedule:
+    - cron: "30 3 * * *"
 
 concurrency:
   group: linayai-live-smoke-tests
