@@ -119,6 +119,7 @@ dialog label{color:#e0d3ed}dialog a{color:#c5a1f1}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.9/purify.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.8.0/mammoth.browser.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head><body>
 <aside id="side">
@@ -138,7 +139,8 @@ dialog label{color:#e0d3ed}dialog a{color:#c5a1f1}
  <div id="chips"></div>
  <div id="bar">
   <button onclick="$('f').click()" title="Dosya / fotoğraf"><svg viewBox="0 0 24 24"><path d="m8 12.5 7.2-7.2a3.2 3.2 0 0 1 4.5 4.5l-9.2 9.2a5 5 0 0 1-7.1-7.1l9-9"/></svg></button>
-  <button id="web" title="İnternette ara"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0-18"/></svg></button>
+  <button id="web" title="Bağımsız internet araması"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0-18"/></svg></button>
+  <button id="agent" title="Ajan modu: araçlarla çok aşamalı görev">✧</button>
   <button id="img" title="Resim oluştur"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="4"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg></button>
   <textarea id="inp" rows="1" placeholder="Bir şey sor…"></textarea>
   <button id="mic" title="Sesle yaz"><svg viewBox="0 0 24 24"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10v2a7 7 0 0 0 14 0v-2M12 19v3m-4 0h8"/></svg></button>
@@ -152,7 +154,9 @@ dialog label{color:#e0d3ed}dialog a{color:#c5a1f1}
  <div id="keybox"><label>Yapay zekâ altyapısı</label><small>LinayAI ana model olarak Cloudflare Workers AI üzerindeki OpenAI GPT-OSS-120B modelini kullanır. Görsel analizinde Gemma 4 Vision, ana model erişilemezse Gemini yedek olarak devreye girer. İnternet araması Gemini Google Search üzerinden yapılır; anahtar sunucuda gizli saklanır.</small></div>
   <label style="display:block;margin-top:12px">Linay hafızası</label>
  <textarea id="memory" rows="4" placeholder="Linay’in sonraki sohbetlerde hatırlamasını istediğin bilgileri buraya yaz…"></textarea>
- <small>Bu bilgiler bu cihazın tarayıcısında saklanır ve yeni sohbetlerde kullanılır.</small>
+ <small>Bu bilgiler sunucu hafızasına kaydedilir. Gizli bilgi veya parola yazma.</small>
+ <div id="docsbox" style="margin-top:12px"><label>Belge hafızası</label><div id="doclist" class="att">Henüz belge yüklenmedi.</div></div>
+ <div style="margin-top:12px"><label>Altyapı ve hata takibi</label><button id="metricsBtn" type="button">Sistem durumunu göster</button><div id="metricsBox" class="att"></div></div>
  <div style="display:flex;gap:8px;justify-content:space-between">
   <button onclick="if(confirm('Tüm sohbetler silinsin mi?')){S.chats=[];S.cur=null;save();render();dl.close()}">Sohbetleri sil</button>
   <button class="nb" onclick="saveSet()">Kaydet</button>
@@ -163,8 +167,9 @@ dialog label{color:#e0d3ed}dialog a{color:#c5a1f1}
 <script src="config.js"></script>
 <script>
 const $=id=>document.getElementById(id),dl=$('dl'),inp=$('inp');
-let S=JSON.parse(localStorage.getItem('ai1')||'null')||{chats:[],cur:null,cfg:{key:'',model:'gemini-flash-lite-latest',mode:'gen',search:false,v:2}};
-if(S.cfg.v!==4){S.cfg.v=4;S.cfg.model='gpt-oss-120b'}if(typeof S.cfg.memory!=='string')S.cfg.memory='';
+let S=JSON.parse(localStorage.getItem('ai1')||'null')||{chats:[],cur:null,cfg:{key:'',model:'gpt-oss-120b',mode:'gen',search:false,agent:false,v:2}};
+if(S.cfg.v!==5){S.cfg.v=5;S.cfg.model='gpt-oss-120b'}if(typeof S.cfg.memory!=='string')S.cfg.memory='';if(typeof S.cfg.agent!=='boolean')S.cfg.agent=false;
+const USER_ID=localStorage.getItem('linay_uid')||(()=>{const id=crypto.randomUUID();localStorage.setItem('linay_uid',id);return id})();
 const RAW=String(window.LINAY_PROXY||window.LINAY_KEY||'').trim();
 const PROXY=/^https?:\/\//i.test(RAW)?RAW.replace(/\/+$/,''):'';
 let imgMode=false;
@@ -219,7 +224,7 @@ function add(role,html,last,media){
  $('msgs').appendChild(w);return d;
 }
 function render(){
- const c=cur();$('ttl').textContent=privateChat?'Gizli sohbet':(c?c.title:'LinayAI');$('web').classList.toggle('on',S.cfg.search);
+ const c=cur();$('agent').classList.toggle('on',!!S.cfg.agent);$('ttl').textContent=privateChat?'Gizli sohbet':(c?c.title:'LinayAI');$('web').classList.toggle('on',S.cfg.search);
  $('list').innerHTML='';
  const q=($('q').value||'').toLowerCase();S.chats.filter(x=>!x.hidden).slice().reverse().filter(x=>!q||(x.title+' '+x.msgs.map(m=>m.text||m.t||'').join(' ')).toLowerCase().includes(q)).forEach(x=>{const r=document.createElement('div');r.className='ci'+(x.id==S.cur?' on':'');
   r.innerHTML='<span></span><button>✕</button>';r.firstChild.textContent=x.title;
