@@ -53,7 +53,7 @@ async function ragSearch(env,userId,query){
  try{
   const hasDocs=await env.DB.prepare("SELECT 1 AS present FROM documents WHERE user_id=? LIMIT 1").bind(userId).first();
   if(!hasDocs)return [];
-  const v=await embed(env,query);const r=await env.VECTOR.query(v,{topK:5,returnMetadata:"all",filter:{userId:{$eq:userId}}});const ids=(r.matches||[]).map(x=>x.id);if(!ids.length)return [];
+  const v=await embed(env,query);const r=await env.VECTOR.query(v,{topK:5,filter:{userId:userId}});const ids=(r.matches||[]).map(x=>x.id);if(!ids.length)return [];
   const rows=await env.DB.prepare("SELECT id,content,document_id FROM chunks WHERE user_id=? AND id IN ("+ids.map(()=>"?").join(",")+")").bind(userId,...ids).all();
   const map=new Map((rows.results||[]).map(x=>[x.id,x]));return ids.map(id=>map.get(id)).filter(Boolean).slice(0,5);
  }catch(e){await log(env,"rag-query","Vectorize",false,0,e.message||e);return []}
