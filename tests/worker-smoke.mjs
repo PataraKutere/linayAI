@@ -10,17 +10,18 @@ async function get(path){
   assert.equal(r.ok,true,"GET "+path+" failed: "+JSON.stringify(body));
   return {r,body};
 }
-async function chat(question,{search=false,agent=false}={}){
+async function chatMessages(messages,{search=false,agent=false}={}){
   const r=await fetch(BASE+"/chat",{
     method:"POST",
     headers:{Origin:ORIGIN,"Content-Type":"application/json"},
-    body:JSON.stringify({userId:USER,messages:[{role:"system",content:"Answer in English, briefly and directly."},{role:"user",content:question}],search,agent})
+    body:JSON.stringify({userId:USER,messages:[{role:"system",content:"Answer in English, briefly and directly."},...messages],search,agent})
   });
   if(!r.ok){const e=await r.json().catch(()=>({}));throw new Error("Chat failed "+r.status+": "+(e.error||""))}
   const reader=r.body.getReader(),decoder=new TextDecoder();let buffer="",answer="";
   for(;;){const {done,value}=await reader.read();if(done)break;buffer+=decoder.decode(value,{stream:true});const lines=buffer.split("\n");buffer=lines.pop();for(const line of lines){if(!line.startsWith("data:"))continue;const raw=line.slice(5).trim();if(!raw||raw==="[DONE]")continue;const j=JSON.parse(raw);answer+=j.choices?.[0]?.delta?.content||""}}
   return {answer,provider:r.headers.get("X-Linay-Provider")||"",search:r.headers.get("X-Linay-Search")||"",sources:r.headers.get("X-Linay-Sources")||"[]",agentSteps:Number(r.headers.get("X-Linay-Agent-Steps")||0)};
 }
+async function chat(question,options={}){return chatMessages([{role:"user",content:question}],options)}
 
 const health=await get("/health");
 assert.equal(health.body.ok,true);
@@ -71,6 +72,17 @@ assert.ok(web.answer.length>0,"Web search response empty");
 const sourceList=JSON.parse(decodeURIComponent(web.sources));
 assert.ok(sourceList.length>0,"Search response did not expose source links");
 console.log("PASS web search + citations: "+web.search);
+
+const football=await chatMessages([
+  {role:"user",content:"Fransa Türkiye maçı kaç kaç bitti?"},
+  {role:"assistant",content:"Hangi tarihi kastediyorsunuz?"},
+  {role:"user",content:"15 kasım 2026 da oynandı"}
+],{search:true});
+assert.match(football.answer,/2\s*[-–:]\s*1/,"Contextual sports score search failed: "+football.answer);
+const footballSources=JSON.parse(decodeURIComponent(football.sources));
+assert.ok(footballSources.length>0,"Sports search returned no source links");
+assert.ok(footballSources.some(x=>/tff\.org|sofascore|flashscore|uefa|ouest-france/i.test(x.url)),"Sports search sources are not authoritative/relevant: "+JSON.stringify(footballSources));
+console.log("PASS contextual football score + source relevance");
 
 const metrics=await get("/metrics");
 assert.ok(metrics.body.groups,"Metrics groups missing");
