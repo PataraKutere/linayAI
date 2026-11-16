@@ -26,6 +26,14 @@ async function searchWeb(query,env){
   try{const u=new URL("https://api.search.brave.com/res/v1/web/search");u.searchParams.set("q",q);u.searchParams.set("count","7");const r=await fetch(u,{headers:{...headers,"X-Subscription-Token":env.BRAVE_SEARCH_API_KEY},signal:AbortSignal.timeout(9000)});if(r.ok){const j=await r.json();const a=(j.web?.results||[]).slice(0,7).map(x=>({title:cleanHtml(x.title),url:x.url,snippet:cleanHtml(x.description),source:"Brave"})).filter(x=>safeUrl(x.url));if(a.length)return {provider:"Brave Search",results:a}}}catch(e){}
  }
  try{
+  const u=new URL("https://www.bing.com/search");u.searchParams.set("q",q);u.searchParams.set("count","8");
+  const r=await fetch(u,{headers:{...headers,"Accept":"text/html","Accept-Language":"tr-TR,tr;q=0.9,en;q=0.8"},signal:AbortSignal.timeout(9000)});
+  if(r.ok){const h=await r.text(),a=[];const re=/<li[^>]*class="[^"]*\bb_algo\b[^"]*"[\s\S]*?<h2[^>]*>\s*<a[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>[\s\S]*?<p[^>]*>([\s\S]*?)<\/p>[\s\S]*?<\/li>/gi;let m;
+   while((m=re.exec(h))&&a.length<8){const href=decodeHtml(m[1]);if(safeUrl(href))a.push({title:cleanHtml(m[2]),url:href,snippet:cleanHtml(m[3]),source:"Bing"})}
+   if(a.length)return {provider:"Bing",results:a}
+  }
+ }catch(e){}
+ try{
   const u=new URL("https://html.duckduckgo.com/html/");u.searchParams.set("q",q);
   const r=await fetch(u,{headers:{...headers,"Accept":"text/html"},signal:AbortSignal.timeout(10000)});
   if(r.ok){const h=await r.text(),a=[];const re=/<a[^>]+class="[^"]*result__a[^"]*"[^>]+href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/gi;let m;
