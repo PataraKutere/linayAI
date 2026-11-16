@@ -274,7 +274,7 @@ async function genImg(text,el,raw){
 async function send(){
  if(busy){ctl&&ctl.abort();return}
  const text=inp.value.trim();if(!text&&!files.length)return;
- const asksClock=/(?:^|\\s)(?:şu an |şu anda |şimdi )?saat kaç(?: oldu)?[?!. ]*$/i.test(text.trim());
+ const asksClock=/saat kaç(?: oldu)?[?!. ]*$/i.test(text.trim());
  if(asksClock&&!files.length){const now=new Intl.DateTimeFormat('tr-TR',{timeZone:'Europe/Istanbul',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).format(new Date());let cc=cur();if(!cc){cc={id:Date.now(),title:text.slice(0,40),msgs:[],hidden:privateChat};S.chats.push(cc);S.cur=cc.id;}cc.msgs.push({role:'user',parts:[{text}],t:text,att:[],media:[]});const answer='İstanbul saatine göre şu an '+now+'.';cc.msgs.push({role:'model',parts:[{text:answer}],text:answer});inp.value='';grow();save();render();return;}
  const freshQuery=/(en yeni|en son|son çıkan|güncel|son dakika|bugün|şu an|şuanda|latest|current|this week|today|2026|kaçta çıktı|ne zaman çıktı|çıkış tarihi|oynanıyor mu|kaç para|fiyatı|döviz|kur|hava durumu)/i.test(text);
  const useSearch=!!text&&(S.cfg.search||freshQuery);
