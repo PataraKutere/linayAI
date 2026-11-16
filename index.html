@@ -292,11 +292,13 @@ async function send(){
   {names:['delhi','yeni delhi','hindistan'],zone:'Asia/Kolkata',label:'Yeni Delhi'},
   {names:['bangkok','tayland'],zone:'Asia/Bangkok',label:'Bangkok'},
   {names:['singapur'],zone:'Asia/Singapore',label:'Singapur'},
-  {names:['new york','newyork'],zone:'America/New_York',label:'New York'},\n  {names:['sırbistan','sirbistan','belgrad','belgrade'],zone:'Europe/Belgrade',label:'Sırbistan'}
+  {names:['new york','newyork'],zone:'America/New_York',label:'New York'},
+  {names:['sırbistan','sirbistan','belgrad','belgrade'],zone:'Europe/Belgrade',label:'Sırbistan'}
  ];
  let target=zones.find(z=>z.names.some(n=>clean.includes(n)));
  const asksClock=/saat kaç|kaç saat|what time is it/i.test(clean);
- const previousAskedClock=/saat kaç|kaç saat|what time is it/i.test(previousUser);\n const isClockFollowup=!asksClock&&!!target&&previousAskedClock;
+ const previousAskedClock=/saat kaç|kaç saat|what time is it/i.test(previousUser);
+ const isClockFollowup=!asksClock&&!!target&&previousAskedClock;
  let localAnswer=null;
  if(!files.length&&/^(sa|selamünaleyküm|selamun aleykum)$/i.test(clean))localAnswer='Aleykümselam.';
  else if(!files.length&&/^(selam|merhaba|hey|hello)$/i.test(clean))localAnswer='Selam! Nasıl yardımcı olayım?';
