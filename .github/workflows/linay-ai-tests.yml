@@ -1,0 +1,26 @@
+name: LinayAI automatic quality tests
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "worker.js"
+      - "index.html"
+      - "tests/**"
+      - ".github/workflows/linay-ai-tests.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  smoke-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Test live LinayAI Worker
+        run: node tests/worker-smoke.mjs
