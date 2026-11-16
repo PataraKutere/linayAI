@@ -212,7 +212,7 @@ function render(){
   r.lastChild.onclick=()=>{S.chats=S.chats.filter(y=>y.id!=x.id);if(S.cur==x.id)S.cur=null;save();render()};
   $('list').appendChild(r)});
  const m=$('msgs');m.innerHTML='';
- if(!c||!c.msgs.length)m.innerHTML='<div id="hello"><div class="zy-orb" aria-hidden="true"></div><h2>Beratın yüce beynine başvur</h2>'+QUICK+'</div>';$("features").innerHTML=CARDS;
+ if(!c||!c.msgs.length){m.innerHTML='<div id="hello"><div class="zy-orb" aria-hidden="true"></div><h2>Beratın yüce beynine başvur</h2>'+QUICK+'</div>'; $("features").innerHTML=CARDS;}
  else c.msgs.forEach((x,i)=>x.role=='user'?add('user',esc(x.t||'')+(x.att&&x.att.length?`<div class="att">📎 ${esc(x.att.join(', '))}</div>`:'')):add('model',md(x.text),i==c.msgs.length-1));
  m.querySelectorAll('.quick-actions button').forEach(d=>d.onclick=()=>{inp.value=d.dataset.p;inp.focus();grow()});$('features').querySelectorAll('.cards div').forEach(d=>d.onclick=()=>{inp.value=d.dataset.p;inp.focus();grow()});if(c&&c.msgs.length)$('features').innerHTML='';m.scrollTop=m.scrollHeight;
 }
