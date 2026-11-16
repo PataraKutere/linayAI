@@ -41,7 +41,7 @@ const math=await chat("What is 125 multiplied by 48? Reply with the result.");
 assert.match(math.answer,/6[\s,.]?000/,"Arithmetic test failed: "+math.answer);
 console.log("PASS arithmetic");
 
-const memoryText="Linay CI memory marker: blue-orchid-4821";
+const memoryText="Linay CI memory marker: amber-owl-2020";
 let r=await fetch(BASE+"/memory",{method:"POST",headers:{Origin:ORIGIN,"Content-Type":"application/json"},body:JSON.stringify({userId:USER,content:memoryText})});
 assert.equal(r.ok,true,"Memory save failed");
 const saved=await get("/memory?userId="+encodeURIComponent(USER));
@@ -54,9 +54,9 @@ assert.equal(doc.ok,true,"RAG indexing failed: "+JSON.stringify(docBody));
 const listed=await get("/documents?userId="+encodeURIComponent(USER));
 assert.ok((listed.body.documents||[]).some(x=>x.id===docBody.document.id),"Indexed document not listed");
 await new Promise(resolve=>setTimeout(resolve,1800));
-const retrieved=await chat("What exact marker is stored in the Linay CI RAG test document? Reply with the marker only.");
-assert.match(retrieved.answer,/violet-cedar-7319/i,"Semantic RAG retrieval failed: "+retrieved.answer);
+const retrieved=await chat("Read the indexed file named Linay CI RAG test. What exact marker does that file contain? Do not use saved memory; reply with the file marker only.");
 await fetch(BASE+"/documents/"+encodeURIComponent(docBody.document.id)+"?userId="+encodeURIComponent(USER),{method:"DELETE",headers:{Origin:ORIGIN}});
+assert.match(retrieved.answer,/violet-cedar-7319/i,"Semantic RAG retrieval failed: "+retrieved.answer);
 console.log("PASS document RAG indexing + retrieval");
 
 const agent=await chat("Use the calculator tool explicitly to calculate 125 multiplied by 48. Then explain the result briefly.",{agent:true});
