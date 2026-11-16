@@ -213,8 +213,9 @@ function stopSpeech(){const b=speakingButton;speakingButton=null;activeUtterance
 const say=(t,btn,chatId)=>{if(btn&&btn===speakingButton){stopSpeech();return}stopSpeech();if(!window.speechSynthesis)return;const u=new SpeechSynthesisUtterance(t.replaceAll(String.fromCharCode(96),'').replace(/[*#]/g,''));u.lang=/[çğıöşüÇĞİÖŞÜ]/.test(t)?'tr-TR':'en-US';activeUtterance=u;speakingButton=btn||null;speechChatId=chatId;if(btn)btn.textContent='⏹';u.onend=()=>{if(activeUtterance===u)stopSpeech()};u.onerror=()=>{if(activeUtterance===u)stopSpeech()};speechSynthesis.speak(u)};
 window.addEventListener('pagehide',stopSpeech);
 function tg(force){const side=$('side'),shade=$('shade');if(matchMedia('(max-width:760px)').matches){const open=typeof force==='boolean'?force:!side.classList.contains('open');side.classList.toggle('open',open);shade.classList.toggle('open',open)}else{const closed=typeof force==='boolean'?!force:!side.classList.contains('closed');side.classList.toggle('closed',closed)}}
-function nc(){stopSpeech();privateChat=false;S.cur=null;render();tg(false);inp.focus()}
-function startPrivateChat(){stopSpeech();privateChat=true;S.cur=null;render();tg(false);inp.focus()}
+function endPrivateChat(){S.chats=S.chats.filter(c=>!c.hidden);privateChat=false}
+function nc(){stopSpeech();endPrivateChat();S.cur=null;render();tg(false);inp.focus()}
+function startPrivateChat(){stopSpeech();endPrivateChat();privateChat=true;S.cur=null;render();tg(false);inp.focus()}
 function add(role,html,last,media){
  const w=document.createElement('div');w.className='w';
  const d=document.createElement('div');d.className=role=='user'?'u':'a';d.innerHTML=html;w.appendChild(d);if(media&&media.length)showMedia(d,media);
@@ -225,9 +226,9 @@ function add(role,html,last,media){
 function render(){
  const c=cur();$('ttl').textContent=privateChat?'Gizli sohbet':(c?c.title:'LinayAI');$('web').classList.toggle('on',S.cfg.search);
  $('list').innerHTML='';
- const q=($('q').value||'').toLowerCase();S.chats.slice().reverse().filter(x=>!q||(x.title+' '+x.msgs.map(m=>m.text||m.t||'').join(' ')).toLowerCase().includes(q)).forEach(x=>{const r=document.createElement('div');r.className='ci'+(x.id==S.cur?' on':'');
+ const q=($('q').value||'').toLowerCase();S.chats.filter(x=>!x.hidden).slice().reverse().filter(x=>!q||(x.title+' '+x.msgs.map(m=>m.text||m.t||'').join(' ')).toLowerCase().includes(q)).forEach(x=>{const r=document.createElement('div');r.className='ci'+(x.id==S.cur?' on':'');
   r.innerHTML='<span></span><button>✕</button>';r.firstChild.textContent=x.title;
-  r.firstChild.onclick=()=>{stopSpeech();privateChat=false;S.cur=x.id;render();tg(false)};
+  r.firstChild.onclick=()=>{stopSpeech();endPrivateChat();S.cur=x.id;render();tg(false)};
   r.lastChild.onclick=()=>{if(speechChatId===x.id)stopSpeech();S.chats=S.chats.filter(y=>y.id!=x.id);if(S.cur==x.id)S.cur=null;save();render()};
   $('list').appendChild(r)});
  const m=$('msgs');m.innerHTML='';
@@ -305,7 +306,7 @@ async function send(){
    clearTimeout(to);
    if(r.ok){if(mdl!=S.cfg.model)note+="\n\n*(Yoğunluk nedeniyle alternatif model kullanıldı.)*";if(S.cfg.search&&!se)note+="\n\n*(Web araması şu an kullanılamadı; bu yanıt güncel web sonuçları kullanılmadan hazırlandı.)*";break}
    let m=r.status+'';try{m=(await r.json()).error.message}catch(e){}
-   if(!(/^(404|408|429|500|503|504)$/.test(r.status)||/quota|demand|overload|unavailable/i.test(m)))throw new Error(m);
+   if(!(/^(404|408|429|500|503|504)$/.test(r.status)||(se&&r.status===400)||/quota|demand|overload|unavailable/i.test(m)))throw new Error(m);
    r.msg=m;
   }
   if(!r.ok)throw new Error(r.msg||('Hata '+r.status));
@@ -324,7 +325,7 @@ async function send(){
   if(!out)out='(Boş yanıt geldi, tekrar dene.)';
   out+=note;
   const mi=out.match(/\[RESIM:\s*([^\]]+)\]/i);
-  if(mi){out=out.replace(mi[0],'').trim();el.innerHTML=md(out);const ie=add('model','');const generated=await genImg(mi[1].trim(),ie,true),mediaId='gen-'+c.id+'-'+Date.now();await mediaPut(mediaId,generated.src);generatedMedia=[{id:mediaId,name:'Oluşturulan resim'}];out+='\n\n🖼 *Resim oluşturuldu: '+generated.prompt+'*';shown=true}
+  if(mi){out=out.replace(mi[0],'').trim();el.innerHTML=md(out);const ie=add('model','');const generated=await genImg(mi[1].trim(),ie,true),mediaId='gen-'+c.id+'-'+Date.now();if(!privateChat)await mediaPut(mediaId,generated.src);generatedMedia=[{id:mediaId,name:'Oluşturulan resim',src:privateChat?generated.src:undefined}];out+='\n\n🖼 *Resim oluşturuldu: '+generated.prompt+'*';shown=true}
   if(src.size)out+='\n\n**Kaynaklar:** '+[...src].slice(0,5).map(([u,t])=>`[${t||'kaynak'}](${u})`).join(' · ');
   c.msgs.push({role:'model',parts:[{text:out}],text:out,media:generatedMedia});
  }catch(e){
@@ -335,8 +336,8 @@ async function send(){
  if(!el.classList.contains('err')&&!shown)render();
 }
 function exportChat(){const c=cur();if(!c||!c.msgs.length){alert('Dışa aktarılacak sohbet yok.');return}const payload={title:c.title,exportedAt:new Date().toISOString(),messages:c.msgs.map(m=>({role:m.role,text:m.text||m.t||''}))};const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=(c.title||'linay-sohbet').replace(/[^a-z0-9-_ğüşöçıİĞÜŞÖÇ]/gi,'-')+'.json';a.click();URL.revokeObjectURL(url)}
-function openSet(){$('keybox').style.display=(BUILT||PROXY)?'none':'';$('key').value=S.cfg.key;$('replyStyle').value=S.cfg.replyStyle||'balanced';$('memory').value=S.cfg.memory||'';tg(false);dl.showModal()}
-function saveSet(){if(!BUILT)S.cfg.key=$('key').value.trim();S.cfg.replyStyle=$('replyStyle').value;S.cfg.memory=$('memory').value.trim().slice(0,6000);save();dl.close()}
+function openSet(){$('keybox').style.display=(BUILT||PROXY)?'none':'';$('key').value=S.cfg.key;$('memory').value=S.cfg.memory||'';tg(false);dl.showModal()}
+function saveSet(){if(!BUILT)S.cfg.key=$('key').value.trim();S.cfg.memory=$('memory').value.trim().slice(0,6000);save();dl.close()}
 const grow=()=>{inp.style.height='auto';inp.style.height=inp.scrollHeight+'px'};
 inp.oninput=grow;
 inp.onkeydown=e=>{if(e.key=='Enter'&&!e.shiftKey&&!matchMedia('(pointer:coarse)').matches){e.preventDefault();send()}};
