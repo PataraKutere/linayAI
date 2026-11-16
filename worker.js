@@ -53,9 +53,16 @@ async function ragSearch(env,userId,query){
  try{
   const hasDocs=await env.DB.prepare("SELECT 1 AS present FROM documents WHERE user_id=? LIMIT 1").bind(userId).first();
   if(!hasDocs)return [];
-  const v=await embed(env,query);const r=await env.VECTOR.query(v,{topK:5,namespace:userId});const ids=(r.matches||[]).map(x=>x.id);await log(env,"rag-query","Vectorize",true,0,"matches="+ids.length);if(!ids.length)return [];
-  const rows=await env.DB.prepare("SELECT id,content,document_id FROM chunks WHERE user_id=? AND id IN ("+ids.map(()=>"?").join(",")+")").bind(userId,...ids).all();
-  const map=new Map((rows.results||[]).map(x=>[x.id,x]));return ids.map(id=>map.get(id)).filter(Boolean).slice(0,5);
+  const v=await embed(env,query);const r=await env.VECTOR.query(v,{topK:5,namespace:userId});const ids=(r.matches||[]).map(x=>x.id);await log(env,"rag-query","Vectorize",true,0,"matches="+ids.length);
+  if(ids.length){const rows=await env.DB.prepare("SELECT id,content,document_id FROM chunks WHERE user_id=? AND id IN ("+ids.map(()=>"?").join(",")+")").bind(userId,...ids).all();const map=new Map((rows.results||[]).map(x=>[x.id,x]));const found=ids.map(id=>map.get(id)).filter(Boolean).slice(0,5);if(found.length)return found}
+  const stop=new Set(["what","which","where","when","that","this","with","from","have","does","your","file","document","the","and","for","about","tell","show","read","please","nedir","nedeni","hangi","bana","hakkında","belge","dosya","içerik","içinde","olan","bunu","şunu","nedir"]);
+  const terms=[...new Set((String(query).toLocaleLowerCase("tr-TR").match(/[\\p{L}\\p{N}]{3,}/gu)||[]).filter(x=>!stop.has(x)))].slice(0,8);
+  if(!terms.length)return [];
+  const where=terms.map(()=>"(d.name LIKE ? OR c.content LIKE ?)").join(" OR ");
+  const args=[userId,...terms.flatMap(x=>["%"+x+"%","%"+x+"%"])];
+  const fallback=await env.DB.prepare("SELECT c.id,c.content,c.document_id FROM chunks c JOIN documents d ON d.id=c.document_id WHERE c.user_id=? AND ("+where+") ORDER BY d.created_at DESC LIMIT 5").bind(...args).all();
+  await log(env,"rag-keyword-fallback","D1",true,0,"matches="+(fallback.results||[]).length);
+  return fallback.results||[];
  }catch(e){await log(env,"rag-query","Vectorize",false,0,e.message||e);return []}
 }
 async function saveDocument(env,userId,name,text){
