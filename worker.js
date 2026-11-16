@@ -4,7 +4,7 @@ const FALLBACK_MODELS=["@cf/meta/llama-3.1-8b-instruct"];
 const VISION_MODEL="@cf/google/gemma-4-26b-a4b-it";
 const EMBED_MODEL="@cf/baai/bge-m3";
 const GEMINI_MODEL="gemini-flash-lite-latest";
-const CORS={"Access-Control-Allow-Origin":ALLOWED_ORIGIN,"Access-Control-Allow-Headers":"Content-Type, X-Linay-Admin","Access-Control-Allow-Methods":"GET, POST, DELETE, OPTIONS","Access-Control-Expose-Headers":"X-Linay-Provider, X-Linay-Search, X-Linay-Trace, X-Linay-Sources","Vary":"Origin"};
+const CORS={"Access-Control-Allow-Origin":ALLOWED_ORIGIN,"Access-Control-Allow-Headers":"Content-Type, X-Linay-Admin","Access-Control-Allow-Methods":"GET, POST, DELETE, OPTIONS","Access-Control-Expose-Headers":"X-Linay-Provider, X-Linay-Search, X-Linay-Trace, X-Linay-Sources, X-Linay-Agent-Steps","Vary":"Origin"};
 const json=(data,status=200,extra={})=>new Response(JSON.stringify(data),{status,headers:{...CORS,"Content-Type":"application/json",...extra}});
 const uid=()=>crypto.randomUUID();
 const safeId=x=>String(x||"").replace(/[^a-zA-Z0-9_-]/g,"").slice(0,80)||"anonymous";
@@ -71,10 +71,10 @@ async function loadMemory(env,userId){
  if(!env.DB)return {memories:[],recent:[]};
  try{const [m,c]=await Promise.all([env.DB.prepare("SELECT content FROM memories WHERE user_id=? ORDER BY created_at DESC LIMIT 8").bind(userId).all(),env.DB.prepare("SELECT role,content FROM conversations WHERE user_id=? ORDER BY created_at DESC LIMIT 8").bind(userId).all()]);return {memories:m.results||[],recent:(c.results||[]).reverse()}}catch(e){return {memories:[],recent:[]}}
 }
-function sseFromText(text,provider,searchState,trace,sources=[]){
+function sseFromText(text,provider,searchState,trace,sources=[],agentSteps=0){
  const enc=new TextEncoder();const chunks=[];for(let i=0;i<text.length;i+=90)chunks.push(text.slice(i,i+90));
  const stream=new ReadableStream({start(c){for(const t of chunks)c.enqueue(enc.encode("data: "+JSON.stringify({choices:[{delta:{content:t},index:0}]})+"\n\n"));c.enqueue(enc.encode("data: [DONE]\n\n"));c.close()}});
- return new Response(stream,{headers:{...CORS,"Content-Type":"text/event-stream; charset=utf-8","Cache-Control":"no-cache","X-Linay-Provider":provider,"X-Linay-Search":searchState,"X-Linay-Trace":trace,"X-Linay-Sources":encodeURIComponent(JSON.stringify(sources.slice(0,7)))}});
+ return new Response(stream,{headers:{...CORS,"Content-Type":"text/event-stream; charset=utf-8","Cache-Control":"no-cache","X-Linay-Provider":provider,"X-Linay-Search":searchState,"X-Linay-Trace":trace,"X-Linay-Sources":encodeURIComponent(JSON.stringify(sources.slice(0,7))),"X-Linay-Agent-Steps":String(agentSteps)}});
 }
 async function callModel(env,messages,vision=false){
  const models=vision?[VISION_MODEL]:[MODEL,...FALLBACK_MODELS];let last;
@@ -120,7 +120,7 @@ async function agentRun(env,userId,messages){
  const tools=["search_web","read_url","calculator","current_time","knowledge_search"];
  let observations=[],steps=0;
  for(;steps<4;steps++){
-  const planner=[...messages,{role:"system",content:"Sen Linay araç kullanan ajansın. Gerekiyorsa tam olarak tek JSON nesnesi üret: {\"tool\":\"search_web|read_url|calculator|current_time|knowledge_search|final\",\"args\":{\"query\":\"...\",\"url\":\"...\",\"expression\":\"...\"},\"answer\":\"...\"}. Araçları yalnızca gerektiğinde kullan. En fazla dört araç adımı. Web araması isteniyorsa search_web kullan; kaynakları uydurma. Sonuca ulaştıysan tool=final ile cevap ver. Gözlemler: "+JSON.stringify(observations).slice(0,10000)}];
+  const planner=[...messages,{role:"system",content:"Sen Linay araç kullanan ajansın. Gerekiyorsa tam olarak tek JSON nesnesi üret: {\"tool\":\"search_web|read_url|calculator|current_time|knowledge_search|final\",\"args\":{\"query\":\"...\",\"url\":\"...\",\"expression\":\"...\"},\"answer\":\"...\"}. Araçları gerektiğinde kullan. Kullanıcı açıkça bir araç istediyse MUTLAKA çalıştır. Matematik işlemi varsa calculator kullan; güncel araştırma isteniyorsa search_web kullan; URL verilmişse read_url kullan; saat soruluyorsa current_time kullan; kullanıcı belgesi soruluyorsa knowledge_search kullan. En fazla dört araç adımı. Kaynakları uydurma. Sonuca ulaştıysan tool=final ile cevap ver. Gözlemler: "+JSON.stringify(observations).slice(0,10000)}];
   const p=await runPlain(env,planner,500);
   const raw=modelText(p);const match=String(raw).match(/\{[\s\S]*\}/);if(!match)break;
   let action;try{action=JSON.parse(match[0])}catch{break}
@@ -151,7 +151,7 @@ async function handleChat(req,env,ctx){
  const sys="LinayAI: Be accurate, concise and honest. For logic, distinguish what follows from what does not follow. Never invent current facts or sources. If sources are supplied, cite them using their numbered URLs. "+(mem.memories.length?"\nUSER SAVED MEMORY:\n"+mem.memories.map(x=>x.content).join("\n"):"")+(mem.recent.length?"\nRECENT SERVER CONTEXT:\n"+mem.recent.map(x=>x.role+": "+x.content).join("\n"):"")+(rag.length?"\nRELEVANT USER DOCUMENT EXCERPTS:\n"+rag.map(x=>x.content).join("\n---\n"):"")+searchContext;
  const enriched=[{role:"system",content:sys},...messages];
  if(body.agent===true){
-  try{const a=await agentRun(env,userId,enriched);const answer=a.answer+(searchSources.length?"\n\nKaynaklar:\n"+searchSources.map((x,i)=>"["+ (i+1)+"] ["+x.title+"]("+x.url+")").join("\n"):"");ctx.waitUntil((async()=>{await log(env,"agent", "Workers AI",true,Date.now()-start,"steps="+a.steps);if(question)await env.DB?.prepare("INSERT INTO conversations(id,user_id,role,content) VALUES(?,?,?,?)").bind(uid(),userId,"user",question).run();if(answer)await env.DB?.prepare("INSERT INTO conversations(id,user_id,role,content) VALUES(?,?,?,?)").bind(uid(),userId,"assistant",answer.slice(0,6000)).run()})());return sseFromText(answer,"Workers AI Agent · GPT-OSS",searchState,uid(),searchSources)}
+  try{const a=await agentRun(env,userId,enriched);const answer=a.answer+(searchSources.length?"\n\nKaynaklar:\n"+searchSources.map((x,i)=>"["+ (i+1)+"] ["+x.title+"]("+x.url+")").join("\n"):"");ctx.waitUntil((async()=>{await log(env,"agent", "Workers AI",true,Date.now()-start,"steps="+a.steps);if(question)await env.DB?.prepare("INSERT INTO conversations(id,user_id,role,content) VALUES(?,?,?,?)").bind(uid(),userId,"user",question).run();if(answer)await env.DB?.prepare("INSERT INTO conversations(id,user_id,role,content) VALUES(?,?,?,?)").bind(uid(),userId,"assistant",answer.slice(0,6000)).run()})());return sseFromText(answer,"Workers AI Agent · GPT-OSS",searchState,uid(),searchSources,a.steps)}
   catch(e){await log(env,"agent","Workers AI",false,Date.now()-start,e.message);return json({error:"Ajan görevi tamamlayamadı: "+e.message},503)}
  }
  const vision=messages.some(m=>Array.isArray(m.content)&&m.content.some(p=>p.type==="image_url"));
