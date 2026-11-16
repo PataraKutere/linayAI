@@ -120,10 +120,10 @@ async function agentRun(env,userId,messages){
  const tools=["search_web","read_url","calculator","current_time","knowledge_search"];
  let observations=[],steps=0;
  const requestText=contentText(lastUser(messages));
- const mult=requestText.match(/(\\d+(?:[.,]\\d+)?)\\s*(?:multiplied by|times|çarpı|ile çarp|×|x)\\s*(\\d+(?:[.,]\\d+)?)/i);
+ const mult=requestText.match(/(\d+(?:[.,]\d+)?)\s*(?:multiplied by|times|çarpı|ile çarp|×|x)\s*(\d+(?:[.,]\d+)?)/i);
  if(mult&&/calculator|calculate|multiply|çarp|hesap/i.test(requestText)){const expression=mult[1].replace(",",".")+"*"+mult[2].replace(",","." );observations.push({tool:"calculator",expression,result:calc(expression)});steps++}
  else if(/what time|current time|saat kaç|şu an saat/i.test(requestText)){observations.push({tool:"current_time",...{time:new Intl.DateTimeFormat("tr-TR",{timeZone:"Europe/Istanbul",dateStyle:"full",timeStyle:"long"}).format(new Date()),timezone:"Europe/Istanbul"}});steps++}
- else if(/https?:\\/\\//i.test(requestText)&&/read|open|summarize|özet|incele|oku/i.test(requestText)){const url=requestText.match(/https?:\\/\\/[^\\s)]+/i)?.[0];try{if(url)observations.push({tool:"read_url",...await readPage(url)})}catch(e){observations.push({tool:"read_url",error:String(e.message||e)})}steps++}
+ else if(/https?:\/\//i.test(requestText)&&/read|open|summarize|özet|incele|oku/i.test(requestText)){const url=requestText.match(/https?:\/\/[^\s)]+/i)?.[0];try{if(url)observations.push({tool:"read_url",...await readPage(url)})}catch(e){observations.push({tool:"read_url",error:String(e.message||e)})}steps++}
  else if(/research|search|look up|araştır|güncel|latest|news/i.test(requestText)){try{const result=await searchWeb(requestText,env);observations.push({tool:"search_web",...result})}catch(e){observations.push({tool:"search_web",error:String(e.message||e)})}steps++}
  else if(/belge|document|dosya|file/i.test(requestText)){observations.push({tool:"knowledge_search",results:await ragSearch(env,userId,requestText)});steps++}
  for(;steps<4;steps++){
