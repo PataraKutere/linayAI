@@ -34,6 +34,9 @@ jobs:
       - name: Check inline browser scripts
         run: |
           node --input-type=module -e 'import fs from "node:fs"; const html=fs.readFileSync("index.html","utf8"); const scripts=[...html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/gi)].map(x=>x[1]).filter(x=>x.trim()); for (const [i,src] of scripts.entries()) new Function(src); console.log("PASS "+scripts.length+" inline scripts");'
+      - name: Check live independent sports search
+        run: |
+          node --input-type=module -e 'const q="France Türkiye football match 15 November 2026 final score result"; const u="https://snowy-meadow-02d9.28berat28.workers.dev/search?q="+encodeURIComponent(q); const r=await fetch(u,{headers:{Origin:"https://patarakutere.github.io"}}); const j=await r.json(); if(!r.ok) throw new Error(JSON.stringify(j)); const a=j.results||[]; const ok=a.some(x=>/\b\d{1,2}\s*[-–:]\s*\d{1,2}\b/.test((x.title||"")+" "+(x.snippet||""))||/tff.org|sofascore|flashscore/i.test(x.url||"")); if(!ok) throw new Error("No relevant football score source: "+JSON.stringify(j)); console.log("PASS live sports search: "+j.provider+" ("+a.length+" results)");'
 
   smoke-tests:
     if: github.event_name != 'push'
