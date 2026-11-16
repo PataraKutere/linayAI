@@ -359,7 +359,7 @@ async function send(){
   const searchState=r.headers.get('X-Linay-Search')||'off';let citations=[];try{citations=JSON.parse(decodeURIComponent(r.headers.get('X-Linay-Sources')||'%5B%5D'))}catch(e){}
   const agentSteps=Number(r.headers.get('X-Linay-Agent-Steps')||0);
   if(useSearch&&searchState==='failed')out+='*(İnternet araması başarısız oldu; yanıt güncel kaynaklarla doğrulanamadı.)*\n\n';
-  if(provider.includes('Gemini Backup'))out+='*(Ana model geçici olarak kullanılamadı; Gemini yedek model devreye girdi.)*\n\n';
+  if(provider.includes('Gemini Backup'))out+=(provider.includes('ücretsiz günlük kotası doldu')?'*(Cloudflare Workers AI ücretsiz günlük kotası doldu; Gemini yedek model devrede.)*\n\n':'*(Ana model geçici olarak kullanılamadı; Gemini yedek model devreye girdi.)*\n\n');
   if(provider.includes('Web search unavailable'))out+='*(Web araması şu anda erişilemiyor; aşağıdaki yanıt güncel internet kaynaklarıyla doğrulanmadı.)*\n\n';
   const rd=r.body.getReader(),dc=new TextDecoder();let buf='';
   for(;;){const {done,value}=await rd.read();if(done)break;buf+=dc.decode(value,{stream:true});const ls=buf.split('\n');buf=ls.pop();for(const l of ls){if(!l.startsWith('data:'))continue;const raw=l.slice(5).trim();if(!raw||raw==='[DONE]')continue;let j;try{j=JSON.parse(raw)}catch{continue}if(j.error)throw new Error(j.error.message||'Model yanıt hatası');out+=(j.choices?.[0]?.delta?.content||'');el.innerHTML=md(out);$('msgs').scrollTop=$('msgs').scrollHeight;}}
