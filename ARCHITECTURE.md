@@ -5,10 +5,10 @@
 - Frontend: GitHub Pages (index.html, config.js, sw.js).
 - API: Cloudflare Worker snowy-meadow-02d9.
 - Main model: Cloudflare Workers AI @cf/openai/gpt-oss-120b.
-- Model fallback: @cf/meta/llama-3.1-8b-instruct, then Gemini Flash Lite.
-- Vision: @cf/google/gemma-4-26b-a4b-it.
+- Model fallback: @cf/qwen/qwen3.8-27b, then Gemini Flash Lite.
+- Vision: @cf/qwen/qwen3.8-27b.
 - Memory and document text: Cloudflare D1 database linayai-memory (EU jurisdiction).
-- Semantic retrieval: Cloudflare Vectorize index linayai-knowledge, 1,024 dimensions, cosine similarity, BGE-M3 embeddings.
+- Semantic retrieval: Cloudflare Vectorize index linayai-knowledge, 1,024 dimensions, cosine similarity, BGE-M3 embeddings, with a D1 keyword fallback while vector mutations propagate.
 - Tests: GitHub Actions workflow .github/workflows/linay-ai-tests.yml.
 
 ## API routes
