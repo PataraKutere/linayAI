@@ -63,10 +63,10 @@ async function loadMemory(env,userId){
  if(!env.DB)return {memories:[],recent:[]};
  try{const [m,c]=await Promise.all([env.DB.prepare("SELECT content FROM memories WHERE user_id=? ORDER BY created_at DESC LIMIT 8").bind(userId).all(),env.DB.prepare("SELECT role,content FROM conversations WHERE user_id=? ORDER BY created_at DESC LIMIT 8").bind(userId).all()]);return {memories:m.results||[],recent:(c.results||[]).reverse()}}catch(e){return {memories:[],recent:[]}}
 }
-function sseFromText(text,provider,searchState,trace){
+function sseFromText(text,provider,searchState,trace,sources=[]){
  const enc=new TextEncoder();const chunks=[];for(let i=0;i<text.length;i+=90)chunks.push(text.slice(i,i+90));
  const stream=new ReadableStream({start(c){for(const t of chunks)c.enqueue(enc.encode("data: "+JSON.stringify({choices:[{delta:{content:t},index:0}]})+"\n\n"));c.enqueue(enc.encode("data: [DONE]\n\n"));c.close()}});
- return new Response(stream,{headers:{...CORS,"Content-Type":"text/event-stream; charset=utf-8","Cache-Control":"no-cache","X-Linay-Provider":provider,"X-Linay-Search":searchState,"X-Linay-Trace":trace}});
+ return new Response(stream,{headers:{...CORS,"Content-Type":"text/event-stream; charset=utf-8","Cache-Control":"no-cache","X-Linay-Provider":provider,"X-Linay-Search":searchState,"X-Linay-Trace":trace,"X-Linay-Sources":encodeURIComponent(JSON.stringify(sources.slice(0,7)))}});
 }
 async function callModel(env,messages,vision=false){
  const models=vision?[VISION_MODEL]:[MODEL,...FALLBACK_MODELS];let last;
@@ -113,7 +113,7 @@ async function agentRun(env,userId,messages){
    if(action.tool==="search_web"){const s=await searchWeb(action.args?.query||contentText(lastUser(messages)),env);result=s;observations.push({tool:action.tool,...s})}
    if(action.tool==="read_url"){result=await readPage(action.args?.url);observations.push({tool:action.tool,...result})}
    if(action.tool==="calculator"){result={result:calc(action.args?.expression||"")};observations.push({tool:action.tool,...result})}
-   if(action.tool==="current_time"){result={time:new Date().toISOString(),timezone:"UTC"};observations.push({tool:action.tool,...result})}
+   if(action.tool==="current_time"){result={time:new Intl.DateTimeFormat("tr-TR",{timeZone:action.args?.timezone||"Europe/Istanbul",dateStyle:"full",timeStyle:"long"}).format(new Date()),timezone:action.args?.timezone||"Europe/Istanbul"};observations.push({tool:action.tool,...result})}
    if(action.tool==="knowledge_search"){result=await ragSearch(env,userId,action.args?.query||contentText(lastUser(messages)));observations.push({tool:action.tool,results:result})}
   }catch(e){observations.push({tool:action.tool,error:String(e.message||e)})}
  }
@@ -133,14 +133,14 @@ async function handleChat(req,env,ctx){
  const sys="LinayAI: Be accurate, concise and honest. For logic, distinguish what follows from what does not follow. Never invent current facts or sources. If sources are supplied, cite them using their numbered URLs. "+(mem.memories.length?"\nUSER SAVED MEMORY:\n"+mem.memories.map(x=>x.content).join("\n"):"")+(mem.recent.length?"\nRECENT SERVER CONTEXT:\n"+mem.recent.map(x=>x.role+": "+x.content).join("\n"):"")+(rag.length?"\nRELEVANT USER DOCUMENT EXCERPTS:\n"+rag.map(x=>x.content).join("\n---\n"):"")+searchContext;
  const enriched=[{role:"system",content:sys},...messages];
  if(body.agent===true){
-  try{const a=await agentRun(env,userId,enriched);const answer=a.answer+(searchSources.length?"\n\nKaynaklar:\n"+searchSources.map((x,i)=>"["+ (i+1)+"] ["+x.title+"]("+x.url+")").join("\n"):"");ctx.waitUntil((async()=>{await log(env,"agent", "Workers AI",true,Date.now()-start,"steps="+a.steps);if(question)await env.DB?.prepare("INSERT INTO conversations(id,user_id,role,content) VALUES(?,?,?,?)").bind(uid(),userId,"user",question).run();if(answer)await env.DB?.prepare("INSERT INTO conversations(id,user_id,role,content) VALUES(?,?,?,?)").bind(uid(),userId,"assistant",answer.slice(0,6000)).run()})());return sseFromText(answer,"Workers AI Agent · GPT-OSS",searchState,uid())}
+  try{const a=await agentRun(env,userId,enriched);const answer=a.answer+(searchSources.length?"\n\nKaynaklar:\n"+searchSources.map((x,i)=>"["+ (i+1)+"] ["+x.title+"]("+x.url+")").join("\n"):"");ctx.waitUntil((async()=>{await log(env,"agent", "Workers AI",true,Date.now()-start,"steps="+a.steps);if(question)await env.DB?.prepare("INSERT INTO conversations(id,user_id,role,content) VALUES(?,?,?,?)").bind(uid(),userId,"user",question).run();if(answer)await env.DB?.prepare("INSERT INTO conversations(id,user_id,role,content) VALUES(?,?,?,?)").bind(uid(),userId,"assistant",answer.slice(0,6000)).run()})());return sseFromText(answer,"Workers AI Agent · GPT-OSS",searchState,uid(),searchSources)}
   catch(e){await log(env,"agent","Workers AI",false,Date.now()-start,e.message);return json({error:"Ajan görevi tamamlayamadı: "+e.message},503)}
  }
  const vision=messages.some(m=>Array.isArray(m.content)&&m.content.some(p=>p.type==="image_url"));
  try{
   const result=await callModel(env,enriched,vision);
   const trace=uid();
-  if(result.text){const answer=result.text+(result.sources?.length?"\n\nSources: "+result.sources.map(x=>x.title+" — "+x.uri).join(" | "):"");ctx.waitUntil(log(env,"chat",result.provider,true,Date.now()-start,"backup"));return sseFromText(answer,result.provider,searchState,uid())}
+  if(result.text){const answer=result.text+(result.sources?.length?"\n\nSources: "+result.sources.map(x=>x.title+" — "+x.uri).join(" | "):"");ctx.waitUntil(log(env,"chat",result.provider,true,Date.now()-start,"backup"));return sseFromText(answer,result.provider,searchState,uid(),searchSources)}
   const stream=result.stream;
   const pair=stream.tee();
   ctx.waitUntil((async()=>{try{
