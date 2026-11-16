@@ -1,0 +1,180 @@
+const ALLOWED_ORIGIN="https://patarakutere.github.io";
+const MODEL="@cf/openai/gpt-oss-120b";
+const FALLBACK_MODELS=["@cf/meta/llama-3.1-8b-instruct"];
+const VISION_MODEL="@cf/google/gemma-4-26b-a4b-it";
+const EMBED_MODEL="@cf/baai/bge-m3";
+const GEMINI_MODEL="gemini-flash-lite-latest";
+const CORS={"Access-Control-Allow-Origin":ALLOWED_ORIGIN,"Access-Control-Allow-Headers":"Content-Type, X-Linay-Admin","Access-Control-Allow-Methods":"GET, POST, DELETE, OPTIONS","Access-Control-Expose-Headers":"X-Linay-Provider, X-Linay-Search, X-Linay-Trace","Vary":"Origin"};
+const json=(data,status=200,extra={})=>new Response(JSON.stringify(data),{status,headers:{...CORS,"Content-Type":"application/json",...extra}});
+const uid=()=>crypto.randomUUID();
+const safeId=x=>String(x||"").replace(/[^a-zA-Z0-9_-]/g,"").slice(0,80)||"anonymous";
+const lastUser=messages=>[...messages].reverse().find(m=>m.role==="user");
+const contentText=m=>typeof m?.content==="string"?m.content:(m?.content||[]).filter(p=>p.type==="text").map(p=>p.text||"").join("\n");
+async function log(env,kind,provider,ok,latency,detail=""){
+ try{if(env.DB)await env.DB.prepare("INSERT INTO events(id,kind,provider,ok,latency_ms,detail) VALUES(?,?,?,?,?,?)").bind(uid(),kind,provider||"unknown",ok?1:0,Math.max(0,Math.round(latency||0)),String(detail).slice(0,350)).run()}catch(e){}
+}
+function decodeHtml(s){return String(s||"").replace(/&amp;/g,"&").replace(/&quot;/g,'"').replace(/&#39;|&apos;/g,"'").replace(/&lt;/g,"<").replace(/&gt;/g,">").replace(/&#x([0-9a-f]+);/gi,(_,x)=>String.fromCharCode(parseInt(x,16))).replace(/&#(\d+);/g,(_,x)=>String.fromCharCode(+x));}
+function cleanHtml(s){return decodeHtml(String(s||"").replace(/<script[\s\S]*?<\/script>/gi," ").replace(/<style[\s\S]*?<\/style>/gi," ").replace(/<[^>]+>/g," ").replace(/\s+/g," ").trim()).slice(0,1800)}
+function safeUrl(raw){try{const u=new URL(raw);if(!["http:","https:"].includes(u.protocol)||/^(localhost|127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|0\.0\.0\.0|\[::1\])/i.test(u.hostname))return null;return u}catch{return null}}
+async function searchWeb(query,env){
+ const q=String(query||"").trim().slice(0,300);if(!q)throw new Error("Arama sorgusu boş.");
+ const headers={"User-Agent":"LinayAI/1.0 (+https://patarakutere.github.io/linayAI/)"};
+ if(env.SEARXNG_URL){
+  try{const u=new URL("/search",env.SEARXNG_URL);u.searchParams.set("q",q);u.searchParams.set("format","json");u.searchParams.set("language","tr-TR");const r=await fetch(u,{headers,signal:AbortSignal.timeout(9000)});if(r.ok){const j=await r.json();const a=(j.results||[]).slice(0,7).map(x=>({title:cleanHtml(x.title),url:x.url,snippet:cleanHtml(x.content),source:x.engine||"SearXNG"})).filter(x=>safeUrl(x.url));if(a.length)return {provider:"SearXNG",results:a}}}catch(e){}
+ }
+ if(env.BRAVE_SEARCH_API_KEY){
+  try{const u=new URL("https://api.search.brave.com/res/v1/web/search");u.searchParams.set("q",q);u.searchParams.set("count","7");const r=await fetch(u,{headers:{...headers,"X-Subscription-Token":env.BRAVE_SEARCH_API_KEY},signal:AbortSignal.timeout(9000)});if(r.ok){const j=await r.json();const a=(j.web?.results||[]).slice(0,7).map(x=>({title:cleanHtml(x.title),url:x.url,snippet:cleanHtml(x.description),source:"Brave"})).filter(x=>safeUrl(x.url));if(a.length)return {provider:"Brave Search",results:a}}}catch(e){}
+ }
+ try{
+  const u=new URL("https://html.duckduckgo.com/html/");u.searchParams.set("q",q);
+  const r=await fetch(u,{headers:{...headers,"Accept":"text/html"},signal:AbortSignal.timeout(10000)});
+  if(r.ok){const h=await r.text(),a=[];const re=/<a[^>]+class="[^"]*result__a[^"]*"[^>]+href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/gi;let m;
+   while((m=re.exec(h))&&a.length<7){let href=decodeHtml(m[1]);try{const x=new URL(href);if(x.searchParams.has("uddg"))href=decodeURIComponent(x.searchParams.get("uddg"))}catch{}const sn=h.slice(re.lastIndex,re.lastIndex+1400).match(/class="result__snippet"[^>]*>([\s\S]*?)<\/(?:a|div)>/i);if(safeUrl(href))a.push({title:cleanHtml(m[2]),url:href,snippet:cleanHtml(sn?.[1]||""),source:"DuckDuckGo"})}
+   if(a.length)return {provider:"DuckDuckGo",results:a}
+  }
+ }catch(e){}
+ try{
+  const u=new URL("https://en.wikipedia.org/w/api.php");u.searchParams.set("action","query");u.searchParams.set("list","search");u.searchParams.set("srsearch",q);u.searchParams.set("format","json");u.searchParams.set("origin","*");
+  const r=await fetch(u,{headers,signal:AbortSignal.timeout(7000)});if(r.ok){const j=await r.json();const a=(j.query?.search||[]).slice(0,5).map(x=>({title:x.title,url:"https://en.wikipedia.org/wiki/"+encodeURIComponent(x.title.replace(/ /g,"_")),snippet:cleanHtml(x.snippet),source:"Wikipedia"}));if(a.length)return {provider:"Wikipedia",results:a}}
+ }catch(e){}
+ throw new Error("Bağımsız arama sağlayıcıları yanıt vermedi. SearXNG/Brave yapılandırması yok veya DuckDuckGo erişimi başarısız.");
+}
+async function embed(env,text){const r=await env.AI.run(EMBED_MODEL,{text:[String(text).slice(0,7000)]});const v=r?.data?.[0]||r?.result?.data?.[0];if(!Array.isArray(v))throw new Error("Embedding modeli geçerli vektör döndürmedi.");return v}
+async function ragSearch(env,userId,query){
+ if(!env.VECTOR||!env.DB)return [];
+ try{const v=await embed(env,query);const r=await env.VECTOR.query(v,{topK:5,returnMetadata:true,filter:{userId:{$eq:userId}}});const ids=(r.matches||[]).map(x=>x.id);if(!ids.length)return [];
+  const rows=await env.DB.prepare("SELECT id,content,document_id FROM chunks WHERE user_id=? AND id IN ("+ids.map(()=>"?").join(",")+")").bind(userId,...ids).all();
+  const map=new Map((rows.results||[]).map(x=>[x.id,x]));return ids.map(id=>map.get(id)).filter(Boolean).slice(0,5);
+ }catch(e){return []}
+}
+async function saveDocument(env,userId,name,text){
+ if(!env.DB||!env.VECTOR||!env.AI)throw new Error("Belge hafızası henüz bağlı değil.");
+ const id=uid(),clean=String(text||"").trim().slice(0,200000);if(!clean)throw new Error("Dosyada okunabilir metin bulunamadı.");
+ await env.DB.prepare("INSERT INTO documents(id,user_id,name) VALUES(?,?,?)").bind(id,userId,String(name||"Belge").slice(0,180)).run();
+ const chunks=[];for(let i=0;i<clean.length;i+=850){const part=clean.slice(i,Math.min(clean.length,i+1050));if(part.trim())chunks.push({id:uid(),content:part})}
+ for(let i=0;i<chunks.length;i+=4){
+  const batch=chunks.slice(i,i+4),vectors=[];
+  for(const c of batch){const v=await embed(env,c.content);vectors.push({id:c.id,values:v,metadata:{userId,documentId:id}});await env.DB.prepare("INSERT INTO chunks(id,user_id,document_id,content) VALUES(?,?,?,?)").bind(c.id,userId,id,c.content).run()}
+  await env.VECTOR.upsert(vectors);
+ }
+ return {id,name:String(name||"Belge").slice(0,180),chunks:chunks.length};
+}
+async function loadMemory(env,userId){
+ if(!env.DB)return {memories:[],recent:[]};
+ try{const [m,c]=await Promise.all([env.DB.prepare("SELECT content FROM memories WHERE user_id=? ORDER BY created_at DESC LIMIT 8").bind(userId).all(),env.DB.prepare("SELECT role,content FROM conversations WHERE user_id=? ORDER BY created_at DESC LIMIT 8").bind(userId).all()]);return {memories:m.results||[],recent:(c.results||[]).reverse()}}catch(e){return {memories:[],recent:[]}}
+}
+function sseFromText(text,provider,searchState,trace){
+ const enc=new TextEncoder();const chunks=[];for(let i=0;i<text.length;i+=90)chunks.push(text.slice(i,i+90));
+ const stream=new ReadableStream({start(c){for(const t of chunks)c.enqueue(enc.encode("data: "+JSON.stringify({choices:[{delta:{content:t},index:0}]})+"\n\n"));c.enqueue(enc.encode("data: [DONE]\n\n"));c.close()}});
+ return new Response(stream,{headers:{...CORS,"Content-Type":"text/event-stream; charset=utf-8","Cache-Control":"no-cache","X-Linay-Provider":provider,"X-Linay-Search":searchState,"X-Linay-Trace":trace}});
+}
+async function callModel(env,messages,vision=false){
+ const models=vision?[VISION_MODEL]:[MODEL,...FALLBACK_MODELS];let last;
+ for(const model of models){const start=Date.now();try{const opts={messages,stream:true,max_tokens:2048,temperature:0.25};if(!vision&&model===MODEL)opts.reasoning_effort="low";const stream=await env.AI.run(model,opts);return {stream,provider:"Workers AI · "+model,latency:Date.now()-start}}catch(e){last=e;await log(env,"model-fallback",model,false,Date.now()-start,e.message||e)}}
+ if(!vision&&env.GEMINI_API_KEY){try{const r=await gemini(env,messages,false);return {response:r,provider:"Gemini Backup",latency:0}}catch(e){last=e}}
+ throw last||new Error("Hiçbir model yanıt veremedi.");
+}
+function toGemini(messages){const system=messages.filter(m=>m.role==="system").map(m=>contentText(m)).join("\n");const contents=messages.filter(m=>m.role!=="system").map(m=>({role:m.role==="assistant"?"model":"user",parts:[{text:contentText(m)}]}));return {systemInstruction:system?{parts:[{text:system}]}:undefined,contents}}
+async function gemini(env,messages,search=false){
+ if(!env.GEMINI_API_KEY)throw new Error("Gemini yedek anahtarı tanımlı değil.");
+ const body=toGemini(messages);if(search)body.tools=[{google_search:{}}];
+ const r=await fetch("https://generativelanguage.googleapis.com/v1beta/models/"+GEMINI_MODEL+":generateContent",{method:"POST",headers:{"Content-Type":"application/json","x-goog-api-key":env.GEMINI_API_KEY},body:JSON.stringify(body)});
+ if(!r.ok)throw new Error("Gemini "+r.status+": "+(await r.text()).slice(0,240));
+ const j=await r.json();const c=j.candidates?.[0];const text=(c?.content?.parts||[]).map(p=>p.text||"").join("");
+ const sources=(c?.groundingMetadata?.groundingChunks||[]).map(x=>x.web).filter(x=>x?.uri);
+ return {text,sources};
+}
+async function readPage(raw){
+ const u=safeUrl(raw);if(!u)throw new Error("Bu bağlantı güvenlik nedeniyle açılamıyor.");
+ const r=await fetch(u,{headers:{"User-Agent":"LinayAI/1.0","Accept":"text/html,text/plain,application/pdf"},redirect:"follow",signal:AbortSignal.timeout(10000)});
+ if(!r.ok)throw new Error("Sayfa HTTP "+r.status);
+ const type=r.headers.get("content-type")||"";if(!/text\/html|text\/plain|application\/pdf/i.test(type))throw new Error("Bu dosya türü sayfa okuma için desteklenmiyor.");
+ const t=await r.text();return {url:u.href,title:u.hostname,text:cleanHtml(t).slice(0,9000)};
+}
+function calc(expr){
+ const s=String(expr).replace(/,/g,".").replace(/\s+/g,"");if(!/^[\d.+\-*/()%^]+$/.test(s)||s.length>100)throw new Error("Hesaplama ifadesi geçersiz.");
+ let i=0;function atom(){if(s[i]==="+"){i++;return atom()}if(s[i]==="-"){i++;return -atom()}if(s[i]==="("){i++;const v=add();if(s[i++]!==")")throw 0;return v}let m=s.slice(i).match(/^(?:\d+(?:\.\d*)?|\.\d+)/);if(!m)throw 0;i+=m[0].length;return Number(m[0])}
+ function pow(){let v=atom();if(s[i]==="^"){i++;v=Math.pow(v,pow())}return v}
+ function mul(){let v=pow();while(s[i]==="*"||s[i]==="/"||s[i]==="%"){const o=s[i++],b=pow();v=o==="*"?v*b:o==="/"?v/b:v%b}return v}
+ function add(){let v=mul();while(s[i]==="+"||s[i]==="-"){const o=s[i++],b=mul();v=o==="+"?v+b:v-b}return v}
+ try{const v=add();if(i!==s.length||!Number.isFinite(v))throw 0;return String(v)}catch{throw new Error("Hesaplama çözümlenemedi.")}}
+async function agentRun(env,userId,messages){
+ const tools=["search_web","read_url","calculator","current_time","knowledge_search"];
+ let observations=[],steps=0;
+ for(;steps<4;steps++){
+  const planner=[...messages,{role:"system",content:"Sen Linay araç kullanan ajansın. Gerekiyorsa tam olarak tek JSON nesnesi üret: {\"tool\":\"search_web|read_url|calculator|current_time|knowledge_search|final\",\"args\":{\"query\":\"...\",\"url\":\"...\",\"expression\":\"...\"},\"answer\":\"...\"}. Araçları yalnızca gerektiğinde kullan. En fazla dört araç adımı. Web araması isteniyorsa search_web kullan; kaynakları uydurma. Sonuca ulaştıysan tool=final ile cevap ver. Gözlemler: "+JSON.stringify(observations).slice(0,10000)}];
+  const p=await env.AI.run(MODEL,{messages:planner,max_tokens:500,temperature:0.1});
+  const raw=p?.response||p?.choices?.[0]?.message?.content||"";const match=String(raw).match(/\{[\s\S]*\}/);if(!match)break;
+  let action;try{action=JSON.parse(match[0])}catch{break}
+  if(action.tool==="final")return {answer:String(action.answer||""),steps,observations};
+  if(!tools.includes(action.tool))break;
+  let result;
+  try{
+   if(action.tool==="search_web"){const s=await searchWeb(action.args?.query||contentText(lastUser(messages)),env);result=s;observations.push({tool:action.tool,...s})}
+   if(action.tool==="read_url"){result=await readPage(action.args?.url);observations.push({tool:action.tool,...result})}
+   if(action.tool==="calculator"){result={result:calc(action.args?.expression||"")};observations.push({tool:action.tool,...result})}
+   if(action.tool==="current_time"){result={time:new Date().toISOString(),timezone:"UTC"};observations.push({tool:action.tool,...result})}
+   if(action.tool==="knowledge_search"){result=await ragSearch(env,userId,action.args?.query||contentText(lastUser(messages)));observations.push({tool:action.tool,results:result})}
+  }catch(e){observations.push({tool:action.tool,error:String(e.message||e)})}
+ }
+ const context=messages.concat([{role:"system",content:"Araç gözlemleri (yalnızca bunlara dayan): "+JSON.stringify(observations).slice(0,12000)+"\nKullanıcıya sonuçları açıkla. Araç başarısızsa bunu belirt."}]);
+ const out=await env.AI.run(MODEL,{messages:context,max_tokens:1800,temperature:0.2});
+ return {answer:out?.response||out?.choices?.[0]?.message?.content||"Ajan yanıt üretemedi.",steps,observations};
+}
+async function handleChat(req,env,ctx){
+ const body=await req.json(),messages=Array.isArray(body.messages)?body.messages:[];if(!messages.length)return json({error:"Mesaj bulunamadı"},400);
+ const userId=safeId(body.userId),start=Date.now(),last=lastUser(messages),question=contentText(last).slice(0,1200);
+ let searchState="off",searchContext="",searchProvider="",searchSources=[];
+ if(body.search===true){
+  try{const sr=await searchWeb(question,env);searchProvider=sr.provider;searchSources=sr.results;searchState="success";searchContext="\n\nWEB SEARCH RESULTS — Use these results, compare dates and sources, cite each factual paragraph with [n]. Do not claim you opened pages unless you did.\n"+sr.results.map((x,i)=>"["+ (i+1)+"] "+x.title+"\nURL: "+x.url+"\nSnippet: "+x.snippet).join("\n\n")}
+  catch(e){searchState="failed";searchContext="\n\nThe independent web search failed. Do not pretend to have verified current facts. Tell the user web search failed. Error: "+e.message}
+ }
+ const mem=await loadMemory(env,userId),rag=await ragSearch(env,userId,question);
+ const sys="LinayAI: Be accurate, concise and honest. For logic, distinguish what follows from what does not follow. Never invent current facts or sources. If sources are supplied, cite them using their numbered URLs. "+(mem.memories.length?"\nUSER SAVED MEMORY:\n"+mem.memories.map(x=>x.content).join("\n"):"")+(mem.recent.length?"\nRECENT SERVER CONTEXT:\n"+mem.recent.map(x=>x.role+": "+x.content).join("\n"):"")+(rag.length?"\nRELEVANT USER DOCUMENT EXCERPTS:\n"+rag.map(x=>x.content).join("\n---\n"):"")+searchContext;
+ const enriched=[{role:"system",content:sys},...messages];
+ if(body.agent===true){
+  try{const a=await agentRun(env,userId,enriched);const answer=a.answer+(searchSources.length?"\n\nKaynaklar:\n"+searchSources.map((x,i)=>"["+ (i+1)+"] ["+x.title+"]("+x.url+")").join("\n"):"");ctx.waitUntil((async()=>{await log(env,"agent", "Workers AI",true,Date.now()-start,"steps="+a.steps);if(question)await env.DB?.prepare("INSERT INTO conversations(id,user_id,role,content) VALUES(?,?,?,?)").bind(uid(),userId,"user",question).run();if(answer)await env.DB?.prepare("INSERT INTO conversations(id,user_id,role,content) VALUES(?,?,?,?)").bind(uid(),userId,"assistant",answer.slice(0,6000)).run()})());return sseFromText(answer,"Workers AI Agent · GPT-OSS",searchState,uid())}
+  catch(e){await log(env,"agent","Workers AI",false,Date.now()-start,e.message);return json({error:"Ajan görevi tamamlayamadı: "+e.message},503)}
+ }
+ const vision=messages.some(m=>Array.isArray(m.content)&&m.content.some(p=>p.type==="image_url"));
+ try{
+  const result=await callModel(env,enriched,vision);
+  const trace=uid();
+  if(result.response){const j=await result.response.json().catch(()=>({}));return json(j)}
+  const stream=result.stream;
+  ctx.waitUntil((async()=>{try{await log(env,body.search?"web-chat":"chat",result.provider,true,Date.now()-start,searchProvider||searchState);if(question)await env.DB?.prepare("INSERT INTO conversations(id,user_id,role,content) VALUES(?,?,?,?)").bind(uid(),userId,"user",question).run()}catch(e){}})());
+  return new Response(stream,{headers:{...CORS,"Content-Type":"text/event-stream; charset=utf-8","Cache-Control":"no-cache","X-Linay-Provider":result.provider,"X-Linay-Search":searchState+(searchProvider?":"+searchProvider:""),"X-Linay-Trace":trace}});
+ }catch(e){await log(env,"chat","all-models",false,Date.now()-start,e.message);return json({error:"Tüm modeller başarısız oldu: "+e.message},503)}
+}
+export default {async fetch(req,env,ctx){
+ const origin=req.headers.get("Origin")||"";if(req.method==="OPTIONS")return new Response(null,{headers:CORS});
+ if(origin.toLowerCase()!==ALLOWED_ORIGIN.toLowerCase())return new Response("forbidden",{status:403,headers:CORS});
+ const url=new URL(req.url),path=url.pathname;
+ if(path==="/health"&&req.method==="GET")return json({ok:true,service:"LinayAI",model:MODEL,searchProviders:["SearXNG (optional)","Brave (optional)","DuckDuckGo","Wikipedia"],memory:!!env.DB,rag:!!env.VECTOR,agents:true,version:"2.0"});
+ if(path==="/chat"&&req.method==="POST"){try{return await handleChat(req,env,ctx)}catch(e){return json({error:e.message||"Sunucu hatası"},500)}}
+ if(path==="/memory"&&req.method==="POST"){
+  try{const b=await req.json(),userId=safeId(b.userId),content=String(b.content||"").trim().slice(0,6000);if(!env.DB)return json({error:"Hafıza veritabanı bağlı değil"},503);await env.DB.prepare("DELETE FROM memories WHERE user_id=?").bind(userId).run();if(content)await env.DB.prepare("INSERT INTO memories(id,user_id,content) VALUES(?,?,?)").bind(uid(),userId,content).run();return json({ok:true})}catch(e){return json({error:e.message},500)}
+ }
+ if(path==="/documents"&&req.method==="POST"){
+  try{const b=await req.json(),userId=safeId(b.userId),d=await saveDocument(env,userId,b.name,b.text);await log(env,"document-index","Workers AI",true,0,d.chunks+" chunks");return json({ok:true,document:d})}catch(e){await log(env,"document-index","Workers AI",false,0,e.message);return json({error:e.message},500)}
+ }
+ if(path==="/documents"&&req.method==="GET"){
+  const userId=safeId(url.searchParams.get("userId"));if(!env.DB)return json({documents:[]});const r=await env.DB.prepare("SELECT id,name,created_at FROM documents WHERE user_id=? ORDER BY created_at DESC LIMIT 50").bind(userId).all();return json({documents:r.results||[]});
+ }
+ if(path.startsWith("/documents/")&&req.method==="DELETE"){
+  const id=path.split("/").pop(),userId=safeId(url.searchParams.get("userId"));try{const r=await env.DB.prepare("SELECT id FROM chunks WHERE user_id=? AND document_id=?").bind(userId,id).all();const ids=(r.results||[]).map(x=>x.id);if(ids.length)await env.VECTOR.deleteByIds(ids);await env.DB.prepare("DELETE FROM chunks WHERE user_id=? AND document_id=?").bind(userId,id).run();await env.DB.prepare("DELETE FROM documents WHERE user_id=? AND id=?").bind(userId,id).run();return json({ok:true})}catch(e){return json({error:e.message},500)}
+ }
+ if(path==="/metrics"&&req.method==="GET"){
+  try{const r=await env.DB.prepare("SELECT kind,provider,ok,COUNT(*) AS count,ROUND(AVG(latency_ms)) AS avg_ms,MAX(created_at) AS last_seen FROM events WHERE created_at>=datetime('now','-7 days') GROUP BY kind,provider,ok ORDER BY count DESC LIMIT 30").all();const d=await env.DB.prepare("SELECT COUNT(*) AS documents FROM documents").first();return json({window:"7 days",groups:r.results||[],documents:d?.documents||0})}catch(e){return json({error:"Metrikler okunamadı: "+e.message},500)}
+ }
+ if(path==="/search"&&req.method==="GET"){
+  try{const r=await searchWeb(url.searchParams.get("q"),env);return json(r)}catch(e){return json({error:e.message},503)}
+ }
+ if(path==="/image"&&req.method==="POST"){
+  if(!env.AI)return json({error:"Workers AI bağlantısı yok"},500);let prompt="";try{prompt=String((await req.json()).prompt||"").slice(0,1800)}catch{}if(!prompt)prompt="A beautiful landscape";const errs=[];
+  try{const r=await env.AI.run("@cf/black-forest-labs/flux-1-schnell",{prompt,steps:4});if(r?.image)return json({image:r.image});errs.push("flux: görsel dönmedi")}catch(e){errs.push("flux: "+(e.message||e))}
+  try{const r=await env.AI.run("@cf/bytedance/stable-diffusion-xl-lightning",{prompt});const buf=await new Response(r).arrayBuffer();if(buf.byteLength>1000){let s="";const a=new Uint8Array(buf);for(let i=0;i<a.length;i+=0x8000)s+=String.fromCharCode(...a.subarray(i,i+0x8000));return json({image:btoa(s),type:"image/png"})}errs.push("sdxl: boş yanıt")}catch(e){errs.push("sdxl: "+(e.message||e))}
+  return json({error:errs.join(" | ")},500);
+ }
+ return new Response("Linay API",{status:404,headers:CORS});
+}};
