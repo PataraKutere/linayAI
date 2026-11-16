@@ -296,7 +296,7 @@ async function send(){
  ];
  let target=zones.find(z=>z.names.some(n=>clean.includes(n)));
  const asksClock=/saat kaç|kaç saat|what time is it/i.test(clean);
- const isClockFollowup=!asksClock&&zones.some(z=>z.names.some(n=>clean===n))&&/saat kaç/i.test(previousUser);
+ const previousAskedClock=/saat kaç|kaç saat|what time is it/i.test(previousUser);\n const isClockFollowup=!asksClock&&!!target&&previousAskedClock;
  let localAnswer=null;
  if(!files.length&&/^(sa|selamünaleyküm|selamun aleykum)$/i.test(clean))localAnswer='Aleykümselam.';
  else if(!files.length&&/^(selam|merhaba|hey|hello)$/i.test(clean))localAnswer='Selam! Nasıl yardımcı olayım?';
