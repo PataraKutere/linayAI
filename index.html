@@ -274,6 +274,10 @@ async function genImg(text,el,raw){
 async function send(){
  if(busy){ctl&&ctl.abort();return}
  const text=inp.value.trim();if(!text&&!files.length)return;
+ const asksClock=/(?:^|\\s)(?:şu an |şu anda |şimdi )?saat kaç(?: oldu)?[?!. ]*$/i.test(text.trim());
+ if(asksClock&&!files.length){const now=new Intl.DateTimeFormat('tr-TR',{timeZone:'Europe/Istanbul',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).format(new Date());let cc=cur();if(!cc){cc={id:Date.now(),title:text.slice(0,40),msgs:[],hidden:privateChat};S.chats.push(cc);S.cur=cc.id;}cc.msgs.push({role:'user',parts:[{text}],t:text,att:[],media:[]});const answer='İstanbul saatine göre şu an '+now+'.';cc.msgs.push({role:'model',parts:[{text:answer}],text:answer});inp.value='';grow();save();render();return;}
+ const freshQuery=/(en yeni|en son|son çıkan|güncel|son dakika|bugün|şu an|şuanda|latest|current|this week|today|2026|kaçta çıktı|ne zaman çıktı|çıkış tarihi|oynanıyor mu|kaç para|fiyatı|döviz|kur|hava durumu)/i.test(text);
+ const useSearch=!!text&&(S.cfg.search||freshQuery);
  if(!KEY()&&!PROXY){openSet();return}
  let c=cur();
  if(!c){c={id:Date.now(),title:(text||files[0].name).slice(0,40),msgs:[],hidden:privateChat};S.chats.push(c);S.cur=c.id}
@@ -285,11 +289,10 @@ async function send(){
  }
  let out='',src=new Map(),shown=false,generatedMedia=[];
  try{
-  const body={systemInstruction:{parts:[{text:GEN+' Bugün: '+new Date().toLocaleDateString('tr-TR')+(S.cfg.memory?'\n\nKULLANICI HAFIZASI (önceki sohbetlerden kaydedilmiş bilgiler):\n'+S.cfg.memory+'\nBu bilgileri yalnızca ilgili olduğunda kullan; kullanıcıya her seferinde tekrar etme.':'')}]}, 
+  const body={systemInstruction:{parts:[{text:GEN+' Şu an: '+new Date().toLocaleString('tr-TR',{timeZone:'Europe/Istanbul'})+' (Europe/Istanbul). Saat sorulursa bu saati kullan; saat tahmin etme. '+(useSearch?'Bu soru güncel bilgi gerektiriyor. Google Search aracını mutlaka kullan; arama kaynakları olmadan kesin bilgi verme. ':'')+(S.cfg.memory?'\n\nKULLANICI HAFIZASI (önceki sohbetlerden kaydedilmiş bilgiler):\n'+S.cfg.memory+'\nBu bilgileri yalnızca ilgili olduğunda kullan; kullanıcıya her seferinde tekrar etme.':'')}]}, 
    contents:c.msgs.map(m=>({role:m.role,parts:m.parts}))};
-  const tries=[[S.cfg.model,S.cfg.search]];
-  if(S.cfg.search)tries.push([S.cfg.model,false]);
-  [FB,'gemini-flash-latest'].forEach(x=>{if(x!=S.cfg.model)tries.push([x,false])});
+  const tries=useSearch? [['gemini-3.5-flash-lite',true]] : [[S.cfg.model,false]];
+  if(!useSearch)[FB,'gemini-flash-latest'].forEach(x=>{if(x!=S.cfg.model)tries.push([x,false])});
   let r,note='';
   for(const [mdl,se] of tries){
    const b2={...body};if(se)b2.tools=[{google_search:{}}];
@@ -322,6 +325,7 @@ async function send(){
      (k.groundingMetadata&&k.groundingMetadata.groundingChunks||[]).forEach(g=>g.web&&src.set(g.web.uri,g.web.title));
      el.innerHTML=md(out);$('msgs').scrollTop=$('msgs').scrollHeight}catch(e){}}
   }
+  if(useSearch&&!src.size)throw new Error('Google araması bu yanıtta doğrulanabilir kaynak döndürmedi. Güncel bilgi uydurmamak için yanıt gösterilmedi; tekrar dene.');
   if(!out)out='(Boş yanıt geldi, tekrar dene.)';
   out+=note;
   const mi=out.match(/\[RESIM:\s*([^\]]+)\]/i);
