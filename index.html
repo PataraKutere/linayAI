@@ -151,7 +151,7 @@ dialog label{color:#e0d3ed}dialog a{color:#c5a1f1}
 </main>
 <dialog id="dl">
  <h3 style="margin-top:0">Ayarlar <small style="color:var(--mu);font-weight:400">v3.0</small></h3>
- <div id="keybox"><label>Yapay zekâ altyapısı</label><small>LinayAI ana model olarak Cloudflare Workers AI üzerindeki OpenAI GPT-OSS-120B modelini kullanır. Görsel analizinde Gemma 4 Vision, ana model erişilemezse Gemini yedek olarak devreye girer. İnternet araması Gemini Google Search üzerinden yapılır; anahtar sunucuda gizli saklanır.</small></div>
+ <div id="keybox"><label>Yapay zekâ altyapısı</label><small>LinayAI ana model olarak GPT-OSS-120B kullanır; erişilemezse Llama 3.1 8B ve ardından Gemini yedeklenir. İnternet araması önce bağımsız DuckDuckGo aramasını dener; SearXNG ve Brave anahtarı eklenirse onları da kullanır. Bağımsız arama başarısız olursa Gemini Google Search yedek aranır. PDF, Word, Excel ve metin belgeleri D1 + Vectorize ile kişisel RAG hafızasına eklenir. Sohbet hafızası ve hata ölçümleri sunucuda tutulur.</small></div>
   <label style="display:block;margin-top:12px">Linay hafızası</label>
  <textarea id="memory" rows="4" placeholder="Linay’in sonraki sohbetlerde hatırlamasını istediğin bilgileri buraya yaz…"></textarea>
  <small>Bu bilgiler sunucu hafızasına kaydedilir. Gizli bilgi veya parola yazma.</small>
