@@ -4,7 +4,7 @@ const FALLBACK_MODELS=["@cf/meta/llama-3.1-8b-instruct"];
 const VISION_MODEL="@cf/google/gemma-4-26b-a4b-it";
 const EMBED_MODEL="@cf/baai/bge-m3";
 const GEMINI_MODEL="gemini-flash-lite-latest";
-const CORS={"Access-Control-Allow-Origin":ALLOWED_ORIGIN,"Access-Control-Allow-Headers":"Content-Type, X-Linay-Admin","Access-Control-Allow-Methods":"GET, POST, DELETE, OPTIONS","Access-Control-Expose-Headers":"X-Linay-Provider, X-Linay-Search, X-Linay-Trace","Vary":"Origin"};
+const CORS={"Access-Control-Allow-Origin":ALLOWED_ORIGIN,"Access-Control-Allow-Headers":"Content-Type, X-Linay-Admin","Access-Control-Allow-Methods":"GET, POST, DELETE, OPTIONS","Access-Control-Expose-Headers":"X-Linay-Provider, X-Linay-Search, X-Linay-Trace, X-Linay-Sources","Vary":"Origin"};
 const json=(data,status=200,extra={})=>new Response(JSON.stringify(data),{status,headers:{...CORS,"Content-Type":"application/json",...extra}});
 const uid=()=>crypto.randomUUID();
 const safeId=x=>String(x||"").replace(/[^a-zA-Z0-9_-]/g,"").slice(0,80)||"anonymous";
