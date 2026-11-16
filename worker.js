@@ -159,6 +159,7 @@ export default {async fetch(req,env,ctx){
  const url=new URL(req.url),path=url.pathname;
  if(path==="/health"&&req.method==="GET")return json({ok:true,service:"LinayAI",model:MODEL,searchProviders:["SearXNG (optional)","Brave (optional)","DuckDuckGo","Wikipedia"],memory:!!env.DB,rag:!!env.VECTOR,agents:true,version:"2.0"});
  if(path==="/chat"&&req.method==="POST"){try{return await handleChat(req,env,ctx)}catch(e){return json({error:e.message||"Sunucu hatası"},500)}}
+ if(path==="/memory"&&req.method==="GET"){try{const userId=safeId(url.searchParams.get("userId"));const row=await env.DB.prepare("SELECT content FROM memories WHERE user_id=? ORDER BY created_at DESC LIMIT 1").bind(userId).first();return json({content:row?.content||""})}catch(e){return json({error:e.message},500)}}
  if(path==="/memory"&&req.method==="POST"){
   try{const b=await req.json(),userId=safeId(b.userId),content=String(b.content||"").trim().slice(0,6000);if(!env.DB)return json({error:"Hafıza veritabanı bağlı değil"},503);await env.DB.prepare("DELETE FROM memories WHERE user_id=?").bind(userId).run();if(content)await env.DB.prepare("INSERT INTO memories(id,user_id,content) VALUES(?,?,?)").bind(uid(),userId,content).run();return json({ok:true})}catch(e){return json({error:e.message},500)}
  }
