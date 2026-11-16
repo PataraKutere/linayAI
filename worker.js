@@ -109,19 +109,20 @@ function calc(expr){
 async function runPlain(env,messages,maxTokens=1200){
  let last;
  for(const model of [MODEL,...FALLBACK_MODELS]){
-  try{return await env.AI.run(model,{messages,max_tokens:maxTokens,temperature:0.15})}
+  try{const value=await env.AI.run(model,{messages,max_tokens:maxTokens,temperature:0.15});return Object.assign({},value,{__linayModel:model})}
   catch(e){last=e;await log(env,"agent-model-fallback",model,false,0,e.message||e)}
  }
- if(env.GEMINI_API_KEY){const g=await gemini(env,messages,false);return {response:g.text}}
+ if(env.GEMINI_API_KEY){const g=await gemini(env,messages,false);return {response:g.text,__linayModel:"Gemini Backup"}}
  throw last||new Error("Ajan için hiçbir model kullanılamadı.");
 }
+function modelText(value){return value?.choices?.[0]?.message?.content||value?.response||value?.result?.choices?.[0]?.message?.content||value?.value?.choices?.[0]?.message?.content||""}
 async function agentRun(env,userId,messages){
  const tools=["search_web","read_url","calculator","current_time","knowledge_search"];
  let observations=[],steps=0;
  for(;steps<4;steps++){
   const planner=[...messages,{role:"system",content:"Sen Linay araç kullanan ajansın. Gerekiyorsa tam olarak tek JSON nesnesi üret: {\"tool\":\"search_web|read_url|calculator|current_time|knowledge_search|final\",\"args\":{\"query\":\"...\",\"url\":\"...\",\"expression\":\"...\"},\"answer\":\"...\"}. Araçları yalnızca gerektiğinde kullan. En fazla dört araç adımı. Web araması isteniyorsa search_web kullan; kaynakları uydurma. Sonuca ulaştıysan tool=final ile cevap ver. Gözlemler: "+JSON.stringify(observations).slice(0,10000)}];
   const p=await runPlain(env,planner,500);
-  const raw=p?.choices?.[0]?.message?.content||p?.response||p?.result?.choices?.[0]?.message?.content||"";const match=String(raw).match(/\{[\s\S]*\}/);if(!match)break;
+  const raw=modelText(p);const match=String(raw).match(/\{[\s\S]*\}/);if(!match)break;
   let action;try{action=JSON.parse(match[0])}catch{break}
   if(action.tool==="final")return {answer:String(action.answer||""),steps,observations};
   if(!tools.includes(action.tool))break;
@@ -155,6 +156,12 @@ async function handleChat(req,env,ctx){
  }
  const vision=messages.some(m=>Array.isArray(m.content)&&m.content.some(p=>p.type==="image_url"));
  try{
+  if(body.search===true&&!vision){
+   const plain=await runPlain(env,enriched,1800),answer=modelText(plain);
+   if(!answer)throw new Error("Arama sonuçları geldi ancak model boş yanıt üretti.");
+   await log(env,"web-chat",plain.__linayModel||MODEL,true,Date.now()-start,searchProvider||searchState);
+   return sseFromText(answer,plain.__linayModel==="Gemini Backup"?"Gemini Backup":"Workers AI · "+(plain.__linayModel||MODEL),searchState,uid(),searchSources);
+  }
   const result=await callModel(env,enriched,vision);
   const trace=uid();
   if(result.text){const answer=result.text+(result.sources?.length?"\n\nSources: "+result.sources.map(x=>x.title+" — "+x.uri).join(" | "):"");ctx.waitUntil(log(env,"chat",result.provider,true,Date.now()-start,"backup"));return sseFromText(answer,result.provider,searchState,uid(),searchSources)}
