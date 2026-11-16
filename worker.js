@@ -16,8 +16,29 @@ async function log(env,kind,provider,ok,latency,detail=""){
 function decodeHtml(s){return String(s||"").replace(/&amp;/g,"&").replace(/&quot;/g,'"').replace(/&#39;|&apos;/g,"'").replace(/&lt;/g,"<").replace(/&gt;/g,">").replace(/&#x([0-9a-f]+);/gi,(_,x)=>String.fromCharCode(parseInt(x,16))).replace(/&#(\d+);/g,(_,x)=>String.fromCharCode(+x));}
 function cleanHtml(s){return decodeHtml(String(s||"").replace(/<script[\s\S]*?<\/script>/gi," ").replace(/<style[\s\S]*?<\/style>/gi," ").replace(/<[^>]+>/g," ").replace(/\s+/g," ").trim()).slice(0,1800)}
 function safeUrl(raw){try{const u=new URL(raw);if(!["http:","https:"].includes(u.protocol)||/^(localhost|127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|169\.254\.|0\.|100\.(6[4-9]|[7-9]\d)\.|\[::1\]|\[f[cd][0-9a-f:]*\]|\[fe80:)/i.test(u.hostname))return null;return u}catch{return null}}
+function searchQueryFromMessages(messages){
+ const users=(messages||[]).filter(m=>m.role==="user").map(m=>contentText(m).trim()).filter(Boolean).slice(-5);
+ if(!users.length)return "";
+ const combined=users.join(" ");
+ const football=/(fransa|france)/i.test(combined)&&/(türkiye|turkiye|turkey)/i.test(combined)&&/(maç|mac|score|kaç kaç|skor|football|futbol)/i.test(combined);
+ if(football){
+  const date=combined.match(/(\d{1,2}\s+(?:ocak|şubat|subat|mart|nisan|mayıs|mayis|haziran|temmuz|ağustos|agustos|eylül|eylul|ekim|kasım|kasim|aralık|aralik)(?:\s+\d{4})?)/i)?.[1]||"";
+  const year=date.match(/\d{4}/)?.[0]||String(new Date().getFullYear());
+  return ("France Türkiye football match "+date+" "+year+" final score result").trim();
+ }
+ const last=users[users.length-1];
+ return users.length>1&&last.length<90?users.slice(-3).join(" "):combined.slice(-450);
+}
+function searchNorm(value){return String(value||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLocaleLowerCase("en").replace(/ı/g,"i").replace(/[^a-z0-9]+/g," ").trim()}
+function relevantResults(query,results){
+ const stop=new Set(["what","which","where","when","that","this","with","from","have","does","your","the","and","for","about","find","current","latest","information","search","please","maçı","macı","mac","kaç","bitti","score","result","results","football","futbol","match","final","kasim","november","nov","2026"]);
+ const terms=[...new Set(searchNorm(query).split(/\s+/).filter(x=>x.length>2&&!stop.has(x)))];
+ if(!terms.length)return results;
+ return results.map(x=>{const hay=searchNorm([x.title,x.snippet,x.url].join(" "));return {...x,_score:terms.filter(t=>hay.includes(t)).length}}).filter(x=>x._score>=Math.min(2,terms.length)).sort((a,b)=>b._score-a._score).map(({_score,...x})=>x);
+}
+function rssTag(item,tag){const m=item.match(new RegExp("<"+tag+"[^>]*>([\\s\\S]*?)<\\/"+tag+">","i"));return m?cleanHtml(m[1].replace(/^<!\[CDATA\[|\]\]>$/g,"").trim()):""}
 async function searchWeb(query,env){
- const q=String(query||"").trim().slice(0,300);if(!q)throw new Error("Arama sorgusu boş.");
+ const q=String(query||"").trim().slice(0,400);if(!q)throw new Error("Arama sorgusu boş.");
  const headers={"User-Agent":"LinayAI/1.0 (+https://patarakutere.github.io/linayAI/)"};
  if(env.SEARXNG_URL){
   try{const u=new URL("/search",env.SEARXNG_URL);u.searchParams.set("q",q);u.searchParams.set("format","json");u.searchParams.set("language","tr-TR");const r=await fetch(u,{headers,signal:AbortSignal.timeout(9000)});if(r.ok){const j=await r.json();const a=(j.results||[]).slice(0,7).map(x=>({title:cleanHtml(x.title),url:x.url,snippet:cleanHtml(x.content),source:x.engine||"SearXNG"})).filter(x=>safeUrl(x.url));if(a.length)return {provider:"SearXNG",results:a}}}catch(e){}
@@ -26,11 +47,16 @@ async function searchWeb(query,env){
   try{const u=new URL("https://api.search.brave.com/res/v1/web/search");u.searchParams.set("q",q);u.searchParams.set("count","7");const r=await fetch(u,{headers:{...headers,"X-Subscription-Token":env.BRAVE_SEARCH_API_KEY},signal:AbortSignal.timeout(9000)});if(r.ok){const j=await r.json();const a=(j.web?.results||[]).slice(0,7).map(x=>({title:cleanHtml(x.title),url:x.url,snippet:cleanHtml(x.description),source:"Brave"})).filter(x=>safeUrl(x.url));if(a.length)return {provider:"Brave Search",results:a}}}catch(e){}
  }
  try{
+ try{
+  const u=new URL("https://www.bing.com/search");u.searchParams.set("format","rss");u.searchParams.set("q",q);u.searchParams.set("count","10");
+  const r=await fetch(u,{headers:{...headers,"Accept":"application/rss+xml, application/xml, text/xml"},signal:AbortSignal.timeout(9000)});
+  if(r.ok){const xml=await r.text(),items=[...xml.matchAll(/<item>([\s\S]*?)<\/item>/gi)];const rss=items.slice(0,12).map(([_,item])=>({title:rssTag(item,"title"),url:rssTag(item,"link"),snippet:rssTag(item,"description"),source:"Bing"})).filter(x=>x.title&&safeUrl(x.url));const good=relevantResults(q,rss);if(good.length)return {provider:"Bing RSS",results:good.slice(0,7)}}
+ }catch(e){}
   const u=new URL("https://www.bing.com/search");u.searchParams.set("q",q);u.searchParams.set("count","8");
   const r=await fetch(u,{headers:{...headers,"Accept":"text/html","Accept-Language":"tr-TR,tr;q=0.9,en;q=0.8"},signal:AbortSignal.timeout(9000)});
   if(r.ok){const h=await r.text(),a=[];const re=/<li[^>]*class="[^"]*\bb_algo\b[^"]*"[\s\S]*?<h2[^>]*>\s*<a[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>[\s\S]*?<p[^>]*>([\s\S]*?)<\/p>[\s\S]*?<\/li>/gi;let m;
    while((m=re.exec(h))&&a.length<8){const href=decodeHtml(m[1]);if(safeUrl(href))a.push({title:cleanHtml(m[2]),url:href,snippet:cleanHtml(m[3]),source:"Bing"})}
-   if(a.length)return {provider:"Bing",results:a}
+   const good=relevantResults(q,a);if(good.length)return {provider:"Bing",results:good.slice(0,7)}
   }
  }catch(e){}
  try{
@@ -38,12 +64,12 @@ async function searchWeb(query,env){
   const r=await fetch(u,{headers:{...headers,"Accept":"text/html"},signal:AbortSignal.timeout(10000)});
   if(r.ok){const h=await r.text(),a=[];const re=/<a[^>]+class="[^"]*result__a[^"]*"[^>]+href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/gi;let m;
    while((m=re.exec(h))&&a.length<7){let href=decodeHtml(m[1]);try{const x=new URL(href);if(x.searchParams.has("uddg"))href=decodeURIComponent(x.searchParams.get("uddg"))}catch{}const sn=h.slice(re.lastIndex,re.lastIndex+1400).match(/class="result__snippet"[^>]*>([\s\S]*?)<\/(?:a|div)>/i);if(safeUrl(href))a.push({title:cleanHtml(m[2]),url:href,snippet:cleanHtml(sn?.[1]||""),source:"DuckDuckGo"})}
-   if(a.length)return {provider:"DuckDuckGo",results:a}
+   const good=relevantResults(q,a);if(good.length)return {provider:"DuckDuckGo",results:good.slice(0,7)}
   }
  }catch(e){}
  try{
   const u=new URL("https://en.wikipedia.org/w/api.php");u.searchParams.set("action","query");u.searchParams.set("list","search");u.searchParams.set("srsearch",q);u.searchParams.set("format","json");u.searchParams.set("origin","*");
-  const r=await fetch(u,{headers,signal:AbortSignal.timeout(7000)});if(r.ok){const j=await r.json();const a=(j.query?.search||[]).slice(0,5).map(x=>({title:x.title,url:"https://en.wikipedia.org/wiki/"+encodeURIComponent(x.title.replace(/ /g,"_")),snippet:cleanHtml(x.snippet),source:"Wikipedia"}));if(a.length)return {provider:"Wikipedia",results:a}}
+  const r=await fetch(u,{headers,signal:AbortSignal.timeout(7000)});if(r.ok){const j=await r.json();const a=(j.query?.search||[]).slice(0,5).map(x=>({title:x.title,url:"https://en.wikipedia.org/wiki/"+encodeURIComponent(x.title.replace(/ /g,"_")),snippet:cleanHtml(x.snippet),source:"Wikipedia"}));const good=relevantResults(q,a);if(good.length)return {provider:"Wikipedia",results:good.slice(0,5)}}
  }catch(e){}
  throw new Error("Bağımsız arama sağlayıcıları yanıt vermedi. SearXNG/Brave yapılandırması yok veya DuckDuckGo erişimi başarısız.");
 }
@@ -120,7 +146,7 @@ async function runPlain(env,messages,maxTokens=1200){
  let last;
  for(const model of [MODEL,...FALLBACK_MODELS]){
   try{
-   const value=await env.AI.run(model,{messages,max_tokens:maxTokens,temperature:0.15});
+   const opts={messages,max_tokens:maxTokens,temperature:0.15};if(model===MODEL)opts.reasoning_effort="low";const value=await env.AI.run(model,opts);
    if(!modelText(value)){last=new Error("Model boş yanıt döndürdü.");await log(env,"agent-model-fallback",model,false,0,last.message);continue}
    return Object.assign({},value,{__linayModel:model});
   }catch(e){last=e;await log(env,"agent-model-fallback",model,false,0,e.message||e)}
@@ -128,7 +154,11 @@ async function runPlain(env,messages,maxTokens=1200){
  if(env.GEMINI_API_KEY){try{const g=await gemini(env,messages,false);if(g.text)return {response:g.text,__linayModel:"Gemini Backup"};last=new Error("Gemini boş yanıt döndürdü.")}catch(e){last=e}}
  throw last||new Error("Ajan için hiçbir model kullanılamadı.");
 }
-function modelText(value){return value?.choices?.[0]?.message?.content||value?.response||value?.result?.choices?.[0]?.message?.content||value?.value?.choices?.[0]?.message?.content||""}
+function modelText(value){
+ const candidates=[value?.choices?.[0]?.message?.content,value?.choices?.[0]?.text,value?.response,value?.result?.choices?.[0]?.message?.content,value?.value?.choices?.[0]?.message?.content,value?.output_text];
+ for(const c of candidates){if(typeof c==="string"&&c.trim())return c;if(Array.isArray(c)){const t=c.map(x=>typeof x==="string"?x:(x?.text||x?.content||"")).join("").trim();if(t)return t}}
+ return "";
+}
 async function agentRun(env,userId,messages){
  const tools=["search_web","read_url","calculator","current_time","knowledge_search"];
  let observations=[],steps=0;
@@ -161,10 +191,10 @@ async function agentRun(env,userId,messages){
 }
 async function handleChat(req,env,ctx){
  const body=await req.json(),messages=Array.isArray(body.messages)?body.messages:[];if(!messages.length)return json({error:"Mesaj bulunamadı"},400);
- const userId=safeId(body.userId),start=Date.now(),last=lastUser(messages),question=contentText(last).slice(0,1200);
+ const userId=safeId(body.userId),start=Date.now(),last=lastUser(messages),question=contentText(last).slice(0,1200),searchQuery=searchQueryFromMessages(messages);
  let searchState="off",searchContext="",searchProvider="",searchSources=[];
  if(body.search===true){
-  try{const sr=await searchWeb(question,env);searchProvider=sr.provider;searchSources=sr.results;searchState="success";searchContext="\n\nWEB SEARCH RESULTS — Use these results, compare dates and sources, cite each factual paragraph with [n]. Do not claim you opened pages unless you did.\n"+sr.results.map((x,i)=>"["+ (i+1)+"] "+x.title+"\nURL: "+x.url+"\nSnippet: "+x.snippet).join("\n\n")}
+  try{const sr=await searchWeb(searchQuery||question,env);searchProvider=sr.provider;searchSources=sr.results;searchState="success";searchContext="\n\nWEB SEARCH RESULTS — Use these results, compare dates and sources, cite each factual paragraph with [n]. Do not claim you opened pages unless you did.\n"+sr.results.map((x,i)=>"["+ (i+1)+"] "+x.title+"\nURL: "+x.url+"\nSnippet: "+x.snippet).join("\n\n")}
   catch(e){try{if(env.GEMINI_API_KEY){const g=await gemini(env,messages,true);searchState="gemini-backup";searchProvider="Gemini Google Search";searchContext="\n\nIndependent search unavailable; Gemini Google Search fallback findings:\n"+g.text+"\nSources:\n"+(g.sources||[]).map(x=>x.title+" "+x.uri).join("\n");searchSources=(g.sources||[]).map(x=>({title:x.title||"Source",url:x.uri,snippet:"Google Search grounding"})).filter(x=>safeUrl(x.url));}else throw e}catch(g){searchState="failed";searchContext="\n\nAll web search providers failed. Do not pretend to have verified current facts. Tell the user web search failed. Error: "+String(g.message||g)}}
  }
  const mem=await loadMemory(env,userId),rag=await ragSearch(env,userId,question);
