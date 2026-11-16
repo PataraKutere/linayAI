@@ -373,7 +373,8 @@ $('msgs').addEventListener('click',e=>{
 });
 let pullStartY=0,pullArmed=false,pullBusy=false;
 document.addEventListener('touchstart',e=>{if(e.touches.length!==1)return;const t=e.touches[0],m=$('msgs');pullStartY=t.clientY;pullArmed=t.clientY<145&&m.scrollTop<=0&&!pullBusy},{passive:true});
-document.addEventListener('touchend',e=>{if(!pullArmed)return;pullArmed=false;const t=e.changedTouches[0];if(t.clientY-pullStartY>95&&!pullBusy){pullBusy=true;$('pullHint').classList.add('show');setTimeout(()=>location.reload(),180)}},{passive:true});
+document.addEventListener('touchmove',e=>{if(!pullArmed||e.touches.length!==1)return;const d=e.touches[0].clientY-pullStartY;if(d>8){e.preventDefault();if(d>40)$('pullHint').classList.add('show')}},{passive:false});
+document.addEventListener('touchend',e=>{if(!pullArmed)return;pullArmed=false;const t=e.changedTouches[0];if(t.clientY-pullStartY>95&&!pullBusy){pullBusy=true;$('pullHint').classList.add('show');setTimeout(()=>location.reload(),180)}else $('pullHint').classList.remove('show')},{passive:true});
 if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
 render();if(!KEY()&&!PROXY)setTimeout(openSet,300);
 </script></body></html>
