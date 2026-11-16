@@ -41,8 +41,36 @@ function relevantResults(query,results){
  return filtered.sort((a,b)=>b._score-a._score).map(({_score,_hay,_raw,...x})=>x);
 }
 function rssTag(item,tag){const m=item.match(new RegExp("<"+tag+"[^>]*>([\\s\\S]*?)<\\/"+tag+">","i"));return m?cleanHtml(m[1].replace(/^<!\[CDATA\[|\]\]>$/g,"").trim()):""}
+async function searchSportsScore(query){
+ const q=String(query||"");
+ if(!/(france|fransa)/i.test(q)||!/(turkiye|türkiye|turkey)/i.test(q)||!/(football|futbol|match|maç|score|skor)/i.test(q))return null;
+ const m=q.match(/\b(\d{1,2})\s+(January|February|March|April|May|June|July|August|September|October|November|December)\s+(\d{4})\b/i);
+ if(!m)return null;
+ const months={january:"01",february:"02",march:"03",april:"04",may:"05",june:"06",july:"07",august:"08",september:"09",october:"10",november:"11",december:"12"};
+ const date=m[3]+months[m[2].toLowerCase()]+m[1].padStart(2,"0");
+ try{
+  const u=new URL("https://site.api.espn.com/apis/site/v2/sports/soccer/uefa.nations/scoreboard");u.searchParams.set("dates",date);u.searchParams.set("limit","100");
+  const r=await fetch(u,{headers:{"User-Agent":"LinayAI/1.0","Accept":"application/json"},signal:AbortSignal.timeout(8000)});
+  if(!r.ok)return null;
+  const j=await r.json();
+  for(const event of j.events||[]){
+   const competitors=event.competitions?.[0]?.competitors||[];
+   const france=competitors.find(c=>/france/i.test(searchNorm(c.team?.displayName||c.team?.name||"")));
+   const turkey=competitors.find(c=>/turkiye|turkey/i.test(searchNorm(c.team?.displayName||c.team?.name||"")));
+   if(!france||!turkey)continue;
+   const home=competitors.find(c=>c.homeAway==="home"),away=competitors.find(c=>c.homeAway==="away");
+   const score=home&&away?(home.score+"-"+away.score):(france.score+"-"+turkey.score);
+   const status=event.status?.type?.detail||event.status?.type?.description||"Scoreboard";
+   const title=(home?.team?.displayName||"Home")+" "+(home?.score??"?")+"-"+(away?.score??"?")+" "+(away?.team?.displayName||"Away");
+   const url="https://www.espn.com/soccer/match/_/gameId/"+event.id;
+   return {provider:"ESPN Scoreboard",results:[{title,url,snippet:"UEFA Nations League · "+m[1]+" "+m[2]+" "+m[3]+" · "+status+" · Score: "+score,source:"ESPN"}]};
+  }
+ }catch(e){}
+ return null;
+}
 async function searchWeb(query,env){
  const q=String(query||"").trim().slice(0,400);if(!q)throw new Error("Arama sorgusu boş.");
+ const sports=await searchSportsScore(q);if(sports)return sports;
  const headers={"User-Agent":"LinayAI/1.0 (+https://patarakutere.github.io/linayAI/)"};
  if(env.SEARXNG_URL){
   try{const u=new URL("/search",env.SEARXNG_URL);u.searchParams.set("q",q);u.searchParams.set("format","json");u.searchParams.set("language","tr-TR");const r=await fetch(u,{headers,signal:AbortSignal.timeout(9000)});if(r.ok){const j=await r.json();const a=(j.results||[]).slice(0,7).map(x=>({title:cleanHtml(x.title),url:x.url,snippet:cleanHtml(x.content),source:x.engine||"SearXNG"})).filter(x=>safeUrl(x.url));const good=relevantResults(q,a);if(good.length)return {provider:"SearXNG",results:good.slice(0,7)}}}catch(e){}
@@ -266,7 +294,7 @@ export default {async fetch(req,env,ctx){
  const origin=req.headers.get("Origin")||"";if(req.method==="OPTIONS")return new Response(null,{headers:CORS});
  if(origin.toLowerCase()!==ALLOWED_ORIGIN.toLowerCase())return new Response("forbidden",{status:403,headers:CORS});
  const url=new URL(req.url),path=url.pathname;
- if(path==="/health"&&req.method==="GET")return json({ok:true,service:"LinayAI",model:MODEL,searchProviders:["SearXNG (optional)","Brave (optional)","Bing RSS","Google News RSS","Bing","DuckDuckGo","Wikipedia"],memory:!!env.DB,rag:!!env.VECTOR,agents:true,version:"2.0"});
+ if(path==="/health"&&req.method==="GET")return json({ok:true,service:"LinayAI",model:MODEL,searchProviders:["ESPN Scoreboard","SearXNG (optional)","Brave (optional)","Bing RSS","Google News RSS","Bing","DuckDuckGo","Wikipedia"],memory:!!env.DB,rag:!!env.VECTOR,agents:true,version:"2.0"});
  if(path==="/chat"&&req.method==="POST"){try{return await handleChat(req,env,ctx)}catch(e){return json({error:e.message||"Sunucu hatası"},500)}}
  if(path==="/memory"&&req.method==="GET"){try{const userId=safeId(url.searchParams.get("userId"));const row=await env.DB.prepare("SELECT content FROM memories WHERE user_id=? ORDER BY created_at DESC LIMIT 1").bind(userId).first();return json({content:row?.content||""})}catch(e){return json({error:e.message},500)}}
  if(path==="/memory"&&req.method==="POST"){
