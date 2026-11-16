@@ -75,33 +75,49 @@ async function searchWeb(query,env){
 }
 async function embed(env,text){const r=await env.AI.run(EMBED_MODEL,{text:[String(text).slice(0,7000)]});const v=r?.data?.[0]||r?.result?.data?.[0];if(!Array.isArray(v))throw new Error("Embedding modeli geçerli vektör döndürmedi.");return v}
 async function ragSearch(env,userId,query){
- if(!env.VECTOR||!env.DB)return [];
+ if(!env.DB)return [];
  try{
   const hasDocs=await env.DB.prepare("SELECT 1 AS present FROM documents WHERE user_id=? LIMIT 1").bind(userId).first();
   if(!hasDocs)return [];
-  const v=await embed(env,query);const r=await env.VECTOR.query(v,{topK:5,filter:{userId:userId}});const ids=(r.matches||[]).map(x=>x.id);await log(env,"rag-query","Vectorize",true,0,"matches="+ids.length);
-  if(ids.length){const rows=await env.DB.prepare("SELECT c.id,c.content,c.document_id,d.name FROM chunks c JOIN documents d ON d.id=c.document_id WHERE c.user_id=? AND c.id IN ("+ids.map(()=>"?").join(",")+")").bind(userId,...ids).all();const map=new Map((rows.results||[]).map(x=>[x.id,x]));const found=ids.map(id=>map.get(id)).filter(Boolean).slice(0,5);if(found.length)return found}
-  const stop=new Set(["what","which","where","when","that","this","with","from","have","does","your","file","document","the","and","for","about","tell","show","read","please","nedir","nedeni","hangi","bana","hakkında","belge","dosya","içerik","içinde","olan","bunu","şunu","nedir"]);
-  const terms=[...new Set((String(query).toLocaleLowerCase("tr-TR").match(/[\p{L}\p{N}]{3,}/gu)||[]).filter(x=>!stop.has(x)))].slice(0,8);
+  if(env.VECTOR&&env.AI){
+   try{
+    const v=await embed(env,query),r=await env.VECTOR.query(v,{topK:5,filter:{userId:userId}});
+    const ids=(r.matches||[]).map(x=>x.id);await log(env,"rag-query","Vectorize",true,0,"matches="+ids.length);
+    if(ids.length){
+     const rows=await env.DB.prepare("SELECT c.id,c.content,c.document_id,d.name FROM chunks c JOIN documents d ON d.id=c.document_id WHERE c.user_id=? AND c.id IN ("+ids.map(()=>"?").join(",")+")").bind(userId,...ids).all();
+     const map=new Map((rows.results||[]).map(x=>[x.id,x]));const found=ids.map(id=>map.get(id)).filter(Boolean).slice(0,5);
+     if(found.length)return found;
+    }
+   }catch(e){await log(env,"rag-vector-unavailable","Workers AI/Vectorize",false,0,e.message||e)}
+  }
+  const stop=new Set(["what","which","where","when","that","this","with","from","have","does","your","file","document","the","and","for","about","tell","show","read","please","nedir","nedeni","hangi","bana","hakkında","belge","dosya","içerik","içinde","olan","bunu","şunu","nedir","indexed","named","exact","contain"]);
+  const terms=[...new Set((String(query).toLocaleLowerCase("tr-TR").match(/[\\p{L}\\p{N}]{3,}/gu)||[]).filter(x=>!stop.has(x)))].slice(0,10);
   if(!terms.length)return [];
   const where=terms.map(()=>"(d.name LIKE ? OR c.content LIKE ?)").join(" OR ");
   const args=[userId,...terms.flatMap(x=>["%"+x+"%","%"+x+"%"])];
   const fallback=await env.DB.prepare("SELECT c.id,c.content,c.document_id,d.name FROM chunks c JOIN documents d ON d.id=c.document_id WHERE c.user_id=? AND ("+where+") ORDER BY d.created_at DESC LIMIT 5").bind(...args).all();
   await log(env,"rag-keyword-fallback","D1",true,0,"matches="+(fallback.results||[]).length);
   return fallback.results||[];
- }catch(e){await log(env,"rag-query","Vectorize",false,0,e.message||e);return []}
+ }catch(e){await log(env,"rag-query","D1",false,0,e.message||e);return []}
 }
 async function saveDocument(env,userId,name,text){
- if(!env.DB||!env.VECTOR||!env.AI)throw new Error("Belge hafızası henüz bağlı değil.");
+ if(!env.DB)throw new Error("Belge veritabanı bağlı değil.");
  const id=uid(),clean=String(text||"").trim().slice(0,200000);if(!clean)throw new Error("Dosyada okunabilir metin bulunamadı.");
- await env.DB.prepare("INSERT INTO documents(id,user_id,name) VALUES(?,?,?)").bind(id,userId,String(name||"Belge").slice(0,180)).run();
+ const docName=String(name||"Belge").slice(0,180);
+ await env.DB.prepare("INSERT INTO documents(id,user_id,name) VALUES(?,?,?)").bind(id,userId,docName).run();
  const chunks=[];for(let i=0;i<clean.length;i+=850){const part=clean.slice(i,Math.min(clean.length,i+1050));if(part.trim())chunks.push({id:uid(),content:part})}
- for(let i=0;i<chunks.length;i+=4){
-  const batch=chunks.slice(i,i+4),vectors=[];
-  for(const c of batch){const v=await embed(env,c.content);vectors.push({id:c.id,values:v,metadata:{userId,documentId:id}});await env.DB.prepare("INSERT INTO chunks(id,user_id,document_id,content) VALUES(?,?,?,?)").bind(c.id,userId,id,c.content).run()}
-  const mutation=await env.VECTOR.upsert(vectors);await log(env,"vector-upsert","Vectorize",true,0,JSON.stringify(mutation).slice(0,300));
+ for(const c of chunks)await env.DB.prepare("INSERT INTO chunks(id,user_id,document_id,content) VALUES(?,?,?,?)").bind(c.id,userId,id,c.content).run();
+ let vectorIndexed=!!(env.VECTOR&&env.AI),vectorError="";
+ if(vectorIndexed){
+  for(let i=0;i<chunks.length;i+=4){
+   const batch=chunks.slice(i,i+4),vectors=[];
+   try{
+    for(const c of batch){const v=await embed(env,c.content);vectors.push({id:c.id,values:v,metadata:{userId,documentId:id}})}
+    const mutation=await env.VECTOR.upsert(vectors);await log(env,"vector-upsert","Vectorize",true,0,JSON.stringify(mutation).slice(0,300));
+   }catch(e){vectorIndexed=false;vectorError=String(e.message||e);await log(env,"vector-upsert","Vectorize",false,0,vectorError);break}
+  }
  }
- return {id,name:String(name||"Belge").slice(0,180),chunks:chunks.length};
+ return {id,name:docName,chunks:chunks.length,vectorIndexed,vectorError:vectorError.slice(0,180)};
 }
 async function loadMemory(env,userId){
  if(!env.DB)return {memories:[],recent:[]};
