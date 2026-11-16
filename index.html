@@ -283,7 +283,7 @@ async function send(){
  }
  let out='',shown=false,generatedMedia=[];
  try{
-  const system=GEN+' Şu an: '+new Date().toLocaleString('tr-TR',{timeZone:'Europe/Istanbul'})+' (Europe/Istanbul). Saat ve tarih hesaplarını tahmin etme. Güncel bilgi gerekiyorsa web araması yapılmadıysa bunu açıkça söyle ve kesin konuşma. '+(S.cfg.memory?'\\n\\nKULLANICI HAFIZASI:\\n'+S.cfg.memory+'\\nYalnızca ilgili olduğunda kullan.':'');
+  const system=GEN+' KİMLİK KURALI: Adın Linay. Kendini yalnızca Linay veya LinayAI olarak tanıt. Asla Sıfır, ChatGPT, Gemini veya başka bir ad kullanma. Kullanıcı adını sorarsa kısa biçimde “Ben LinayAI.” de. '+' Şu an: '+new Date().toLocaleString('tr-TR',{timeZone:'Europe/Istanbul'})+' (Europe/Istanbul). Saat ve tarih hesaplarını tahmin etme. Güncel bilgi gerekiyorsa web araması yapılmadıysa bunu açıkça söyle ve kesin konuşma. '+(S.cfg.memory?'\\n\\nKULLANICI HAFIZASI:\\n'+S.cfg.memory+'\\nYalnızca ilgili olduğunda kullan.':'');
   const messages=[{role:'system',content:system},...c.msgs.map(m=>{
    const content=[];for(const p of (m.parts||[])){if(p.text)content.push({type:'text',text:p.text});if(p.inlineData?.data)content.push({type:'image_url',image_url:{url:'data:'+(p.inlineData.mimeType||'application/octet-stream')+';base64,'+p.inlineData.data}})}
    return {role:m.role==='model'?'assistant':'user',content:content.length?content:[{type:'text',text:m.t||''}]};
@@ -300,7 +300,7 @@ async function send(){
   c.msgs.push({role:'model',parts:[{text:out}],text:out,media:generatedMedia});
  }catch(e){
   if(e.name==='AbortError'){if(out)c.msgs.push({role:'model',parts:[{text:out}],text:out});else c.msgs.pop()}
-  else{c.msgs.pop();files=sf;chips();inp.value=text;el.className='a err';el.textContent='Hata: '+e.message}
+  else{c.msgs.pop();files=sf;chips();inp.value=text;el.className='a err';const em=String(e.message||e);el.textContent=(useSearch&&(/429|RESOURCE_EXHAUSTED|rate.?limit|quota/i.test(em))?'Google arama kotası dolmuş veya hız sınırına ulaşılmış. Bu nedenle web araması yapılamadı. Bir süre sonra tekrar dene. Ayrıntı: ': 'Hata: ')+em}
  }
  busy=false;$('go').textContent='➤';save();if(!el.classList.contains('err')&&!shown)render();
 }
