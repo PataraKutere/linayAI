@@ -348,14 +348,17 @@ async function send(){
    const content=[];for(const p of (m.parts||[])){if(p.text)content.push({type:'text',text:p.text});if(p.inlineData?.data)content.push({type:'image_url',image_url:{url:'data:'+(p.inlineData.mimeType||'application/octet-stream')+';base64,'+p.inlineData.data}})}
    return {role:m.role==='model'?'assistant':'user',content:content.length?content:[{type:'text',text:m.t||''}]};
   })];
-  const r=await fetch(PROXY+'/chat',{method:'POST',headers:{'Content-Type':'application/json'},signal:ctl.signal,body:JSON.stringify({messages,search:useSearch})});
+  const r=await fetch(PROXY+'/chat',{method:'POST',headers:{'Content-Type':'application/json'},signal:ctl.signal,body:JSON.stringify({messages,search:useSearch,agent:!!S.cfg.agent,userId:USER_ID})});
   if(!r.ok){let msg='HTTP '+r.status;try{const j=await r.json();msg=j.error||msg}catch{}throw new Error(msg)}
   const provider=r.headers.get('X-Linay-Provider')||'Cloudflare Workers AI';
+  const searchState=r.headers.get('X-Linay-Search')||'off';let citations=[];try{citations=JSON.parse(decodeURIComponent(r.headers.get('X-Linay-Sources')||'%5B%5D'))}catch(e){}
+  if(useSearch&&searchState==='failed')out+='*(İnternet araması başarısız oldu; yanıt güncel kaynaklarla doğrulanamadı.)*\\n\\n';
   if(provider.includes('Gemini Backup'))out+='*(Ana model geçici olarak kullanılamadı; Gemini yedek model devreye girdi.)*\\n\\n';
   if(provider.includes('Web search unavailable'))out+='*(Web araması şu anda erişilemiyor; aşağıdaki yanıt güncel internet kaynaklarıyla doğrulanmadı.)*\\n\\n';
   const rd=r.body.getReader(),dc=new TextDecoder();let buf='';
   for(;;){const {done,value}=await rd.read();if(done)break;buf+=dc.decode(value,{stream:true});const ls=buf.split('\n');buf=ls.pop();for(const l of ls){if(!l.startsWith('data:'))continue;const raw=l.slice(5).trim();if(!raw||raw==='[DONE]')continue;let j;try{j=JSON.parse(raw)}catch{continue}if(j.error)throw new Error(j.error.message||'Model yanıt hatası');out+=(j.choices?.[0]?.delta?.content||'');el.innerHTML=md(out);$('msgs').scrollTop=$('msgs').scrollHeight;}}
   if(!out)out='(Boş yanıt geldi, tekrar dene.)';
+  if(citations.length)out+='\\n\\n**Kaynaklar**\\n'+citations.map(x=>'- ['+(x.title||'Kaynak')+']('+x.url+')').join('\\n');
   const mi=out.match(/\[RESIM:\s*([^\]]+)\]/i);
   if(mi){out=out.replace(mi[0],'').trim();el.innerHTML=md(out);const ie=add('model','');const generated=await genImg(mi[1].trim(),ie,true),mediaId='gen-'+c.id+'-'+Date.now();if(!privateChat)await mediaPut(mediaId,generated.src);generatedMedia=[{id:mediaId,name:'Oluşturulan resim',src:privateChat?generated.src:undefined}];out+='\\n\\n🖼 *Resim oluşturuldu: '+generated.prompt+'*';shown=true}
   c.msgs.push({role:'model',parts:[{text:out}],text:out,media:generatedMedia});
@@ -366,8 +369,12 @@ async function send(){
  busy=false;$('go').textContent='➤';save();if(!el.classList.contains('err')&&!shown)render();
 }
 function exportChat(){const c=cur();if(!c||!c.msgs.length){alert('Dışa aktarılacak sohbet yok.');return}const payload={title:c.title,exportedAt:new Date().toISOString(),messages:c.msgs.map(m=>({role:m.role,text:m.text||m.t||''}))};const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=(c.title||'linay-sohbet').replace(/[^a-z0-9-_ğüşöçıİĞÜŞÖÇ]/gi,'-')+'.json';a.click();URL.revokeObjectURL(url)}
-function openSet(){$('keybox').style.display='block';$('memory').value=S.cfg.memory||'';tg(false);dl.showModal()}
-function saveSet(){S.cfg.memory=$('memory').value.trim().slice(0,6000);save();dl.close()}
+async function openSet(){$('keybox').style.display='block';$('memory').value=S.cfg.memory||'';$('metricsBox').textContent='';tg(false);dl.showModal();loadDocs()}
+async function loadDocs(){try{const r=await fetch(PROXY+'/documents?userId='+encodeURIComponent(USER_ID));const j=await r.json();$('doclist').innerHTML=(j.documents||[]).map(d=>'<div style="display:flex;justify-content:space-between;gap:8px;padding:5px 0;border-bottom:1px solid #ffffff16"><span>'+esc(d.name)+'</span><button data-doc="'+d.id+'">Sil</button></div>').join('')||'Henüz belge yüklenmedi.';$('doclist').querySelectorAll('[data-doc]').forEach(b=>b.onclick=()=>deleteDoc(b.dataset.doc))}catch(e){$('doclist').textContent='Belge listesi alınamadı.'}}
+async function deleteDoc(id){if(!confirm('Bu belge hafızadan silinsin mi?'))return;const r=await fetch(PROXY+'/documents/'+encodeURIComponent(id)+'?userId='+encodeURIComponent(USER_ID),{method:'DELETE'});if(r.ok)loadDocs();else alert('Belge silinemedi.')}
+async function showMetrics(){const box=$('metricsBox');box.textContent='Sistem bilgileri alınıyor…';try{const [h,m]=await Promise.all([fetch(PROXY+'/health'),fetch(PROXY+'/metrics')]);const a=await h.json(),b=await m.json();box.textContent='API: '+(a.ok?'Çalışıyor':'Hata')+' · Ana model: '+a.model+' · Hafıza: '+(a.memory?'Açık':'Kapalı')+' · RAG: '+(a.rag?'Açık':'Kapalı')+' · Belgeler: '+(b.documents??'?')+'\\n'+(b.groups||[]).map(x=>x.kind+' / '+x.provider+': '+x.count+' işlem, ort. '+x.avg_ms+' ms'+(x.ok?'':' (hata)')).join('\\n')}catch(e){box.textContent='Durum alınamadı: '+e.message}}
+$('metricsBtn').onclick=showMetrics;
+async function saveSet(){S.cfg.memory=$('memory').value.trim().slice(0,6000);save();try{const r=await fetch(PROXY+'/memory',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:USER_ID,content:S.cfg.memory})});if(!r.ok)throw new Error('Sunucu hafızası kaydedilemedi')}catch(e){alert('Cihaz hafızası kaydedildi; sunucu senkronizasyonu başarısız: '+e.message)}dl.close()}
 const grow=()=>{inp.style.height='auto';inp.style.height=inp.scrollHeight+'px'};
 inp.oninput=grow;
 inp.onkeydown=e=>{if(e.key=='Enter'&&!e.shiftKey&&!matchMedia('(pointer:coarse)').matches){e.preventDefault();send()}};
@@ -376,6 +383,7 @@ $('img').onclick=()=>{imgMode=!imgMode;$('img').classList.toggle('on',imgMode);i
 $('web').title="Web'de ara — Google Arama ile güncel kaynakları yanıta ekle";
 $('web').setAttribute('aria-label',"Web'de ara");
 $('web').onclick=()=>{S.cfg.search=!S.cfg.search;$('web').classList.toggle('on',S.cfg.search);save()};
+$('agent').onclick=()=>{S.cfg.agent=!S.cfg.agent;$('agent').classList.toggle('on',S.cfg.agent);save()};
 const SR=window.SpeechRecognition||window.webkitSpeechRecognition;let rec;
 $('mic').onclick=()=>{
  if(!SR)return alert('Bu tarayıcı sesle yazmayı desteklemiyor.');
