@@ -24,7 +24,8 @@ function searchQueryFromMessages(messages){
  if(football){
   const date=combined.match(/(\d{1,2}\s+(?:ocak|şubat|subat|mart|nisan|mayıs|mayis|haziran|temmuz|ağustos|agustos|eylül|eylul|ekim|kasım|kasim|aralık|aralik)(?:\s+\d{4})?)/i)?.[1]||"";
   const year=date.match(/\d{4}/)?.[0]||String(new Date().getFullYear());
-  return ("France Türkiye football match "+date+" "+year+" final score result").trim();
+  const englishDate=date.replace(/ocak/ig,"January").replace(/şubat|subat/ig,"February").replace(/mart/ig,"March").replace(/nisan/ig,"April").replace(/mayıs|mayis/ig,"May").replace(/haziran/ig,"June").replace(/temmuz/ig,"July").replace(/ağustos|agustos/ig,"August").replace(/eylül|eylul/ig,"September").replace(/ekim/ig,"October").replace(/kasım|kasim/ig,"November").replace(/aralık|aralik/ig,"December");
+  return ("France Türkiye football match "+englishDate+" "+year+" final score result").trim();
  }
  const last=users[users.length-1];
  return users.length>1&&last.length<90?users.slice(-3).join(" "):combined.slice(-450);
@@ -36,7 +37,7 @@ function relevantResults(query,results){
  if(!terms.length)return results;
  let filtered=results.map(x=>{const hay=searchNorm([x.title,x.snippet,x.url].join(" "));return {...x,_score:terms.filter(t=>hay.includes(t)).length,_hay:hay,_raw:[x.title,x.snippet,x.url].join(" ")}}).filter(x=>x._score>=Math.min(2,terms.length));
  const football=/(france|fransa)/i.test(query)&&/(turkiye|türkiye|turkey)/i.test(query)&&/(football|futbol|match|maç|score|skor)/i.test(query);
- if(football)filtered=filtered.filter(x=>/\b\d{1,2}\s*[-–:]\s*\d{1,2}\b/.test(x._raw)||/uefa nations league|uefa|league a|ligue des nations/i.test(x._hay)&&/15 nov|15 november|15 kasim|15\.11\.2026|2026/i.test(x._hay));
+ if(football)filtered=filtered.filter(x=>/\b\d{1,2}\s*[-–:]\s*\d{1,2}\b/.test(x._raw)||/uefa nations league|uefa|league a|ligue des nations/i.test(x._hay)&&/(15\s*(nov|november|kasim)|11[./-]15[./-]2026|15[./-]11[./-]2026|2026-11-15|november\s+15)/i.test(x._raw));
  return filtered.sort((a,b)=>b._score-a._score).map(({_score,_hay,_raw,...x})=>x);
 }
 function rssTag(item,tag){const m=item.match(new RegExp("<"+tag+"[^>]*>([\\s\\S]*?)<\\/"+tag+">","i"));return m?cleanHtml(m[1].replace(/^<!\[CDATA\[|\]\]>$/g,"").trim()):""}
@@ -55,6 +56,18 @@ async function searchWeb(query,env){
   const r=await fetch(u,{headers:{...headers,"Accept":"application/rss+xml, application/xml, text/xml"},signal:AbortSignal.timeout(9000)});
   if(r.ok){const xml=await r.text(),items=[...xml.matchAll(/<item>([\s\S]*?)<\/item>/gi)];const rss=items.slice(0,12).map(([_,item])=>({title:rssTag(item,"title"),url:rssTag(item,"link"),snippet:rssTag(item,"description"),source:"Bing"})).filter(x=>x.title&&safeUrl(x.url));const good=relevantResults(q,rss);if(good.length)return {provider:"Bing RSS",results:good.slice(0,7)}}
  }catch(e){}
+  const isFootball=/(france|fransa)/i.test(q)&&/(turkiye|türkiye|turkey)/i.test(q)&&/(football|futbol|match|maç|score|skor)/i.test(q);
+  const variants=isFootball?[q,q+" UEFA Nations League result",'"France" "Türkiye" "15 November 2026" score','site:tff.org France Türkiye 15 November 2026 result']:[q];
+  const collected=[];
+  for(const query of variants){
+   const u=new URL("https://news.google.com/rss/search");u.searchParams.set("q",query);u.searchParams.set("hl","en-US");u.searchParams.set("gl","US");u.searchParams.set("ceid","US:en");
+   const r=await fetch(u,{headers:{...headers,"Accept":"application/rss+xml, application/xml, text/xml"},signal:AbortSignal.timeout(9000)});
+   if(!r.ok)continue;
+   const xml=await r.text(),items=[...xml.matchAll(/<item>([\s\S]*?)<\/item>/gi)];
+   const found=items.slice(0,10).map(([_,item])=>({title:rssTag(item,"title"),url:rssTag(item,"link"),snippet:rssTag(item,"description"),source:"Google News"})).filter(x=>x.title&&safeUrl(x.url));
+   collected.push(...found);
+   const good=relevantResults(q,collected);if(good.length)return {provider:"Google News RSS",results:good.slice(0,7)};
+  }
   const u=new URL("https://www.bing.com/search");u.searchParams.set("q",q);u.searchParams.set("count","8");
   const r=await fetch(u,{headers:{...headers,"Accept":"text/html","Accept-Language":"tr-TR,tr;q=0.9,en;q=0.8"},signal:AbortSignal.timeout(9000)});
   if(r.ok){const h=await r.text(),a=[];const re=/<li[^>]*class="[^"]*\bb_algo\b[^"]*"[\s\S]*?<h2[^>]*>\s*<a[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>[\s\S]*?<p[^>]*>([\s\S]*?)<\/p>[\s\S]*?<\/li>/gi;let m;
