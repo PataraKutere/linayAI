@@ -267,7 +267,7 @@ async function send(){
  if(!KEY()&&!PROXY){openSet();return}
  let c=cur();
  if(!c){c={id:Date.now(),title:(text||files[0].name).slice(0,40),msgs:[]};S.chats.push(c);S.cur=c.id}
- const sf=files;const imageFiles=sf.filter(f=>f.part&&f.part.inlineData&&/^image\\//i.test(f.part.inlineData.mimeType||''));const media=imageFiles.map((f,i)=>({id:'up-'+c.id+'-'+Date.now()+'-'+i,name:f.name}));await Promise.all(media.map((m,i)=>{const f=imageFiles[i].part.inlineData;return mediaPut(m.id,'data:'+f.mimeType+';base64,'+f.data)}));const parts=sf.map(f=>f.part);if(text)parts.push({text});const um={role:'user',parts,t:text,att:sf.map(f=>f.name),media};c.msgs.push(um);files=[];chips();inp.value='';grow();render();
+ const sf=files;const imageFiles=sf.filter(f=>f.part&&f.part.inlineData&&String(f.part.inlineData.mimeType||'').startsWith('image/'));const media=imageFiles.map((f,i)=>({id:'up-'+c.id+'-'+Date.now()+'-'+i,name:f.name}));await Promise.all(media.map((m,i)=>{const f=imageFiles[i].part.inlineData;return mediaPut(m.id,'data:'+f.mimeType+';base64,'+f.data)}));const parts=sf.map(f=>f.part);if(text)parts.push({text});const um={role:'user',parts,t:text,att:sf.map(f=>f.name),media};c.msgs.push(um);files=[];chips();inp.value='';grow();render();
  const el=add('model','<span style="color:var(--mu)">Linay düşünüyor…</span>');busy=true;$('go').textContent='■';ctl=new AbortController();
  if(text&&(imgMode||(!sf.length&&text.length<200&&IMG_RE.test(text)))){
   imgMode=false;$('img').classList.remove('on');
