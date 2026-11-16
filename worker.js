@@ -98,12 +98,21 @@ function calc(expr){
  function mul(){let v=pow();while(s[i]==="*"||s[i]==="/"||s[i]==="%"){const o=s[i++],b=pow();v=o==="*"?v*b:o==="/"?v/b:v%b}return v}
  function add(){let v=mul();while(s[i]==="+"||s[i]==="-"){const o=s[i++],b=mul();v=o==="+"?v+b:v-b}return v}
  try{const v=add();if(i!==s.length||!Number.isFinite(v))throw 0;return String(v)}catch{throw new Error("Hesaplama çözümlenemedi.")}}
+async function runPlain(env,messages,maxTokens=1200){
+ let last;
+ for(const model of [MODEL,...FALLBACK_MODELS]){
+  try{return await env.AI.run(model,{messages,max_tokens:maxTokens,temperature:0.15})}
+  catch(e){last=e;await log(env,"agent-model-fallback",model,false,0,e.message||e)}
+ }
+ if(env.GEMINI_API_KEY){const g=await gemini(env,messages,false);return {response:g.text}}
+ throw last||new Error("Ajan için hiçbir model kullanılamadı.");
+}
 async function agentRun(env,userId,messages){
  const tools=["search_web","read_url","calculator","current_time","knowledge_search"];
  let observations=[],steps=0;
  for(;steps<4;steps++){
   const planner=[...messages,{role:"system",content:"Sen Linay araç kullanan ajansın. Gerekiyorsa tam olarak tek JSON nesnesi üret: {\"tool\":\"search_web|read_url|calculator|current_time|knowledge_search|final\",\"args\":{\"query\":\"...\",\"url\":\"...\",\"expression\":\"...\"},\"answer\":\"...\"}. Araçları yalnızca gerektiğinde kullan. En fazla dört araç adımı. Web araması isteniyorsa search_web kullan; kaynakları uydurma. Sonuca ulaştıysan tool=final ile cevap ver. Gözlemler: "+JSON.stringify(observations).slice(0,10000)}];
-  const p=await env.AI.run(MODEL,{messages:planner,max_tokens:500,temperature:0.1});
+  const p=await runPlain(env,planner,500);
   const raw=p?.choices?.[0]?.message?.content||p?.response||p?.result?.choices?.[0]?.message?.content||"";const match=String(raw).match(/\{[\s\S]*\}/);if(!match)break;
   let action;try{action=JSON.parse(match[0])}catch{break}
   if(action.tool==="final")return {answer:String(action.answer||""),steps,observations};
@@ -118,7 +127,7 @@ async function agentRun(env,userId,messages){
   }catch(e){observations.push({tool:action.tool,error:String(e.message||e)})}
  }
  const context=messages.concat([{role:"system",content:"Araç gözlemleri (yalnızca bunlara dayan): "+JSON.stringify(observations).slice(0,12000)+"\nKullanıcıya sonuçları açıkla. Araç başarısızsa bunu belirt."}]);
- const out=await env.AI.run(MODEL,{messages:context,max_tokens:1800,temperature:0.2});
+ const out=await runPlain(env,context,1800);
  return {answer:out?.response||out?.choices?.[0]?.message?.content||"Ajan yanıt üretemedi.",steps,observations};
 }
 async function handleChat(req,env,ctx){
