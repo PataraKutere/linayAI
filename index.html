@@ -302,7 +302,7 @@ async function send(){
  else if(!files.length&&/^(selam|merhaba|hey|hello)$/i.test(clean))localAnswer='Selam! Nasıl yardımcı olayım?';
  else if(!files.length&&(asksClock||isClockFollowup)){
   if(!target){
-   const hasLocationHint=/\\b(de|da|nde|nda|in|at)\\b/i.test(clean)||clean.split(/\\s+/).length>2;
+   const hasLocationHint=/\b(de|da|nde|nda|in|at)\b/i.test(clean)||clean.split(/\s+/).length>2;
    if(hasLocationHint)localAnswer='Hangi şehir veya ülkeyi kastediyorsun? Yanlış saat vermemek için konumu netleştireyim.';
    else target=zones[0];
   }
