@@ -133,7 +133,7 @@ function sseFromText(text,provider,searchState,trace,sources=[],agentSteps=0){
 }
 async function callModel(env,messages,vision=false){
  const models=vision?[VISION_MODEL]:[MODEL,...FALLBACK_MODELS];let last;
- for(const model of models){const start=Date.now();try{const opts={messages,stream:true,max_tokens:2048,temperature:0.25};if(!vision&&model===MODEL)opts.reasoning_effort="low";const stream=await env.AI.run(model,opts);return {stream,provider:"Workers AI · "+model,latency:Date.now()-start}}catch(e){last=e;await log(env,"model-fallback",model,false,Date.now()-start,e.message||e)}}
+ for(const model of models){const start=Date.now();try{const opts={messages,stream:true,max_tokens:2048,temperature:0.25};if(!vision&&model===MODEL)opts.reasoning_effort="low";const stream=await env.AI.run(model,opts);return {stream,provider:"Workers AI · "+model,latency:Date.now()-start}}catch(e){last=e;await log(env,"model-fallback",model,false,Date.now()-start,e.message||e);if(isWorkersAIQuotaError(e))break}}
  if(!vision&&env.GEMINI_API_KEY){try{const r=await gemini(env,messages,false);return {text:r.text,sources:r.sources,provider:"Gemini Backup"+(/4006|daily free allocation|neurons/i.test(last?.message||"")?" · Cloudflare AI ücretsiz günlük kotası doldu":""),latency:0}}catch(e){last=e}}
  throw last||new Error("Hiçbir model yanıt veremedi.");
 }
@@ -168,11 +168,12 @@ async function runPlain(env,messages,maxTokens=1200){
    const opts={messages,max_tokens:maxTokens,temperature:0.15};if(model===MODEL)opts.reasoning_effort="low";const value=await env.AI.run(model,opts);
    if(!modelText(value)){last=new Error("Model boş yanıt döndürdü.");await log(env,"agent-model-fallback",model,false,0,last.message);continue}
    return Object.assign({},value,{__linayModel:model});
-  }catch(e){last=e;await log(env,"agent-model-fallback",model,false,0,e.message||e)}
+  }catch(e){last=e;await log(env,"agent-model-fallback",model,false,0,e.message||e);if(isWorkersAIQuotaError(e))break}
  }
  if(env.GEMINI_API_KEY){try{const g=await gemini(env,messages,false);if(g.text)return {response:g.text,__linayModel:"Gemini Backup"+(/4006|daily free allocation|neurons/i.test(last?.message||"")?" · Cloudflare AI ücretsiz günlük kotası doldu":"")};last=new Error("Gemini boş yanıt döndürdü.")}catch(e){last=e}}
  throw last||new Error("Ajan için hiçbir model kullanılamadı.");
 }
+function isWorkersAIQuotaError(error){return /4006|daily free allocation|neurons/i.test(String(error?.message||error||""))}
 function modelText(value){
  const candidates=[value?.choices?.[0]?.message?.content,value?.choices?.[0]?.text,value?.response,value?.result?.choices?.[0]?.message?.content,value?.value?.choices?.[0]?.message?.content,value?.output_text];
  for(const c of candidates){if(typeof c==="string"&&c.trim())return c;if(Array.isArray(c)){const t=c.map(x=>typeof x==="string"?x:(x?.text||x?.content||"")).join("").trim();if(t)return t}}
