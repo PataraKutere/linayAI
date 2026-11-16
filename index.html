@@ -167,9 +167,6 @@ let S=JSON.parse(localStorage.getItem('ai1')||'null')||{chats:[],cur:null,cfg:{k
 if(S.cfg.v!==3){S.cfg.v=3;S.cfg.model='cloudflare-gemma-4';S.cfg.search=false}if(typeof S.cfg.memory!=='string')S.cfg.memory='';
 const RAW=String(window.LINAY_PROXY||window.LINAY_KEY||'').trim();
 const PROXY=/^https?:\/\//i.test(RAW)?RAW.replace(/\/+$/,''):'';
-const BUILT=PROXY?'':String(window.LINAY_KEY||'').trim();
-const KEY=()=>true;
-const HDR=()=>({'Content-Type':'application/json'});
 let imgMode=false;
 const IMG_RE=/(resim|resm\w*|görsel|fotoğraf|foto|logo|poster|illüstrasyon|çizim|image|picture)\w*\s+(yap|çiz|oluştur|üret|hazırla|tasarla|generate|create|make)|(^|\s)çiz(er\s*misin)?([\s.!?]|$)|\b(draw|generate|create|make)\b.{0,15}\b(image|picture|photo|logo|drawing)\b/i;
 let files=[],busy=false,ctl=null,privateChat=false;
