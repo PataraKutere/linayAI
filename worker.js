@@ -15,7 +15,7 @@ async function log(env,kind,provider,ok,latency,detail=""){
 }
 function decodeHtml(s){return String(s||"").replace(/&amp;/g,"&").replace(/&quot;/g,'"').replace(/&#39;|&apos;/g,"'").replace(/&lt;/g,"<").replace(/&gt;/g,">").replace(/&#x([0-9a-f]+);/gi,(_,x)=>String.fromCharCode(parseInt(x,16))).replace(/&#(\d+);/g,(_,x)=>String.fromCharCode(+x));}
 function cleanHtml(s){return decodeHtml(String(s||"").replace(/<script[\s\S]*?<\/script>/gi," ").replace(/<style[\s\S]*?<\/style>/gi," ").replace(/<[^>]+>/g," ").replace(/\s+/g," ").trim()).slice(0,1800)}
-function safeUrl(raw){try{const u=new URL(raw);if(!["http:","https:"].includes(u.protocol)||/^(localhost|127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|0\.0\.0\.0|\[::1\])/i.test(u.hostname))return null;return u}catch{return null}}
+function safeUrl(raw){try{const u=new URL(raw);if(!["http:","https:"].includes(u.protocol)||/^(localhost|127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|169\.254\.|0\.|100\.(6[4-9]|[7-9]\d)\.|\[::1\]|\[f[cd][0-9a-f:]*\]|\[fe80:)/i.test(u.hostname))return null;return u}catch{return null}}
 async function searchWeb(query,env){
  const q=String(query||"").trim().slice(0,300);if(!q)throw new Error("Arama sorgusu boş.");
  const headers={"User-Agent":"LinayAI/1.0 (+https://patarakutere.github.io/linayAI/)"};
@@ -94,7 +94,7 @@ async function gemini(env,messages,search=false){
 }
 async function readPage(raw){
  const u=safeUrl(raw);if(!u)throw new Error("Bu bağlantı güvenlik nedeniyle açılamıyor.");
- const r=await fetch(u,{headers:{"User-Agent":"LinayAI/1.0","Accept":"text/html,text/plain,application/pdf"},redirect:"follow",signal:AbortSignal.timeout(10000)});
+ const r=await fetch(u,{headers:{"User-Agent":"LinayAI/1.0","Accept":"text/html,text/plain,application/pdf"},redirect:"error",signal:AbortSignal.timeout(10000)});
  if(!r.ok)throw new Error("Sayfa HTTP "+r.status);
  const type=r.headers.get("content-type")||"";if(!/text\/html|text\/plain/i.test(type))throw new Error("Bu dosya türü sayfa okuma için desteklenmiyor.");
  const t=await r.text();return {url:u.href,title:u.hostname,text:cleanHtml(t).slice(0,9000)};
