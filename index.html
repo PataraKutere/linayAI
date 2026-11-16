@@ -357,6 +357,7 @@ async function send(){
   if(!r.ok){let msg='HTTP '+r.status;try{const j=await r.json();msg=j.error||msg}catch{}throw new Error(msg)}
   const provider=r.headers.get('X-Linay-Provider')||'Cloudflare Workers AI';
   const searchState=r.headers.get('X-Linay-Search')||'off';let citations=[];try{citations=JSON.parse(decodeURIComponent(r.headers.get('X-Linay-Sources')||'%5B%5D'))}catch(e){}
+  const agentSteps=Number(r.headers.get('X-Linay-Agent-Steps')||0);
   if(useSearch&&searchState==='failed')out+='*(İnternet araması başarısız oldu; yanıt güncel kaynaklarla doğrulanamadı.)*\n\n';
   if(provider.includes('Gemini Backup'))out+='*(Ana model geçici olarak kullanılamadı; Gemini yedek model devreye girdi.)*\n\n';
   if(provider.includes('Web search unavailable'))out+='*(Web araması şu anda erişilemiyor; aşağıdaki yanıt güncel internet kaynaklarıyla doğrulanmadı.)*\n\n';
@@ -364,6 +365,7 @@ async function send(){
   for(;;){const {done,value}=await rd.read();if(done)break;buf+=dc.decode(value,{stream:true});const ls=buf.split('\n');buf=ls.pop();for(const l of ls){if(!l.startsWith('data:'))continue;const raw=l.slice(5).trim();if(!raw||raw==='[DONE]')continue;let j;try{j=JSON.parse(raw)}catch{continue}if(j.error)throw new Error(j.error.message||'Model yanıt hatası');out+=(j.choices?.[0]?.delta?.content||'');el.innerHTML=md(out);$('msgs').scrollTop=$('msgs').scrollHeight;}}
   if(!out)out='(Boş yanıt geldi, tekrar dene.)';if(docNotice)out+=docNotice;
   if(citations.length)out+='\n\n**Kaynaklar**\n'+citations.map(x=>'- ['+(x.title||'Kaynak')+']('+x.url+')').join('\n');
+  if(S.cfg.agent)out+='\n\n*Linay ajanı '+agentSteps+' araç adımı kullandı.*';
   const mi=out.match(/\[RESIM:\s*([^\]]+)\]/i);
   if(mi){out=out.replace(mi[0],'').trim();el.innerHTML=md(out);const ie=add('model','');const generated=await genImg(mi[1].trim(),ie,true),mediaId='gen-'+c.id+'-'+Date.now();if(!privateChat)await mediaPut(mediaId,generated.src);generatedMedia=[{id:mediaId,name:'Oluşturulan resim',src:privateChat?generated.src:undefined}];out+='\\n\\n🖼 *Resim oluşturuldu: '+generated.prompt+'*';shown=true}
   c.msgs.push({role:'model',parts:[{text:out}],text:out,media:generatedMedia});
