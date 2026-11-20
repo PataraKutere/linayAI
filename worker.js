@@ -532,15 +532,34 @@ export default {async fetch(req,env,ctx){
     for(let i=0;i<bytes.length;i+=0x8000)binary+=String.fromCharCode(...bytes.subarray(i,i+0x8000));
     const base64=btoa(binary);
     await log(env,"image-generation","Cloudflare Workers AI "+fluxModel,true,Date.now()-started,"ratio="+ratio+"; style="+style);
-    return json({image:base64,type:"image/jpeg",provider:"Cloudflare Workers AI",model:fluxModel,apiVersion:"Workers AI",edited:false,ratio,style,promptTranslated:true,dailyLimit:30});
+    return json({image:base64,type:"image/jpeg",provider:"Cloudflare Workers AI",model:fluxModel,apiVersion:"Workers AI",engine:"Cloudflare Workers AI / FLUX",promptUsed:fluxPrompt,edited:false,ratio,style,promptTranslated:true,dailyLimit:30});
    }catch(e){
     const rawError=String(e?.message||e||"Bilinmeyen Workers AI hatası");
-    const quota=isWorkersAIQuotaError(e)||/4006|daily free allocation|10,000 neurons/i.test(rawError);
-    const detail=quota
-     ?"Cloudflare Workers AI ücretsiz günlük 10.000 neuron kotası doldu. Kota yenilendiğinde tekrar deneyebilirsin."
-     :"Cloudflare FLUX görsel üretimi başarısız: "+rawError.slice(0,700);
+    const quota=isWorkersAIQuotaError(e)||/4006|daily free allocation|10,000 neurons|quota/i.test(rawError);
     await log(env,"image-generation","Cloudflare Workers AI "+fluxModel,false,Date.now()-started,rawError);
-    return json({error:detail,code:quota?"WORKERS_AI_DAILY_QUOTA_EXHAUSTED":"FLUX_GENERATION_FAILED",provider:"Cloudflare Workers AI",model:fluxModel,apiVersion:"Workers AI",retryable:quota,dailyLimit:30},quota?429:503);
+    if(!quota){
+     return json({error:"Cloudflare FLUX görsel üretimi başarısız: "+rawError.slice(0,700),code:"FLUX_GENERATION_FAILED",provider:"Cloudflare Workers AI",model:fluxModel,apiVersion:"Workers AI",retryable:false,dailyLimit:30},503);
+    }
+    // Cloudflare günlük ücretsiz neuron kotası dolduysa Pollinations / FLUX'a geç.
+    try{
+     const fallbackUrl="https://image.pollinations.ai/prompt/"+encodeURIComponent(fluxPrompt)+"?model=flux&nologo=true";
+     const fallbackResponse=await fetch(fallbackUrl,{method:"GET",headers:{"Accept":"image/*"},signal:AbortSignal.timeout(90000)});
+     if(!fallbackResponse.ok)throw new Error("Pollinations HTTP "+fallbackResponse.status);
+     const contentType=(fallbackResponse.headers.get("content-type")||"").split(";")[0].trim().toLowerCase();
+     if(!contentType.startsWith("image/"))throw new Error("Pollinations geçerli bir görsel yanıtı döndürmedi.");
+     const buffer=await fallbackResponse.arrayBuffer();
+     if(!buffer||buffer.byteLength===0)throw new Error("Pollinations boş görsel verisi döndürdü.");
+     const bytes=new Uint8Array(buffer);
+     let binary="";
+     for(let i=0;i<bytes.length;i+=0x8000)binary+=String.fromCharCode(...bytes.subarray(i,i+0x8000));
+     const fallbackBase64=btoa(binary);
+     await log(env,"image-generation","Pollinations / FLUX (Fallback)",true,Date.now()-started,"Cloudflare günlük neuron kotası dolu; ratio="+ratio+"; style="+style);
+     return json({image:fallbackBase64,type:contentType==="image/jpeg"?"image/jpeg":contentType,provider:"Pollinations",model:"FLUX (Fallback)",apiVersion:"Pollinations",engine:"Pollinations / FLUX (Fallback)",promptUsed:fluxPrompt,edited:false,ratio,style,fallbackReason:"Cloudflare Workers AI günlük ücretsiz neuron kotası dolduğu için yedek motor kullanıldı.",dailyLimit:30});
+    }catch(fallbackError){
+     const fallbackDetail=String(fallbackError?.message||fallbackError||"Bilinmeyen Pollinations hatası");
+     await log(env,"image-generation","Pollinations / FLUX (Fallback)",false,Date.now()-started,fallbackDetail);
+     return json({error:"Cloudflare FLUX ücretsiz kotası doldu ve yedek görsel motoru da şu anda yanıt veremedi. Lütfen daha sonra tekrar dene.",code:"IMAGE_ENGINES_EXHAUSTED",provider:"LinayAI",engine:"Cloudflare FLUX + Pollinations",details:fallbackDetail.slice(0,400),retryable:true,dailyLimit:30},503);
+    }
    }
   }
   const model="gemini-2.5-flash-image";
