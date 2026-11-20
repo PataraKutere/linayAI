@@ -1,8 +1,9 @@
 <!DOCTYPE html>
 <html lang="tr"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#0d0d0f">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,interactive-widget=resizes-content">
+<meta name="theme-color" content="#080b13">
 <link rel="manifest" href="manifest.json">
+<link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
 <link rel="apple-touch-icon" href="icon-192.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Linay">
@@ -231,9 +232,9 @@ dialog input,dialog textarea{background:#0b1220;border-color:#334765;color:#eef3
 <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.9/purify.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.8.0/mammoth.browser.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+
+
 </head><body>
 <aside id="side" class="closed">
  <button class="new-chat-btn" onclick="nc()" aria-label="Yeni sohbet"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span>Yeni sohbet</span><kbd>＋</kbd></button>
@@ -376,22 +377,32 @@ function render(){
  m.querySelectorAll('.quick-actions button').forEach(d=>d.onclick=()=>{inp.value=d.dataset.p;inp.focus();grow()});$('features').querySelectorAll('.cards div').forEach(d=>d.onclick=()=>{inp.value=d.dataset.p;inp.focus();grow()});if(c&&c.msgs.length)$('features').innerHTML='';m.scrollTop=m.scrollHeight;
 }
 function chips(){$('chips').innerHTML='';files.forEach((f,i)=>{const s=document.createElement('span');s.textContent='📎 '+f.name+' ✕';s.onclick=()=>{files.splice(i,1);chips()};$('chips').appendChild(s)})}
+const CDN='https://cdnjs.cloudflare.com/ajax/libs/',libLoads={};
+function loadLib(src,ready){if(ready())return Promise.resolve();if(libLoads[src])return libLoads[src];libLoads[src]=new Promise((resolve,reject)=>{const tag=document.createElement('script');tag.src=src;tag.onload=resolve;tag.onerror=()=>{delete libLoads[src];reject(new Error('Gerekli dosya okuyucu yüklenemedi.'))};document.head.appendChild(tag)});return libLoads[src]}
+const needPdf=()=>loadLib(CDN+'pdf.js/3.11.174/pdf.min.js',()=>!!window.pdfjsLib),needDocx=()=>loadLib(CDN+'mammoth/1.8.0/mammoth.browser.min.js',()=>!!window.mammoth),needXlsx=()=>loadLib(CDN+'xlsx/0.18.5/xlsx.full.min.js',()=>!!window.XLSX);
+async function readImage(f){
+ if(f.type==='image/jpeg'&&f.size>600000&&window.createImageBitmap){try{const bmp=await createImageBitmap(f),scale=Math.min(1,1800/Math.max(bmp.width,bmp.height)),c=document.createElement('canvas');c.width=Math.round(bmp.width*scale);c.height=Math.round(bmp.height*scale);c.getContext('2d').drawImage(bmp,0,0,c.width,c.height);bmp.close?.();const blob=await new Promise(resolve=>c.toBlob(resolve,'image/jpeg',.84));if(blob&&blob.size<f.size)f=blob}catch(_){}}
+ const data=await new Promise((resolve,reject)=>{const x=new FileReader();x.onload=()=>resolve(x.result.split(',')[1]);x.onerror=()=>reject(x.error||new Error('Görsel okunamadı.'));x.readAsDataURL(f)});return{mimeType:f.type||'image/jpeg',data}
+}
 $('f').onchange=async e=>{
- for(const f of e.target.files){
-  if(f.size>15e6){alert(f.name+' çok büyük (en fazla 15 MB)');continue}
+ const picked=[...e.target.files];e.target.value='';
+ for(const f of picked){try{
+  if(f.size>15e6)throw new Error('Dosya çok büyük (en fazla 15 MB).');
   if(f.type==='application/pdf'||/\.pdf$/i.test(f.name)){
-   if(!window.pdfjsLib){alert('PDF okuyucu yüklenemedi.');continue}
-   pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-   const pdf=await pdfjsLib.getDocument({data:await f.arrayBuffer()}).promise;let pages=[];
+   await needPdf();pdfjsLib.GlobalWorkerOptions.workerSrc=CDN+'pdf.js/3.11.174/pdf.worker.min.js';
+   const pdf=await pdfjsLib.getDocument({data:await f.arrayBuffer()}).promise,pages=[];
    for(let n=1;n<=Math.min(pdf.numPages,80);n++){const page=await pdf.getPage(n),tc=await page.getTextContent();pages.push(tc.items.map(x=>x.str).join(' '))}
    const t=pages.join('\n').slice(0,100000);files.push({name:f.name,docText:t,part:{text:'[PDF belgesi: '+f.name+']\n'+t}})
+  }else if(/^image\/(jpeg|png|webp)$/.test(f.type)){
+   files.push({name:f.name,part:{inlineData:await readImage(f)}})
+  }else if(/\.docx$/i.test(f.name)){
+   await needDocx();const z=await mammoth.extractRawText({arrayBuffer:await f.arrayBuffer()}),t=z.value.slice(0,100000);files.push({name:f.name,docText:t,part:{text:'[Word belgesi: '+f.name+']\n'+t}})
+  }else if(/\.xlsx$/i.test(f.name)){
+   await needXlsx();const wb=XLSX.read(await f.arrayBuffer(),{type:'array'}),t=wb.SheetNames.map(n=>'## '+n+'\n'+XLSX.utils.sheet_to_csv(wb.Sheets[n])).join('\n\n').slice(0,100000);files.push({name:f.name,docText:t,part:{text:'[Excel çalışma kitabı: '+f.name+']\n'+t}})
+  }else{
+   const t=(await f.text()).slice(0,100000);files.push({name:f.name,docText:t,part:{text:'[Dosya: '+f.name+']\n'+t}})
   }
-  else if(/^image\//.test(f.type)){const d=await new Promise(r=>{const x=new FileReader();x.onload=()=>r(x.result.split(',')[1]);x.readAsDataURL(f)});files.push({name:f.name,part:{inlineData:{mimeType:f.type,data:d}}})}
-  else if(/\.docx$/i.test(f.name)&&window.mammoth){const z=await mammoth.extractRawText({arrayBuffer:await f.arrayBuffer()});const t=z.value.slice(0,100000);files.push({name:f.name,docText:t,part:{text:'[Word belgesi: '+f.name+']\n'+t}})}
-  else if(/\.xlsx$/i.test(f.name)&&window.XLSX){const wb=XLSX.read(await f.arrayBuffer(),{type:'array'});const t=wb.SheetNames.map(n=>'## '+n+'\n'+XLSX.utils.sheet_to_csv(wb.Sheets[n])).join('\n\n').slice(0,100000);files.push({name:f.name,docText:t,part:{text:'[Excel çalışma kitabı: '+f.name+']\n'+t}})}
-  else{const t=(await f.text()).slice(0,100000);files.push({name:f.name,docText:t,part:{text:'[Dosya: '+f.name+']\n'+t}})}
- }
- e.target.value='';chips();
+ }catch(err){alert(f.name+' okunamadı: '+(err?.message||err))}chips()}
 };
 function regen(){if(busy)return;const c=cur();if(!c)return;while(c.msgs.length&&c.msgs[c.msgs.length-1].role=='model')c.msgs.pop();const u=c.msgs.pop();if(!u)return;inp.value=u.t||'';send()}
 async function enPrompt(t){
