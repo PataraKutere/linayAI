@@ -318,6 +318,49 @@ body.voice-speaking #voiceOrbButton:before,body.voice-speaking #voiceOrbButton:a
 .memory-suggestion button[data-memory-approve]{background:#59478e;border-color:#a994ed;color:white}
 .memory-suggestion button:disabled{opacity:.65}
 @media(max-width:760px){.smart-actions{gap:5px;margin:3px 0 10px}.smart-actions button{min-height:36px;padding:6px 9px}.memory-suggestion{gap:6px;padding:10px}.memory-suggestion button{flex:1;min-height:40px}}
+
+/* HOTFIX: restore text-mode welcome layout and composer controls */
+body.text-mode #hello{
+  display:block;width:100%;max-width:850px;box-sizing:border-box;
+  margin:0 auto;padding:24px 16px 10px;text-align:center;
+}
+body.text-mode #hello h2{margin:10px 0 8px;font-size:clamp(23px,3vw,30px);line-height:1.2;color:var(--fg)}
+body.text-mode .welcome-kicker{margin-top:16px;color:#aeb9e8;font-size:10px;letter-spacing:.2em;font-weight:750}
+body.text-mode .welcome-sub{margin:0 auto 18px;max-width:520px;color:var(--mu);font-size:13px;line-height:1.5}
+#features{display:block;width:calc(100% - 32px);max-width:850px;margin:0 auto 14px;box-sizing:border-box}
+#features .cards{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;width:100%;max-width:850px;margin:0 auto}
+#features .cards>div{
+ display:flex;flex-direction:column;align-items:flex-start;justify-content:flex-start;
+ min-width:0;min-height:112px;padding:17px 15px;box-sizing:border-box;
+ border:1px solid rgba(166,177,220,.16);border-radius:15px;
+ background:linear-gradient(145deg,rgba(23,32,55,.96),rgba(14,21,38,.96));
+ color:#aebbd5;cursor:pointer;transition:transform .18s,border-color .18s,background .18s;
+}
+#features .cards>div:hover{transform:translateY(-2px);border-color:#8d80d866;background:#1b2340}
+#features .cards b{display:block;margin:0 0 7px;color:#edf0ff;font-size:14px}
+#features .cards .card-icon{display:grid;place-items:center;width:30px;height:30px;margin-bottom:10px;border-radius:9px;background:#242b4b;color:#c2b4ff}
+#features .cards .card-icon svg{width:17px;height:17px;stroke:currentColor;fill:none}
+#chips{max-width:850px;width:calc(100% - 28px);margin:0 auto}
+#bar{box-sizing:border-box;align-items:center}
+#bar button{
+ display:inline-flex;flex:0 0 auto;align-items:center;justify-content:center;gap:6px;
+ min-width:36px;height:36px;padding:0 10px;border:1px solid #ffffff20;border-radius:10px;
+ background:#172238;color:#dce5ff;font:inherit;line-height:1;cursor:pointer;
+}
+#bar button svg{display:block;width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+#bar button#research,#bar button#agent{height:36px}
+#bar button#go{min-width:38px;background:linear-gradient(135deg,#9478f5,#5278d9);border-color:#b4a2ff;color:#fff}
+#inp{flex:1 1 180px;min-width:80px;min-height:36px;max-height:150px;box-sizing:border-box;padding:9px 10px;border:1px solid #ffffff1c;border-radius:10px;background:#0c1423;color:#f4f2ff;font:inherit;resize:vertical}
+#inp:focus{outline:none;border-color:#9b86ed;box-shadow:0 0 0 3px #9b86ed20}
+#pullHint{position:fixed;z-index:60;left:50%;top:12px;transform:translateX(-50%);opacity:0;pointer-events:none}
+@media(max-width:760px){
+ body.text-mode #hello{padding:18px 8px 8px}
+ #features{width:calc(100% - 20px)}
+ #features .cards{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+ #features .cards>div{min-height:108px;padding:13px 12px}
+ #bar button{height:40px}
+}
+
 </style><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
