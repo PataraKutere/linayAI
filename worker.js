@@ -24,13 +24,13 @@ function extractMemoryCandidate(messages){
 }
 function shouldSelfAudit(question){return /(?:\b(?:logic|logical|math|mathemat|calculate|calculation|multiply|multiplied|multiplication|code|coding|debug|date|timeline|compare|contradict|prove|proof|formula|equation)\b|mantık|matematik|hesap|çarp|kod|programla|hata ayıkla|tarih|kronoloji|çeliş|ispat|formül|denklem|kaç gün|kaç yıl|ne zaman)/i.test(String(question||""));}
 async function selfAudit(env,question,draft){
- const answer=String(draft||"").trim();if(!answer||!shouldSelfAudit(question))return {answer,checked:false,corrected:false};
+ const answer=String(draft||"").trim();if(!answer||!shouldSelfAudit(question))return {answer,checked:false,corrected:false,attempted:false};
  try{
   const review=await runPlain(env,[{role:"system",content:'You are LinayAI final-answer verifier. Independently check contradictions, arithmetic, dates, units, code logic, and unsupported claims. Do not browse or invent sources. Return ONLY valid JSON: {"issues":[short Turkish issue strings],"correctedAnswer":"complete corrected answer in Turkish"}. If sound, issues=[] and correctedAnswer exactly equals the draft. If uncertainty cannot be resolved, state it explicitly. Preserve formatting.'},{role:"user",content:"Question:\\n"+String(question||"").slice(0,1800)+"\\n\\nDraft answer:\\n"+answer.slice(0,9000)}],900);
-  const raw=modelText(review),match=raw.match(/\{[\s\S]*\}/);if(!match)return {answer,checked:false,corrected:false};
+  const raw=modelText(review),match=raw.match(/\{[\s\S]*\}/);if(!match)return {answer,checked:false,corrected:false,attempted:true};
   const parsed=JSON.parse(match[0]),corrected=typeof parsed.correctedAnswer==="string"&&parsed.correctedAnswer.trim()?parsed.correctedAnswer.trim():answer;
-  return {answer:corrected,checked:true,corrected:corrected!==answer,issues:Array.isArray(parsed.issues)?parsed.issues.slice(0,4):[]};
- }catch(e){await log(env,"self-audit","Workers AI",false,0,String(e.message||e));return {answer,checked:false,corrected:false}}
+  return {answer:corrected,checked:true,corrected:corrected!==answer,attempted:true,issues:Array.isArray(parsed.issues)?parsed.issues.slice(0,4):[]};
+ }catch(e){await log(env,"self-audit","Workers AI",false,0,String(e.message||e));return {answer,checked:false,corrected:false,attempted:true}}
 }
 async function log(env,kind,provider,ok,latency,detail=""){
  try{if(env.DB)await env.DB.prepare("INSERT INTO events(id,kind,provider,ok,latency_ms,detail) VALUES(?,?,?,?,?,?)").bind(uid(),kind,provider||"unknown",ok?1:0,Math.max(0,Math.round(latency||0)),String(detail).slice(0,350)).run()}catch(e){}
@@ -226,10 +226,10 @@ async function loadMemory(env,userId){
  }catch(e){}
  return {memories,recent};
 }
-function sseFromText(text,provider,searchState,trace,sources=[],agentSteps=0,documents=[],agentTrace=[],memoryCandidate=null,auditChecked=false){
+function sseFromText(text,provider,searchState,trace,sources=[],agentSteps=0,documents=[],agentTrace=[],memoryCandidate=null,auditChecked=false,auditAttempted=false){
  const enc=new TextEncoder();const chunks=[];for(let i=0;i<text.length;i+=90)chunks.push(text.slice(i,i+90));
  const stream=new ReadableStream({start(c){for(const t of chunks)c.enqueue(enc.encode("data: "+JSON.stringify({choices:[{delta:{content:t},index:0}]})+"\n\n"));c.enqueue(enc.encode("data: [DONE]\n\n"));c.close()}});
- return new Response(stream,{headers:{...CORS,"Content-Type":"text/event-stream; charset=utf-8","Cache-Control":"no-cache","X-Linay-Provider":provider,"X-Linay-Search":searchState,"X-Linay-Trace":trace,"X-Linay-Sources":encodeURIComponent(JSON.stringify(sources.slice(0,7))),"X-Linay-Documents":encodeURIComponent(JSON.stringify(documents.slice(0,5))),"X-Linay-Agent-Steps":String(agentSteps),"X-Linay-Agent-Trace":encodeURIComponent(JSON.stringify(agentTrace.slice(0,8))),"X-Linay-Memory-Candidate":encodeURIComponent(JSON.stringify(memoryCandidate||null)),"X-Linay-Self-Audit":auditChecked?"checked":"not-needed"}});
+ return new Response(stream,{headers:{...CORS,"Content-Type":"text/event-stream; charset=utf-8","Cache-Control":"no-cache","X-Linay-Provider":provider,"X-Linay-Search":searchState,"X-Linay-Trace":trace,"X-Linay-Sources":encodeURIComponent(JSON.stringify(sources.slice(0,7))),"X-Linay-Documents":encodeURIComponent(JSON.stringify(documents.slice(0,5))),"X-Linay-Agent-Steps":String(agentSteps),"X-Linay-Agent-Trace":encodeURIComponent(JSON.stringify(agentTrace.slice(0,8))),"X-Linay-Memory-Candidate":encodeURIComponent(JSON.stringify(memoryCandidate||null)),"X-Linay-Self-Audit":auditChecked?"checked":auditAttempted?"failed":"not-needed"}});
 }
 async function callModel(env,messages,vision=false){
  const models=vision?[VISION_MODEL]:[MODEL,...FALLBACK_MODELS];let last;
@@ -354,12 +354,12 @@ async function handleChat(req,env,ctx){
    if(!draft)throw new Error("Arama sonuçları geldi ancak model boş yanıt üretti.");
    const audit=await selfAudit(env,question,draft);
    await log(env,"web-chat",plain.__linayModel||MODEL,true,Date.now()-start,searchProvider||searchState+(audit.checked?"; self-audit":""));
-   return sseFromText(audit.answer,String(plain.__linayModel||"").startsWith("Gemini Backup")?plain.__linayModel:"Workers AI · "+(plain.__linayModel||MODEL),searchState,uid(),searchSources,0,documentSources,[],memoryCandidate,audit.checked);
+   return sseFromText(audit.answer,String(plain.__linayModel||"").startsWith("Gemini Backup")?plain.__linayModel:"Workers AI · "+(plain.__linayModel||MODEL),searchState,uid(),searchSources,0,documentSources,[],memoryCandidate,audit.checked,audit.attempted);
   }
   if(!vision&&shouldSelfAudit(question)){
    const plain=await runPlain(env,enriched,1800),draft=modelText(plain);if(!draft)throw new Error("Model boş yanıt döndürdü.");
    const audit=await selfAudit(env,question,draft);ctx.waitUntil(log(env,"chat",plain.__linayModel||MODEL,true,Date.now()-start,audit.checked?"self-audit":"self-audit-unavailable"));
-   return sseFromText(audit.answer,plain.__linayModel||MODEL,searchState,uid(),searchSources,0,documentSources,[],memoryCandidate,audit.checked);
+   return sseFromText(audit.answer,plain.__linayModel||MODEL,searchState,uid(),searchSources,0,documentSources,[],memoryCandidate,audit.checked,audit.attempted);
   }
   const result=await callModel(env,enriched,vision);
   const trace=uid();
