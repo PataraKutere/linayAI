@@ -501,9 +501,9 @@ export default {async fetch(req,env,ctx){
     const value=modelText(translated).trim();
     if(value)fluxPrompt=value;
    }catch(e){await log(env,"image-prompt-translation","Workers AI",false,Date.now()-started,String(e.message||e));}
-   const dimensions=ratio==="16:9"?{width:1024,height:576}:ratio==="9:16"?{width:576,height:1024}:{width:1024,height:1024};
    try{
-    const result=await env.AI.run(fluxModel,{prompt:fluxPrompt,steps:4,...dimensions});
+    const ratioHint=ratio==="16:9"?" Compose as a wide landscape image (16:9).":ratio==="9:16"?" Compose as a tall portrait image (9:16).":" Compose as a square image (1:1).";
+    const result=await env.AI.run(fluxModel,{prompt:fluxPrompt+ratioHint,steps:4});
     if(!result?.image)throw new Error("FLUX görsel verisi döndürmedi.");
     const bytes=result.image instanceof Uint8Array?result.image:new Uint8Array(result.image);
     let binary="";
