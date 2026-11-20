@@ -22,7 +22,7 @@ function extractMemoryCandidate(messages){
  const candidate=picked.replace(/[.!?]+$/,"").trim().slice(0,180);if(candidate.length<10)return null;
  return {text:candidate,reason:explicit?"Açık hafıza isteği":project?"Proje bilgisi":"Kalıcı tercih",status:"pending"};
 }
-function shouldSelfAudit(question){return /(?:\b(?:logic|logical|math|mathemat|calculate|calculation|code|coding|debug|date|timeline|compare|contradict|prove|proof|formula|equation)\b|mantık|matematik|hesap|kod|programla|hata ayıkla|tarih|kronoloji|çeliş|ispat|formül|denklem|kaç gün|kaç yıl|ne zaman)/i.test(String(question||""));}
+function shouldSelfAudit(question){return /(?:\b(?:logic|logical|math|mathemat|calculate|calculation|multiply|multiplied|multiplication|code|coding|debug|date|timeline|compare|contradict|prove|proof|formula|equation)\b|mantık|matematik|hesap|çarp|kod|programla|hata ayıkla|tarih|kronoloji|çeliş|ispat|formül|denklem|kaç gün|kaç yıl|ne zaman)/i.test(String(question||""));}
 async function selfAudit(env,question,draft){
  const answer=String(draft||"").trim();if(!answer||!shouldSelfAudit(question))return {answer,checked:false,corrected:false};
  try{
