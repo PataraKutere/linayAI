@@ -14,11 +14,19 @@ const contentText=m=>typeof m?.content==="string"?m.content:(m?.content||[]).fil
 function extractMemoryCandidate(messages){
  const text=String(contentText(lastUser(messages))||"").replace(/\s+/g," ").trim();
  if(!text||text.length>500)return null;
- if(/\b(sağlık|saglik|hastalık|hastalik|ilaç|ilac|tedavi|teşhis|teshis|astım|astim|sigara|hamile|gebelik|dinim|mezhebim|oy ver|siyasi görüş|cinsel|seksüel|şifre|parola|kimlik numarası|tc kimlik)\b/i.test(text))return null;
- const explicit=text.match(/(?:hatırla|aklında tut|unutma)\s*[:：,]?\s*(.{10,180})/i);
- const preference=text.match(/(?:tercih ederim|tercihim|tercih ediyorum|istemiyorum|seviyorum|sevmiyorum|her zaman|bundan sonra|yanıtlarımı|cevaplarımı)\b.{0,150}/i);
- const project=text.match(/(?:projem(?:in)? adı|projemizin adı|bu projede|projemiz|projem)\b.{0,150}/i);
- const picked=explicit?.[1]||preference?.[0]||project?.[0];if(!picked)return null;
+ // Sensitive-topic filter on a normalised copy (Turkish lower-case, diacritics stripped, ı→i), prefix-matched so ç/ş/ğ/ı and suffixes ("hastalığım", "şifremi", "ilacımı") are caught.
+ const norm=text.toLocaleLowerCase("tr-TR").normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/ı/g,"i");
+ if(/\b(?:saglik|hastalik|hastalig|hastane|ilac|tedavi|teshis|astim|sigara|hamile|gebelik|dinim|mezhep|oy ver|siyasi|cinsel|seksuel|sifre|parola|kimlik no|kimlik numara|tc kimlik|iban|kredi kart|banka hesab|pasaport|ehliyet)/.test(norm))return null;
+ // Patterns run on the Turkish-lower-cased text (same length as the original), the candidate is cut from the original text to keep its casing.
+ const lower=text.toLocaleLowerCase("tr-TR"),isQuestion=/\?/.test(text);
+ const slice=(m,start=m.index)=>text.slice(start,m.index+m[0].length);
+ const sentenceOf=m=>{let st=0;for(const x of text.matchAll(/[.!?]\s+/g)){const end=x.index+x[0].length;if(end<=m.index)st=end;else break}const rest=text.slice(st),e=rest.search(/[.!?](?:\s|$)/);return (e>=0?rest.slice(0,e):rest).trim()};
+ const explicitM=/(?:^|[.!?]\s+)(?:lütfen\s+)?(?:(?:şunu|bunu)\s+)?(?:hatırla|aklında tut|unutma|hafızana\s+(?:ekle|kaydet))\s*[:：,]?\s+(.{10,180})/.exec(lower);
+ const prefM=isQuestion?null:/(?:tercih ederim|tercih ediyorum|tercihim|bundan sonra|yanıtlarımı|cevaplarımı|(?:her zaman|daima|asla)\s.{0,120}?(?:yanıt|cevap|yaz|anlat|kullan|açıkla|ver))/.exec(lower);
+ const projM=isQuestion?null:/(?:projem(?:in)?|projemizin)\s+adı\s.{0,150}|bu projede\s+(?:her zaman|hep|daima|şunu|şu)\s.{0,150}/.exec(lower);
+ const explicit=explicitM?slice(explicitM,explicitM.index+explicitM[0].length-explicitM[1].length):"";
+ const preference=prefM?sentenceOf(prefM):"",project=projM?sentenceOf(projM):"";
+ const picked=explicit||preference||project;if(!picked)return null;
  const candidate=picked.replace(/[.!?]+$/,"").trim().slice(0,180);if(candidate.length<10)return null;
  return {text:candidate,reason:explicit?"Açık hafıza isteği":project?"Proje bilgisi":"Kalıcı tercih",status:"pending"};
 }
@@ -187,7 +195,7 @@ async function embed(env,text){const r=await env.AI.run(EMBED_MODEL,{text:[Strin
 async function ragSearch(env,userId,query,projectId=null){
  if(!env.DB)return [];
  try{
-  const hasDocs=await env.DB.prepare("SELECT 1 AS present FROM documents WHERE user_id=? AND (? IS NULL OR project_id=? OR project_id IS NULL) LIMIT 1").bind(userId,projectId,projectId).first();
+  const hasDocs=await env.DB.prepare("SELECT 1 AS present FROM documents WHERE user_id=? AND (project_id IS NULL OR project_id=?) LIMIT 1").bind(userId,projectId).first();
   if(!hasDocs)return [];
   let semantic=[];
   if(env.VECTOR&&env.AI){
@@ -195,7 +203,7 @@ async function ragSearch(env,userId,query,projectId=null){
     const v=await embed(env,query),r=await env.VECTOR.query(v,{topK:20,filter:{userId:userId}});
     const ids=[...new Set((r.matches||[]).map(x=>x.id))];await log(env,"rag-query","Vectorize",true,0,"matches="+ids.length);
     if(ids.length){
-     const rows=await env.DB.prepare("SELECT c.id AS chunk_id,c.content,c.document_id,d.name,d.project_id FROM chunks c JOIN documents d ON d.id=c.document_id WHERE c.user_id=? AND c.id IN ("+ids.map(()=>"?").join(",")+") AND (? IS NULL OR d.project_id=? OR d.project_id IS NULL)").bind(userId,...ids,projectId,projectId).all();
+     const rows=await env.DB.prepare("SELECT c.id AS chunk_id,c.content,c.document_id,d.name,d.project_id FROM chunks c JOIN documents d ON d.id=c.document_id WHERE c.user_id=? AND c.id IN ("+ids.map(()=>"?").join(",")+") AND (d.project_id IS NULL OR d.project_id=?)").bind(userId,...ids,projectId).all();
      const map=new Map((rows.results||[]).map(x=>[x.chunk_id,x]));
      semantic=ids.map(id=>map.get(id)).filter(Boolean);
     }
@@ -207,8 +215,8 @@ async function ragSearch(env,userId,query,projectId=null){
   if(terms.length){
    const where=terms.map(()=>"(d.name LIKE ? OR c.content LIKE ?)").join(" OR ");
    const args=[userId,...terms.flatMap(x=>["%"+x+"%","%"+x+"%"])];
-   const scope=projectId?" AND (d.project_id=? OR d.project_id IS NULL)":"";
-   const fallback=await env.DB.prepare("SELECT c.id AS chunk_id,c.content,c.document_id,d.name,d.project_id FROM chunks c JOIN documents d ON d.id=c.document_id WHERE c.user_id=? AND ("+where+")"+scope+" ORDER BY CASE WHEN d.project_id=? THEN 0 ELSE 1 END,d.created_at DESC LIMIT 5").bind(...args,...(projectId?[projectId]:[null])).all();
+   const scope=projectId?" AND (d.project_id=? OR d.project_id IS NULL)":" AND d.project_id IS NULL";
+   const fallback=await env.DB.prepare("SELECT c.id AS chunk_id,c.content,c.document_id,d.name,d.project_id FROM chunks c JOIN documents d ON d.id=c.document_id WHERE c.user_id=? AND ("+where+")"+scope+" ORDER BY CASE WHEN d.project_id=? THEN 0 ELSE 1 END,d.created_at DESC LIMIT 5").bind(...args,...(projectId?[projectId,projectId]:[null])).all();
    keyword=fallback.results||[];
    await log(env,"rag-keyword-fallback","D1",true,0,"matches="+keyword.length);
   }
@@ -237,14 +245,12 @@ async function saveDocument(env,userId,name,text,projectId=null){
  return {id,name:docName,projectId:projectId||null,chunks:chunks.length,vectorIndexed,vectorError:vectorError.slice(0,180)};
 }
 async function loadMemory(env,userId){
+ // The server memory is the single source of truth (one row per user, same row GET /memory returns).
+ // Past conversations are deliberately NOT loaded: the server has no per-chat/private/project scope for them.
  if(!env.DB)return {memories:[],recent:[]};
- let memories=[],recent=[];
- try{const m=await env.DB.prepare("SELECT content FROM memories WHERE user_id=? ORDER BY created_at DESC LIMIT 8").bind(userId).all();memories=m.results||[]}catch(e){}
- try{
-  const r=await env.DB.prepare("SELECT role,content FROM conversations WHERE user_id=? ORDER BY rowid DESC LIMIT 6").bind(userId).all();
-  recent=(r.results||[]).reverse().filter(x=>x&&["user","assistant"].includes(x.role)&&typeof x.content==="string").map(x=>({role:x.role,content:x.content.slice(0,3000)}));
- }catch(e){}
- return {memories,recent};
+ let memories=[];
+ try{const m=await env.DB.prepare("SELECT content FROM memories WHERE user_id=? ORDER BY created_at DESC LIMIT 1").bind(userId).all();memories=(m.results||[]).filter(x=>x&&String(x.content||"").trim())}catch(e){}
+ return {memories,recent:[]};
 }
 function sseFromText(text,provider,searchState,trace,sources=[],agentSteps=0,documents=[],agentTrace=[],memoryCandidate=null,auditChecked=false,auditAttempted=false){
  const enc=new TextEncoder();const chunks=[];for(let i=0;i<text.length;i+=90)chunks.push(text.slice(i,i+90));
@@ -345,10 +351,11 @@ async function handleChat(req,env,ctx){
  const asksAboutDocuments=/(yüklediğim|yukledigim|eklediğim|ekledigim|paylaştığım|paylastigim|dosya|belge|doküman|dokuman|pdf|dosyanın|dosyanin|belgenin|belge içeriği|dosya içeriği|içinde ne yazıyor|içeriğinde ne var)/i.test(question);
  const rag=asksAboutDocuments?await ragSearch(env,userId,question,projectId):[];
   const documentSources=rag.map(x=>({documentId:x.document_id,chunkId:x.chunk_id||x.id,title:x.name||"Belge",projectId:x.project_id||null,excerpt:String(x.content||"").replace(/\s+/g," ").slice(0,220)}));
- const originalSystem=messages.filter(m=>m.role==="system").map(m=>contentText(m)).join("\n");
- const requestContext=new Set(messages.filter(m=>m&&["user","assistant"].includes(m.role)).map(m=>m.role+"\n"+contentText(m)));
- const recentContext=mem.recent.filter(m=>!requestContext.has(m.role+"\n"+m.content));
- const sys=originalSystem+"\n\nLinayAI: Be accurate, concise and honest. For logic, distinguish what follows from what does not follow. Never invent current facts, sources, citations, scores or statistics. If sources are supplied, cite them using their numbered URLs. Before presenting current or researched findings, compare dates, numerical values and claims across supplied sources. Distinguish publication dates from event dates and values referring to different measures. If credible sources disagree on the same fact, explicitly state the conflict and differing values with source numbers. If a key date, number or source is missing, say it could not be verified; never guess. If only one source exists, disclose that independent confirmation is limited. "+(mem.memories.length?"\nUSER SAVED MEMORY:\n"+mem.memories.map(x=>x.content).join("\n"):"")+(recentContext.length?"\nRECENT SERVER CONTEXT (older messages not already present in this request):\n"+recentContext.map(x=>x.role+": "+x.content).join("\n"):"")+(rag.length?"\nIMPORTANT: THE USER DOCUMENT SEARCH FOUND THE FOLLOWING EXCERPTS FROM THE USER UPLOADED FILES. YOU CAN READ THESE EXCERPTS. Use them to answer questions about those files. Never claim you cannot access a file when an excerpt is provided.\nUSER DOCUMENT EXCERPTS:\n"+rag.map((x,i)=>"[Belge: "+(x.name||"yüklenen dosya")+" | Parça "+(i+1)+"]\n"+x.content).join("\n---\n"):"")+searchContext;
+ // When the server holds the user's memory it is the only memory injected; the client's copy is removed to avoid duplicate/stale memory.
+ const clientMemoryRe=/\n*KULLANICI HAFIZASI:\n[\s\S]*?\nYalnızca ilgili olduğunda kullan\./;
+ const originalSystem=messages.filter(m=>m.role==="system").map(m=>contentText(m)).join("\n").replace(mem.memories.length?clientMemoryRe:/(?!)/,"");
+ const memoryBlock=mem.memories.length?"\n\nUSER SAVED MEMORY (use only when relevant to the request):\n"+mem.memories.map(x=>x.content).join("\n"):"";
+ const sys=originalSystem+"\n\nLinayAI: Be accurate, concise and honest. For logic, distinguish what follows from what does not follow. Never invent current facts, sources, citations, scores or statistics. If sources are supplied, cite them using their numbered URLs. Before presenting current or researched findings, compare dates, numerical values and claims across supplied sources. Distinguish publication dates from event dates and values referring to different measures. If credible sources disagree on the same fact, explicitly state the conflict and differing values with source numbers. If a key date, number or source is missing, say it could not be verified; never guess. If only one source exists, disclose that independent confirmation is limited. "+memoryBlock+(rag.length?"\nIMPORTANT: THE USER DOCUMENT SEARCH FOUND THE FOLLOWING EXCERPTS FROM THE USER UPLOADED FILES. YOU CAN READ THESE EXCERPTS. Use them to answer questions about those files. Never claim you cannot access a file when an excerpt is provided.\nUSER DOCUMENT EXCERPTS:\n"+rag.map((x,i)=>"[Belge: "+(x.name||"yüklenen dosya")+" | Parça "+(i+1)+"]\n"+x.content).join("\n---\n"):"")+searchContext;
  const enriched=[{role:"system",content:sys},...messages.filter(m=>m.role!=="system")];
  if(body.agent===true){
   const enc=new TextEncoder();let streamController;
@@ -358,7 +365,7 @@ async function handleChat(req,env,ctx){
    emit({progress:{label:"Görev planlanıyor",status:"started"}});
    const a=await agentRun(env,userId,enriched,projectId,event=>emit({progress:event}),searchState==="success"||searchState==="gemini-backup");
    const answer=a.answer+(searchSources.length?"\n\nKaynaklar:\n"+searchSources.map((x,i)=>"["+ (i+1)+"] ["+x.title+"]("+x.url+")").join("\n"):"");
-   ctx.waitUntil((async()=>{await log(env,"agent","Workers AI",true,Date.now()-start,"steps="+a.steps);if(question)await env.DB?.prepare("INSERT INTO conversations(id,user_id,role,content) VALUES(?,?,?,?)").bind(uid(),userId,"user",question).run();if(answer)await env.DB?.prepare("INSERT INTO conversations(id,user_id,role,content) VALUES(?,?,?,?)").bind(uid(),userId,"assistant",answer.slice(0,6000)).run()})());
+   ctx.waitUntil((async()=>{await log(env,"agent","Workers AI",true,Date.now()-start,"steps="+a.steps);})());
    const agentDocs=(a.observations||[]).filter(x=>x.tool==="knowledge_search").flatMap(x=>x.results||[]).map(x=>({documentId:x.document_id,chunkId:x.chunk_id||x.id,title:x.name||"Belge",projectId:x.project_id||null,excerpt:String(x.content||"").replace(/\s+/g," ").slice(0,220)}));
    const agentTrace=(a.observations||[]).map(x=>({tool:x.tool,label:({search_web:"Web araması",read_url:"Bağlantı okuma",calculator:"Hesaplama",current_time:"Güncel saat",knowledge_search:"Proje / belge araması"})[x.tool]||"Araç",status:x.error?"failed":"done",detail:x.error?String(x.error).slice(0,120):""}));
    emit({meta:{sources:searchSources,documents:agentDocs,steps:a.steps,trace:agentTrace,memoryCandidate,audit:a.audit||{checked:false}}});
@@ -390,8 +397,6 @@ async function handleChat(req,env,ctx){
    let raw="",buf="",reader=pair[1].getReader(),dec=new TextDecoder();
    for(;;){const z=await reader.read();if(z.done)break;buf+=dec.decode(z.value,{stream:true});const ls=buf.split("\n");buf=ls.pop();for(const line of ls){if(!line.startsWith("data:"))continue;const v=line.slice(5).trim();if(!v||v==="[DONE]")continue;try{const j=JSON.parse(v);raw+=j.choices?.[0]?.delta?.content||""}catch(e){}}}
    await log(env,searchRequested?"web-chat":"chat",result.provider,true,Date.now()-start,searchProvider||searchState);
-   if(question)await env.DB?.prepare("INSERT INTO conversations(id,user_id,role,content) VALUES(?,?,?,?)").bind(uid(),userId,"user",question).run();
-   if(raw)await env.DB?.prepare("INSERT INTO conversations(id,user_id,role,content) VALUES(?,?,?,?)").bind(uid(),userId,"assistant",raw.slice(0,6000)).run();
   }catch(e){}})());
   return new Response(pair[0],{headers:{...CORS,"Content-Type":"text/event-stream; charset=utf-8","Cache-Control":"no-cache","X-Linay-Provider":result.provider,"X-Linay-Search":searchState+(searchProvider?":"+searchProvider:""),"X-Linay-Trace":trace,"X-Linay-Sources":encodeURIComponent(JSON.stringify(searchSources.slice(0,7))),"X-Linay-Documents":encodeURIComponent(JSON.stringify(documentSources.slice(0,5))),"X-Linay-Memory-Candidate":encodeURIComponent(JSON.stringify(memoryCandidate||null)),"X-Linay-Self-Audit":"not-needed"}});
  }catch(e){await log(env,"chat","all-models",false,Date.now()-start,e.message);return json({error:"Tüm modeller başarısız oldu: "+e.message},503)}
@@ -427,7 +432,7 @@ export default {async fetch(req,env,ctx){
  if(path==="/chat"&&req.method==="POST"){try{return await handleChat(req,env,ctx)}catch(e){return json({error:e.message||"Sunucu hatası"},500)}}
  if(path==="/memory"&&req.method==="GET"){try{const rawUserId=url.searchParams.get("userId");if(!validUserId(rawUserId))return json({error:"Geçersiz kullanıcı kimliği."},400);const userId=safeId(rawUserId);const row=await env.DB.prepare("SELECT content FROM memories WHERE user_id=? ORDER BY created_at DESC LIMIT 1").bind(userId).first();return json({content:row?.content||""})}catch(e){return json({error:e.message},500)}}
  if(path==="/memory"&&req.method==="POST"){
-  try{const b=await req.json();if(!validUserId(b.userId))return json({error:"Geçersiz kullanıcı kimliği."},400);const userId=safeId(b.userId),content=String(b.content||"").trim().slice(0,6000);if(!env.DB)return json({error:"Hafıza veritabanı bağlı değil"},503);await env.DB.prepare("DELETE FROM memories WHERE user_id=?").bind(userId).run();if(content)await env.DB.prepare("INSERT INTO memories(id,user_id,content) VALUES(?,?,?)").bind(uid(),userId,content).run();return json({ok:true})}catch(e){return json({error:e.message},500)}
+  try{const b=await req.json();if(!validUserId(b.userId))return json({error:"Geçersiz kullanıcı kimliği."},400);const userId=safeId(b.userId),content=String(b.content||"").trim().slice(0,6000);if(!env.DB)return json({error:"Hafıza veritabanı bağlı değil"},503);const del=env.DB.prepare("DELETE FROM memories WHERE user_id=?").bind(userId);await env.DB.batch(content?[del,env.DB.prepare("INSERT INTO memories(id,user_id,content) VALUES(?,?,?)").bind(uid(),userId,content)]:[del]);return json({ok:true})}catch(e){return json({error:e.message},500)}
  }
  if(path==="/documents"&&req.method==="POST"){
   try{const b=await req.json();if(!validUserId(b.userId))return json({error:"Geçersiz kullanıcı kimliği."},400);const userId=safeId(b.userId),projectId=typeof b.projectId==="string"&&/^[a-zA-Z0-9_-]{1,100}$/.test(b.projectId)?b.projectId:null,d=await saveDocument(env,userId,b.name,b.text,projectId);await log(env,"document-index","Workers AI",true,0,d.chunks+" chunks");return json({ok:true,document:d})}catch(e){await log(env,"document-index","Workers AI",false,0,e.message);return json({error:e.message},500)}
@@ -463,60 +468,65 @@ export default {async fetch(req,env,ctx){
   const style=["photo","cinematic","illustration","logo"].includes(body.style)?body.style:"photo";
   if(!prompt)return json({error:"Görsel açıklaması boş olamaz.",provider:"LinayAI"},400);
   if(image&&(!/^image\/(jpeg|png|webp)$/.test(String(image.mimeType||""))||image.data.length>12000000))return json({error:"Düzenleme için JPEG, PNG veya WebP görseli (en fazla 9 MB) gerekli.",provider:"LinayAI"},400);
-  const styleText={photo:"doğal ve inandırıcı fotoğraf",cinematic:"sinematik görsel anlatım",illustration:"tutarlı ve temiz illüstrasyon",logo:"sade, profesyonel logo tasarımı"}[style];
-  // General subject-first prompt: the user's requested subject remains the visual hierarchy.
-  const promptParts=[
-   "GÖREV: Kullanıcının aşağıdaki talebini doğrudan karşılayan tek bir görsel üret.",
-   "ANA KONU: Kullanıcının açıkça istediği kişi, nesne, mekân, olay veya sahne görselin ana ve baskın konusu olmalıdır. Ana konuyu değiştirme, başka bir konuya dönüştürme, kadraj dışında bırakma veya arka planla ikame etme.",
-   "ÖNCELİK SIRASI: 1) Kullanıcının istediği ana konu ve eylem, 2) belirtilen sahne ve önemli ayrıntılar, 3) kompozisyon, 4) stil, ışık ve doku. Stil ve estetik efektler ana konudan daha baskın olamaz.",
-   "SADAKAT: İstekte bulunmayan kişi, nesne, yazı, logo, filigran, sembol, dekor veya hikâye unsuru ekleme. Kullanıcı özellikle yazı istemedikçe görselde okunabilir metin, harf, sayı veya logo oluşturma.",
-   "KALİTE: Tek ve tutarlı sahne; anatomik ve perspektif tutarlılığı; nesnelerin doğru biçim, oran ve bağlantıları; temiz kenarlar; doğal ışık ve malzeme dokuları. Rastgele sembol, bozuk yazı, yinelenmiş uzuv/nesne, anlamsız desen, yapay kolaj ve görsel artefakt üretme.",
-   "STİL: "+styleText+". En-boy oranı: "+ratio+".",
-   "KULLANICININ İSTEĞİ (anlamını ve özel adları koru): "+prompt
-  ];
-  if(image)promptParts.splice(1,0,
-   "DÜZENLEME MODU: Yüklenen görsel kaynak eserdir. Yeni bir sahne üretme. Görseldeki ana kişi/nesne kimliğini, yüz özelliklerini, görünüşünü, sayısını, pozunu, kıyafetini, mekânını, kamera açısını ve mevcut kompozisyonu; kullanıcı açıkça değiştirilmesini istemediği sürece koru. Yalnızca istenen değişikliği uygula. İstenen değişiklik kaynak görselle çelişiyorsa kaynak görseli koru ve değişikliği mümkün olan en dar kapsamda uygula."
-  );
-  const fullPrompt=promptParts.join("\n\n");
+  // Short, consistent English template. Subject first; style/ratio are applied only when generating (not when editing).
+  const subject=prompt.slice(0,1500);
+  const styleText={photo:"a natural, realistic photograph",cinematic:"a cinematic still with dramatic, motivated lighting",illustration:"a clean, coherent illustration",logo:"a simple, professional logo on a plain background"}[style];
+  const textRule=style==="logo"?"Include text only if the request contains it, spelled exactly as given.":"Do not add any text, letters, numbers or watermarks unless the request asks for them.";
+  const fullPrompt=image
+   ?["Edit the provided image according to this request: "+subject,"Change only what the request asks for. Keep the identity, faces, pose, clothing, background, camera angle, framing and aspect ratio of the original image unchanged. If the request conflicts with the original, apply the smallest possible change."].join("\n\n")
+   :["Create a single image: "+subject,"The requested subject must be the clear main focus. Do not add people, objects or scenery that were not requested. Preserve any names exactly as written. "+textRule,"Style: "+styleText+". Aspect ratio: "+ratio+". Keep anatomy, proportions and perspective correct and the result free of artifacts."].join("\n\n");
   const model="gemini-2.5-flash-image";
   const apiVersion="v1beta";
   if(env.GEMINI_API_KEY){
-   try{
-    const parts=[{text:fullPrompt}];
+   const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+   // One Gemini attempt. Returns {data,mime} or {error,status,retry,...}; never throws for API-level failures.
+   const attemptGemini=async(modalities,noImageHint)=>{
+    const parts=[{text:noImageHint?fullPrompt+"\n\nReturn the result as an image, not as text.":fullPrompt}];
     if(image)parts.push({inlineData:{mimeType:image.mimeType,data:image.data}});
+    const generationConfig={responseModalities:modalities};
+    // Editing must keep the source image's own proportions, so no aspect ratio is forced then.
+    if(!image)generationConfig.imageConfig={aspectRatio:ratio};
     const response=await fetch("https://generativelanguage.googleapis.com/"+apiVersion+"/models/"+model+":generateContent",{
      method:"POST",
      headers:{"Content-Type":"application/json","x-goog-api-key":env.GEMINI_API_KEY},
-     body:JSON.stringify({contents:[{role:"user",parts}],generationConfig:{responseModalities:["TEXT","IMAGE"],imageConfig:{aspectRatio:ratio}}}),
-     signal:AbortSignal.timeout(110000)
+     body:JSON.stringify({contents:[{role:"user",parts}],generationConfig}),
+     signal:AbortSignal.timeout(Math.max(5000,Math.min(75000,105000-(Date.now()-started))))
     });
     const raw=await response.text();
     let payload={};try{payload=JSON.parse(raw)}catch{}
     if(!response.ok){
      const apiMessage=payload.error?.message||raw.slice(0,700)||"Açıklama içermeyen API hatası";
-     const detail="Gemini API HTTP "+response.status+" ("+model+", "+apiVersion+"): "+apiMessage;
-     await log(env,"image-generation","Gemini "+model,false,Date.now()-started,detail);
-     return json({error:detail,provider:"Gemini",model,apiVersion,edited:!!image},response.status===429?429:response.status===401||response.status===403?502:502);
+     return {error:"Gemini API HTTP "+response.status+" ("+model+", "+apiVersion+"): "+apiMessage,status:response.status===429?429:502,retry:[429,500,502,503,504].includes(response.status),modalityRejected:response.status===400&&/modalit/i.test(apiMessage)};
     }
     const candidate=payload.candidates?.[0];
     const partsOut=candidate?.content?.parts||[];
     const output=partsOut.find(p=>p.inlineData?.data||p.inline_data?.data);
     const data=output?.inlineData?.data||output?.inline_data?.data;
     const mime=output?.inlineData?.mimeType||output?.inline_data?.mime_type||"image/png";
-    if(data){
-     await log(env,"image-generation","Gemini "+model,true,Date.now()-started,"ratio="+ratio+"; style="+style+"; edit="+!!image);
-     return json({image:data,type:mime,provider:"Gemini",model,apiVersion,edited:!!image,ratio,style});
-    }
+    if(data)return {data,mime};
     const reason=candidate?.finishReason||payload.promptFeedback?.blockReason||"NO_IMAGE_PART";
+    const blocked=!!payload.promptFeedback?.blockReason||/SAFETY|PROHIBITED|BLOCKLIST|RECITATION|SPII/i.test(String(reason));
     const textPart=partsOut.find(p=>p.text)?.text||"";
-    const detail="Gemini yanıtı görsel içermedi. Neden: "+reason+(textPart?" · "+textPart.slice(0,400):"");
-    await log(env,"image-generation","Gemini "+model,false,Date.now()-started,detail);
-    return json({error:detail,provider:"Gemini",model,apiVersion,edited:!!image},502);
-   }catch(e){
-    const detail="Gemini isteği başarısız ("+model+", "+apiVersion+"): "+String(e?.message||e);
-    await log(env,"image-generation","Gemini "+model,false,Date.now()-started,detail);
-    return json({error:detail,provider:"Gemini",model,apiVersion,edited:!!image},502);
+    return {error:"Gemini yanıtı görsel içermedi. Neden: "+reason+(textPart?" · "+textPart.slice(0,400):""),status:blocked?422:502,retry:!blocked,noImage:true};
+   };
+   let outcome,retried=0,modalities=["IMAGE"],noImageHint=false;
+   for(let tries=0;tries<3;tries++){
+    try{outcome=await attemptGemini(modalities,noImageHint)}
+    catch(e){outcome={error:"Gemini isteği başarısız ("+model+", "+apiVersion+"): "+String(e?.message||e),status:502,retry:true}}
+    if(outcome.data)break;
+    // Some image models may reject IMAGE-only output: fall back to the TEXT+IMAGE form once.
+    if(outcome.modalityRejected&&modalities.length===1){modalities=["TEXT","IMAGE"];continue}
+    // Single retry for transient failures (429/5xx, network/timeout, text-only reply) while time remains.
+    if(outcome.retry&&retried<1&&Date.now()-started<80000){retried++;noImageHint=!!outcome.noImage;await sleep(1200);continue}
+    break;
    }
+   if(outcome.data){
+    await log(env,"image-generation","Gemini "+model,true,Date.now()-started,"ratio="+(image?"source":ratio)+"; style="+style+"; edit="+!!image+"; retried="+retried+"; modalities="+modalities.join("+"));
+    return json({image:outcome.data,type:outcome.mime,provider:"Gemini",model,apiVersion,edited:!!image,ratio:image?null:ratio,style,retried:retried>0});
+   }
+   const detail=outcome.error+(retried?" (yeniden deneme yapıldı)":"");
+   await log(env,"image-generation","Gemini "+model,false,Date.now()-started,detail);
+   return json({error:detail,provider:"Gemini",model,apiVersion,edited:!!image},outcome.status||502);
   }
   // Fallback is allowed only when Gemini is not configured, never after a Gemini API failure.
   if(image)return json({error:"Görsel düzenleme yapılamadı: GEMINI_API_KEY tanımlı değil. Kaynak görsel korunarak işlem durduruldu.",provider:"LinayAI",model:null,edited:true},503);
