@@ -51,7 +51,7 @@ async function searchSportsScore(query){
  const date=m[3]+months[m[2].toLowerCase()]+m[1].padStart(2,"0");
  try{
   const u=new URL("https://site.api.espn.com/apis/site/v2/sports/soccer/uefa.nations/scoreboard");u.searchParams.set("dates",date);u.searchParams.set("limit","100");
-  const r=await fetch(u,{headers:{"User-Agent":"LinayAI/1.0","Accept":"application/json"},signal:AbortSignal.timeout(8000)});
+  const r=await fetch(u,{headers:{"User-Agent":"LinayAI/1.0","Accept":"application/json"},signal:AbortSignal.timeout(4500)});
   if(!r.ok)return null;
   const j=await r.json();
   for(const event of j.events||[]){
@@ -71,53 +71,76 @@ async function searchSportsScore(query){
 }
 async function searchWeb(query,env){
  const q=String(query||"").trim().slice(0,400);if(!q)throw new Error("Arama sorgusu boş.");
- const sports=await searchSportsScore(q);if(sports)return sports;
  const headers={"User-Agent":"LinayAI/1.0 (+https://patarakutere.github.io/linayAI/)"};
- if(env.SEARXNG_URL){
-  try{const u=new URL("/search",env.SEARXNG_URL);u.searchParams.set("q",q);u.searchParams.set("format","json");u.searchParams.set("language","tr-TR");const r=await fetch(u,{headers,signal:AbortSignal.timeout(9000)});if(r.ok){const j=await r.json();const a=(j.results||[]).slice(0,7).map(x=>({title:cleanHtml(x.title),url:x.url,snippet:cleanHtml(x.content),source:x.engine||"SearXNG"})).filter(x=>safeUrl(x.url));const good=relevantResults(q,a);if(good.length)return {provider:"SearXNG",results:good.slice(0,7)}}}catch(e){}
- }
- if(env.BRAVE_SEARCH_API_KEY){
-  try{const u=new URL("https://api.search.brave.com/res/v1/web/search");u.searchParams.set("q",q);u.searchParams.set("count","7");const r=await fetch(u,{headers:{...headers,"X-Subscription-Token":env.BRAVE_SEARCH_API_KEY},signal:AbortSignal.timeout(9000)});if(r.ok){const j=await r.json();const a=(j.web?.results||[]).slice(0,7).map(x=>({title:cleanHtml(x.title),url:x.url,snippet:cleanHtml(x.description),source:"Brave"})).filter(x=>safeUrl(x.url));const good=relevantResults(q,a);if(good.length)return {provider:"Brave Search",results:good.slice(0,7)}}}catch(e){}
- }
- try{
- try{
+ const timeout=4500,errors=[];
+ const accept=async(name,promise)=>{
+  try{const value=await promise;if(value?.results?.length)return value;errors.push(name+": uygun sonuç yok");}
+  catch(e){errors.push(name+": "+String(e?.message||e).slice(0,120))}
+  return null;
+ };
+ const sports=await searchSportsScore(q);
+ if(sports?.results?.length)return sports;
+ const first=[];
+ if(env.SEARXNG_URL)first.push(accept("SearXNG",(async()=>{
+  const u=new URL("/search",env.SEARXNG_URL);u.searchParams.set("q",q);u.searchParams.set("format","json");u.searchParams.set("language","tr-TR");
+  const r=await fetch(u,{headers,signal:AbortSignal.timeout(timeout)});if(!r.ok)throw new Error("HTTP "+r.status);
+  const j=await r.json(),a=(j.results||[]).slice(0,10).map(x=>({title:cleanHtml(x.title),url:x.url,snippet:cleanHtml(x.content),source:x.engine||"SearXNG"})).filter(x=>x.title&&safeUrl(x.url));
+  const results=relevantResults(q,a);if(!results.length)throw new Error("alakalı sonuç bulunamadı");
+  return {provider:"SearXNG",results:results.slice(0,7)};
+ })()));
+ if(env.BRAVE_SEARCH_API_KEY)first.push(accept("Brave Search",(async()=>{
+  const u=new URL("https://api.search.brave.com/res/v1/web/search");u.searchParams.set("q",q);u.searchParams.set("count","8");
+  const r=await fetch(u,{headers:{...headers,"X-Subscription-Token":env.BRAVE_SEARCH_API_KEY},signal:AbortSignal.timeout(timeout)});if(!r.ok)throw new Error("HTTP "+r.status);
+  const j=await r.json(),a=(j.web?.results||[]).slice(0,10).map(x=>({title:cleanHtml(x.title),url:x.url,snippet:cleanHtml(x.description),source:"Brave"})).filter(x=>x.title&&safeUrl(x.url));
+  const results=relevantResults(q,a);if(!results.length)throw new Error("alakalı sonuç bulunamadı");
+  return {provider:"Brave Search",results:results.slice(0,7)};
+ })()));
+ first.push(accept("Bing RSS",(async()=>{
   const u=new URL("https://www.bing.com/search");u.searchParams.set("format","rss");u.searchParams.set("q",q);u.searchParams.set("count","10");
-  const r=await fetch(u,{headers:{...headers,"Accept":"application/rss+xml, application/xml, text/xml"},signal:AbortSignal.timeout(9000)});
-  if(r.ok){const xml=await r.text(),items=[...xml.matchAll(/<item>([\s\S]*?)<\/item>/gi)];const rss=items.slice(0,12).map(([_,item])=>({title:rssTag(item,"title"),url:rssTag(item,"link"),snippet:rssTag(item,"description"),source:"Bing"})).filter(x=>x.title&&safeUrl(x.url));const good=relevantResults(q,rss);if(good.length)return {provider:"Bing RSS",results:good.slice(0,7)}}
- }catch(e){}
-  const isFootball=/(france|fransa)/i.test(q)&&/(turkiye|türkiye|turkey)/i.test(q)&&/(football|futbol|match|maç|score|skor)/i.test(q);
-  const variants=isFootball?[q,q+" UEFA Nations League result",q+" final score","site:tff.org "+q]:[q];
-  const collected=[];
-  for(const query of variants){
-   const u=new URL("https://news.google.com/rss/search");u.searchParams.set("q",query);u.searchParams.set("hl","en-US");u.searchParams.set("gl","US");u.searchParams.set("ceid","US:en");
-   const r=await fetch(u,{headers:{...headers,"Accept":"application/rss+xml, application/xml, text/xml"},signal:AbortSignal.timeout(9000)});
-   if(!r.ok)continue;
+  const r=await fetch(u,{headers:{...headers,"Accept":"application/rss+xml, application/xml, text/xml"},signal:AbortSignal.timeout(timeout)});if(!r.ok)throw new Error("HTTP "+r.status);
+  const xml=await r.text(),items=[...xml.matchAll(/<item>([\s\S]*?)<\/item>/gi)];
+  const a=items.slice(0,12).map(([_,item])=>({title:rssTag(item,"title"),url:rssTag(item,"link"),snippet:rssTag(item,"description"),source:"Bing"})).filter(x=>x.title&&safeUrl(x.url));
+  const results=relevantResults(q,a);if(!results.length)throw new Error("alakalı sonuç bulunamadı");
+  return {provider:"Bing RSS",results:results.slice(0,7)};
+ })()));
+ const fast=await Promise.any(first.map(p=>p.then(v=>{if(!v)throw new Error("sonuç yok");return v})).concat([]).map(p=>p.catch(e=>{throw e}))).catch(()=>null);
+ if(fast)return fast;
+ const second=[
+  accept("Google News RSS",(async()=>{
+   const u=new URL("https://news.google.com/rss/search");u.searchParams.set("q",q);u.searchParams.set("hl","tr");u.searchParams.set("gl","TR");u.searchParams.set("ceid","TR:tr");
+   const r=await fetch(u,{headers:{...headers,"Accept":"application/rss+xml, application/xml, text/xml"},signal:AbortSignal.timeout(timeout)});if(!r.ok)throw new Error("HTTP "+r.status);
    const xml=await r.text(),items=[...xml.matchAll(/<item>([\s\S]*?)<\/item>/gi)];
-   const found=items.slice(0,10).map(([_,item])=>({title:rssTag(item,"title"),url:rssTag(item,"link"),snippet:rssTag(item,"description"),source:"Google News"})).filter(x=>x.title&&safeUrl(x.url));
-   collected.push(...found);
-   const good=relevantResults(q,collected);if(good.length)return {provider:"Google News RSS",results:good.slice(0,7)};
-  }
-  const u=new URL("https://www.bing.com/search");u.searchParams.set("q",q);u.searchParams.set("count","8");
-  const r=await fetch(u,{headers:{...headers,"Accept":"text/html","Accept-Language":"tr-TR,tr;q=0.9,en;q=0.8"},signal:AbortSignal.timeout(9000)});
-  if(r.ok){const h=await r.text(),a=[];const re=/<li[^>]*class="[^"]*\bb_algo\b[^"]*"[\s\S]*?<h2[^>]*>\s*<a[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>[\s\S]*?<p[^>]*>([\s\S]*?)<\/p>[\s\S]*?<\/li>/gi;let m;
-   while((m=re.exec(h))&&a.length<8){const href=decodeHtml(m[1]);if(safeUrl(href))a.push({title:cleanHtml(m[2]),url:href,snippet:cleanHtml(m[3]),source:"Bing"})}
-   const good=relevantResults(q,a);if(good.length)return {provider:"Bing",results:good.slice(0,7)}
-  }
- }catch(e){}
- try{
-  const u=new URL("https://html.duckduckgo.com/html/");u.searchParams.set("q",q);
-  const r=await fetch(u,{headers:{...headers,"Accept":"text/html"},signal:AbortSignal.timeout(10000)});
-  if(r.ok){const h=await r.text(),a=[];const re=/<a[^>]+class="[^"]*result__a[^"]*"[^>]+href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/gi;let m;
-   while((m=re.exec(h))&&a.length<7){let href=decodeHtml(m[1]);try{const x=new URL(href);if(x.searchParams.has("uddg"))href=decodeURIComponent(x.searchParams.get("uddg"))}catch{}const sn=h.slice(re.lastIndex,re.lastIndex+1400).match(/class="result__snippet"[^>]*>([\s\S]*?)<\/(?:a|div)>/i);if(safeUrl(href))a.push({title:cleanHtml(m[2]),url:href,snippet:cleanHtml(sn?.[1]||""),source:"DuckDuckGo"})}
-   const good=relevantResults(q,a);if(good.length)return {provider:"DuckDuckGo",results:good.slice(0,7)}
-  }
- }catch(e){}
- try{
-  if(/(france|fransa)/i.test(q)&&/(turkiye|türkiye|turkey)/i.test(q)&&/(football|futbol|match|maç|score|skor)/i.test(q))throw new Error("Maç sonucu için doğrulanabilir skor kaynağı bulunamadı.");
-  const u=new URL("https://en.wikipedia.org/w/api.php");u.searchParams.set("action","query");u.searchParams.set("list","search");u.searchParams.set("srsearch",q);u.searchParams.set("format","json");u.searchParams.set("origin","*");
-  const r=await fetch(u,{headers,signal:AbortSignal.timeout(7000)});if(r.ok){const j=await r.json();const a=(j.query?.search||[]).slice(0,5).map(x=>({title:x.title,url:"https://en.wikipedia.org/wiki/"+encodeURIComponent(x.title.replace(/ /g,"_")),snippet:cleanHtml(x.snippet),source:"Wikipedia"}));const good=relevantResults(q,a);if(good.length)return {provider:"Wikipedia",results:good.slice(0,5)}}
- }catch(e){}
- throw new Error("Bağımsız arama sağlayıcıları yanıt vermedi. SearXNG/Brave yapılandırması yok veya DuckDuckGo erişimi başarısız.");
+   const a=items.slice(0,15).map(([_,item])=>({title:rssTag(item,"title"),url:rssTag(item,"link"),snippet:rssTag(item,"description"),source:"Google News"})).filter(x=>x.title&&safeUrl(x.url));
+   const results=relevantResults(q,a);if(!results.length)throw new Error("alakalı sonuç bulunamadı");
+   return {provider:"Google News RSS",results:results.slice(0,7)};
+  })()),
+  accept("Bing",(async()=>{
+   const u=new URL("https://www.bing.com/search");u.searchParams.set("q",q);u.searchParams.set("count","8");
+   const r=await fetch(u,{headers:{...headers,"Accept":"text/html","Accept-Language":"tr-TR,tr;q=0.9,en;q=0.8"},signal:AbortSignal.timeout(timeout)});if(!r.ok)throw new Error("HTTP "+r.status);
+   const h=await r.text(),a=[];const re=/<li[^>]*class="[^"]*\bb_algo\b[^"]*"[^\s\S]*?<h2[^>]*>\s*<a[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>[\s\S]*?<p[^>]*>([\s\S]*?)<\/p>[\s\S]*?<\/li>/gi;let m;
+   while((m=re.exec(h))&&a.length<10){const url=decodeHtml(m[1]);if(safeUrl(url))a.push({title:cleanHtml(m[2]),url,snippet:cleanHtml(m[3]),source:"Bing"})}
+   const results=relevantResults(q,a);if(!results.length)throw new Error("alakalı sonuç bulunamadı");
+   return {provider:"Bing",results:results.slice(0,7)};
+  })()),
+  accept("DuckDuckGo",(async()=>{
+   const u=new URL("https://html.duckduckgo.com/html/");u.searchParams.set("q",q);
+   const r=await fetch(u,{headers:{...headers,"Accept":"text/html"},signal:AbortSignal.timeout(timeout)});if(!r.ok)throw new Error("HTTP "+r.status);
+   const h=await r.text(),a=[];const re=/<a[^>]+class="[^"]*result__a[^"]*"[^>]+href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/gi;let m;
+   while((m=re.exec(h))&&a.length<10){let url=decodeHtml(m[1]);try{const x=new URL(url);if(x.searchParams.has("uddg"))url=decodeURIComponent(x.searchParams.get("uddg"))}catch{}const sn=h.slice(re.lastIndex,re.lastIndex+1400).match(/class="result__snippet"[^>]*>([\s\S]*?)<\/(?:a|div)>/i);if(safeUrl(url))a.push({title:cleanHtml(m[2]),url,snippet:cleanHtml(sn?.[1]||""),source:"DuckDuckGo"})}
+   const results=relevantResults(q,a);if(!results.length)throw new Error("alakalı sonuç bulunamadı");
+   return {provider:"DuckDuckGo",results:results.slice(0,7)};
+  })()),
+  accept("Wikipedia",(async()=>{
+   const u=new URL("https://en.wikipedia.org/w/api.php");u.searchParams.set("action","query");u.searchParams.set("list","search");u.searchParams.set("srsearch",q);u.searchParams.set("format","json");u.searchParams.set("origin","*");
+   const r=await fetch(u,{headers,signal:AbortSignal.timeout(timeout)});if(!r.ok)throw new Error("HTTP "+r.status);
+   const j=await r.json(),a=(j.query?.search||[]).slice(0,7).map(x=>({title:x.title,url:"https://en.wikipedia.org/wiki/"+encodeURIComponent(x.title.replace(/ /g,"_")),snippet:cleanHtml(x.snippet),source:"Wikipedia"}));
+   const results=relevantResults(q,a);if(!results.length)throw new Error("alakalı sonuç bulunamadı");
+   return {provider:"Wikipedia",results:results.slice(0,5)};
+  })())
+ ];
+ const fallback=await Promise.any(second.map(p=>p.then(v=>{if(!v)throw new Error("sonuç yok");return v}))).catch(()=>null);
+ if(fallback)return fallback;
+ throw new Error("Web araması zaman aşımına uğradı veya sağlayıcılar doğrulanabilir, alakalı sonuç döndürmedi. Hiçbir kaynak üretilemedi. "+errors.slice(0,3).join("; "));
 }
 async function embed(env,text){const r=await env.AI.run(EMBED_MODEL,{text:[String(text).slice(0,7000)]});const v=r?.data?.[0]||r?.result?.data?.[0];if(!Array.isArray(v))throw new Error("Embedding modeli geçerli vektör döndürmedi.");return v}
 async function ragSearch(env,userId,query,projectId=null){
