@@ -1028,7 +1028,7 @@ async function send(){
  busy=true;$('go').textContent='■';ctl=new AbortController();
  if(text&&(imgMode||(!sf.length&&text.length<200&&IMG_RE.test(text)))){
   const source=imageFiles[0]?.part?.inlineData||null;const generated=await genImg(text,el,false,source);
-  if(generated.src){const mediaId='gen-'+c.id+'-'+Date.now();if(!privateChat)await mediaPut(mediaId,generated.src);c.msgs.push({role:'model',parts:[{text:'[Resim oluşturuldu: '+generated.prompt+']'}],text:'🖼 Resim oluşturuldu: '+generated.prompt,media:[{id:mediaId,name:source?'Düzenlenmiş resim':'Oluşturulan resim',src:privateChat?generated.src:undefined}]})}
+  if(generated.src){const mediaId='gen-'+c.id+'-'+Date.now();if(!privateChat)await mediaPut(mediaId,generated.src);c.msgs.push({role:'model',parts:[{text:'[Resim oluşturuldu: '+generated.prompt+']'}],text:'🖼 Resim oluşturuldu: '+generated.prompt+' · Motor: '+(generated.provider||'Bilinmiyor')+(generated.model?' / '+generated.model:'')+(generated.apiVersion?' · '+generated.apiVersion:''),media:[{id:mediaId,name:source?'Düzenlenmiş resim':'Oluşturulan resim',src:privateChat?generated.src:undefined}]})}
   else c.msgs.push({role:'model',parts:[{text:'[Görsel oluşturma hatası: '+generated.error+']'}],text:'Görsel oluşturulamadı: '+generated.error});
   busy=false;$('go').textContent='➤';save();render();return;
  }
