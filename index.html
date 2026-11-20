@@ -259,6 +259,7 @@ body.voice-speaking .voice-orb-core{animation:orbSpeak .55s ease-in-out infinite
 /* Projects and saved answers */
 .workspace-tools{display:grid;grid-template-columns:1fr 1fr;gap:7px}.workspace-tools button{background:#121b2b;border:1px solid #ffffff16;border-radius:10px;color:#dce5ff;font-size:12px;padding:9px 7px}.workspace-tools span{color:#b8a0ff}.project-list{display:grid;gap:4px;max-height:180px;overflow:auto}.project-row{display:flex;align-items:center;gap:3px}.project-item{flex:1;text-align:left;color:#aebbd0;font-size:12px;padding:8px 10px;border-radius:9px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.project-item.active{background:#8d75dc24;color:#e2d8ff;border:1px solid #9b83eb45}.project-edit{color:#9ba8bf;padding:5px 8px}.project-filter{font-size:10px;color:#77869e;letter-spacing:.1em;text-transform:uppercase;padding:6px 9px 2px}.saved-list{display:grid;gap:10px;max-height:60vh;overflow:auto}.saved-card{padding:12px;border:1px solid #ffffff17;border-radius:12px;background:#0d1421}.saved-card p{font-size:13px;line-height:1.5;white-space:pre-wrap;max-height:180px;overflow:auto;color:#d3dced}.saved-actions{display:flex;gap:6px;flex-wrap:wrap}.saved-actions button{font-size:11px;background:#1a2639;border:1px solid #ffffff18}
 @media(max-width:760px){.workspace-tools{grid-template-columns:1fr 1fr}.project-list{max-height:145px}}
+#research{font-size:12px;padding:8px 10px;border:1px solid var(--bd);border-radius:10px;background:var(--card);color:var(--fg);white-space:nowrap}#research.on{background:linear-gradient(135deg,#7053bd,#3e66a8);border-color:#a38be8;color:white;box-shadow:0 0 18px #8267d54a}@media(max-width:760px){#research{font-size:11px;padding:7px 8px}}
 </style>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
@@ -298,7 +299,7 @@ body.voice-speaking .voice-orb-core{animation:orbSpeak .55s ease-in-out infinite
  <div id="chips"></div>
  <div id="bar">
   <button onclick="$('f').click()" title="Dosya / fotoğraf"><svg viewBox="0 0 24 24"><path d="m8 12.5 7.2-7.2a3.2 3.2 0 0 1 4.5 4.5l-9.2 9.2a5 5 0 0 1-7.1-7.1l9-9"/></svg></button>
-  <button id="web" title="Bağımsız internet araması"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0-18"/></svg></button>
+  <button id="research" title="Kaynaklı, çok aşamalı araştırma modu">Araştır</button><button id="web" title="Bağımsız internet araması"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0-18"/></svg></button>
   <button id="agent" title="Ajan modu: araçlarla çok aşamalı görev">✧</button>
   <button id="img" title="Resim oluştur"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="4"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg></button>
   <textarea id="inp" rows="1" placeholder="Bir şey sor…"></textarea>
@@ -310,7 +311,7 @@ body.voice-speaking .voice-orb-core{animation:orbSpeak .55s ease-in-out infinite
 </main>
 <dialog id="dl">
  <h3 style="margin-top:0">Ayarlar <small style="color:var(--mu);font-weight:400">v3.0</small></h3>
- <div id="keybox"><label>Yapay zekâ altyapısı</label><small>LinayAI ana model olarak GPT-OSS-120B kullanır; erişilemezse Qwen 3.8 27B ve ardından Gemini yedeklenir. Görsel analizinde de Qwen 3.8 27B kullanılır. İnternet araması önce bağımsız DuckDuckGo aramasını dener; SearXNG ve Brave anahtarı eklenirse onları da kullanır. Bağımsız arama başarısız olursa Gemini Google Search yedek aranır. PDF, Word, Excel ve metin belgeleri D1 + Vectorize ile kişisel RAG hafızasına eklenir. Sohbet hafızası ve hata ölçümleri sunucuda tutulur.</small></div>
+ <div id="keybox"><label>Yapay zekâ altyapısı</label><small>LinayAI ana model olarak Qwen 3.8 27B kullanır; erişilemezse GPT-OSS-120B, ardından Gemini Flash Lite yedeklenir. Görsel analizinde de Qwen 3.8 27B kullanılır. İnternet araması önce bağımsız DuckDuckGo aramasını dener; SearXNG ve Brave anahtarı eklenirse onları da kullanır. Bağımsız arama başarısız olursa Gemini Google Search yedek aranır. PDF, Word, Excel ve metin belgeleri D1 + Vectorize ile kişisel RAG hafızasına eklenir. Sohbet hafızası ve hata ölçümleri sunucuda tutulur.</small></div>
   <label style="display:block;margin-top:12px">Linay hafızası</label>
  <textarea id="memory" rows="4" placeholder="Linay’in sonraki sohbetlerde hatırlamasını istediğin bilgileri buraya yaz…"></textarea>
  <small>Bu bilgiler sunucu hafızasına kaydedilir. Gizli bilgi veya parola yazma.</small>
@@ -338,7 +339,7 @@ body.voice-speaking .voice-orb-core{animation:orbSpeak .55s ease-in-out infinite
 <script>
 const $=id=>document.getElementById(id),dl=$('dl'),inp=$('inp');
 let S=JSON.parse(localStorage.getItem('ai1')||'null')||{chats:[],cur:null,cfg:{key:'',model:'gpt-oss-120b',mode:'gen',search:false,agent:false,v:2}};
-if(S.cfg.v!==6){S.cfg.v=6;S.cfg.model='qwen3.8-27b';S.cfg.search=false;S.cfg.agent=false}if(typeof S.cfg.memory!=='string')S.cfg.memory='';if(typeof S.cfg.agent!=='boolean')S.cfg.agent=false;
+if(S.cfg.v!==6){S.cfg.v=6;S.cfg.model='qwen3.8-27b';S.cfg.search=false;S.cfg.agent=false}if(typeof S.cfg.memory!=='string')S.cfg.memory='';if(typeof S.cfg.agent!=='boolean')S.cfg.agent=false;if(typeof S.cfg.research!=='boolean')S.cfg.research=false;
 if(!Array.isArray(S.projects))S.projects=[];if(!Array.isArray(S.saved))S.saved=[];if(!('activeProjectId'in S))S.activeProjectId=null;let editingProjectId=null;
 const USER_ID=localStorage.getItem('linay_uid')||(()=>{const id=crypto.randomUUID();localStorage.setItem('linay_uid',id);return id})();
 const RAW=String(window.LINAY_PROXY||window.LINAY_KEY||'').trim();
@@ -417,7 +418,7 @@ function add(role,html,last,media){
  $('msgs').appendChild(w);return d;
 }
 function render(){
- const c=cur();document.body.classList.toggle('has-chat',!!(c&&c.msgs.length));document.body.classList.toggle('text-mode',!voiceMode);$('modeBtn').textContent=voiceMode?'Yazı modu':'Sesli mod';$('agent').classList.toggle('on',!!S.cfg.agent);$('ttl').textContent=privateChat?'Gizli sohbet':(c?c.title:'Linay');$('web').classList.toggle('on',S.cfg.search);
+ const c=cur();document.body.classList.toggle('has-chat',!!(c&&c.msgs.length));document.body.classList.toggle('text-mode',!voiceMode);$('modeBtn').textContent=voiceMode?'Yazı modu':'Sesli mod';$('agent').classList.toggle('on',!!S.cfg.agent);$('research').classList.toggle('on',!!S.cfg.research);$('ttl').textContent=privateChat?'Gizli sohbet':(c?c.title:'Linay');$('web').classList.toggle('on',S.cfg.search);
  $('list').innerHTML='';
  renderProjects();
  $('savedCount').textContent=String(S.saved.length);
@@ -550,7 +551,7 @@ async function send(){
   inp.value='';grow();save();render();if(voiceReplyPending){voiceReplyPending=false;speakAssistant(localAnswer)}return;
  }
  const explicitSearch=/(internetten ara|web(?:de)? ara|google(?:'da|da)? ara|araştır|araştırma yap|kaynak (?:bul|göster|ver)|kaynakları bul|internetten kontrol et|güncel kaynak)/i.test(text);
- const useSearch=!!text&&(S.cfg.search||explicitSearch);
+ const useSearch=!!text&&(S.cfg.search||S.cfg.research||explicitSearch);
  let c=cur();
  if(!c){c={id:Date.now(),title:(text||files[0].name).slice(0,40),msgs:[],hidden:privateChat,projectId:privateChat?null:S.activeProjectId};S.chats.push(c);S.cur=c.id}
  const sf=files;const imageFiles=sf.filter(f=>f.part&&f.part.inlineData&&String(f.part.inlineData.mimeType||'').startsWith('image/'));const media=imageFiles.map((f,i)=>({id:'up-'+c.id+'-'+Date.now()+'-'+i,name:f.name,src:privateChat?'data:'+f.part.inlineData.mimeType+';base64,'+f.part.inlineData.data:undefined}));if(!privateChat)await Promise.all(media.map((m,i)=>{const f=imageFiles[i].part.inlineData;return mediaPut(m.id,'data:'+f.mimeType+';base64,'+f.data)}));const parts=sf.map(f=>f.part);if(text)parts.push({text});const um={role:'user',parts,t:text,att:sf.map(f=>f.name),media};c.msgs.push(um);files=[];chips();inp.value='';grow();render();
@@ -567,12 +568,13 @@ async function send(){
    catch(de){docNotice+='\n\n⚠️ '+f.name+' belge hafızasına eklenemedi: '+de.message}
   }
   const activeProject=S.projects.find(p=>p.id===c.projectId);const projectPrompt=activeProject?.instructions?'\n\nAKTİF PROJE: '+activeProject.name+'\nPROJE TALİMATLARI: '+activeProject.instructions+'\nBu talimatlar yalnızca bu projedeki sohbette geçerlidir.':'';
-  const system=GEN+projectPrompt+' KİMLİK KURALI: Adın Linay. Kendini yalnızca Linay veya LinayAI olarak tanıt. Asla Sıfır, ChatGPT, Gemini veya başka bir ad kullanma. Kullanıcı adını sorarsa kısa biçimde “Ben LinayAI.” de. '+' Şu an: '+new Date().toLocaleString('tr-TR',{timeZone:'Europe/Istanbul'})+' (Europe/Istanbul). KISA VE DOĞRU CEVAP KURALLARI: Kullanıcının son mesajını önceki konuşma bağlamıyla birlikte yorumla; yazım hatalarını makul biçimde düzelt. Kullanıcı yalnızca kısa selam verirse kısa selamla karşılık ver, gereksiz soru listesi veya uzun açıklama üretme. Önceki asistan yanıtlarını kesin bilgi kabul etme; kullanıcı hata gösterirse yeniden değerlendir, hatayı tekrarlama ve açıkça düzelt. Bilmediğin bilgiyi uydurma; emin değilsen bunu söyle veya tek netleştirici soru sor. Mantık ve matematik sorularında yalnızca verilen bilgilerden çıkan sonucu ver; varsayım ekleme. Bulmacanın koşullarını değiştirme, cevabı ilk cümlede açıkla ve açıklamanı sonuçla tutarlı tut. Cevap göndermeden önce kendi içinde çelişki veya hesap hatası olup olmadığını kontrol et. Saat/tarih ve konum sorularında şehir ya da ülkeyi doğru belirle; konum belirsizse İstanbul varsayma, netleştir. Güncel bilgi gerekiyorsa web araması yapılmadıysa bunu açıkça söyle ve kesin konuşma. '+(S.cfg.memory?'\n\nKULLANICI HAFIZASI:\n'+S.cfg.memory+'\nYalnızca ilgili olduğunda kullan.':'')+(voiceReplyPending?'\n\nSESLİ SOHBET MODU: Konuşma dilinde doğal, akıcı ve kısa cevap ver. İlk cümlede doğrudan yanıtla. Normal sorularda 1-3 cümle yeterlidir; kullanıcı ayrıntı isterse genişlet. Gereksiz başlık, tablo, uzun madde listesi, kod biçimlendirmesi ve kaynak URL yığınları kullanma. Bilmediğini uydurma.':'');
+  const researchPrompt=S.cfg.research?'\n\nARAŞTIRMA MODU: Bu isteği güncel ve güvenilir kaynaklarla araştır. Soruyu alt başlıklara ayır, web aramasını kullan, bağımsız kaynakları karşılaştır ve tarihleri kontrol et. Kaynakların desteklemediği iddiaları yazma. Yanıtta kısa sonuç, önemli bulgular ve doğrudan kaynak bağlantıları ver. Çelişkili veya eksik bilgiyi açıkça belirt.':'';
+  const system=GEN+projectPrompt+researchPrompt+' KİMLİK KURALI: Adın Linay. Kendini yalnızca Linay veya LinayAI olarak tanıt. Asla Sıfır, ChatGPT, Gemini veya başka bir ad kullanma. Kullanıcı adını sorarsa kısa biçimde “Ben LinayAI.” de. '+' Şu an: '+new Date().toLocaleString('tr-TR',{timeZone:'Europe/Istanbul'})+' (Europe/Istanbul). KISA VE DOĞRU CEVAP KURALLARI: Kullanıcının son mesajını önceki konuşma bağlamıyla birlikte yorumla; yazım hatalarını makul biçimde düzelt. Kullanıcı yalnızca kısa selam verirse kısa selamla karşılık ver, gereksiz soru listesi veya uzun açıklama üretme. Önceki asistan yanıtlarını kesin bilgi kabul etme; kullanıcı hata gösterirse yeniden değerlendir, hatayı tekrarlama ve açıkça düzelt. Bilmediğin bilgiyi uydurma; emin değilsen bunu söyle veya tek netleştirici soru sor. Mantık ve matematik sorularında yalnızca verilen bilgilerden çıkan sonucu ver; varsayım ekleme. Bulmacanın koşullarını değiştirme, cevabı ilk cümlede açıkla ve açıklamanı sonuçla tutarlı tut. Cevap göndermeden önce kendi içinde çelişki veya hesap hatası olup olmadığını kontrol et. Saat/tarih ve konum sorularında şehir ya da ülkeyi doğru belirle; konum belirsizse İstanbul varsayma, netleştir. Güncel bilgi gerekiyorsa web araması yapılmadıysa bunu açıkça söyle ve kesin konuşma. '+(S.cfg.memory?'\n\nKULLANICI HAFIZASI:\n'+S.cfg.memory+'\nYalnızca ilgili olduğunda kullan.':'')+(voiceReplyPending?'\n\nSESLİ SOHBET MODU: Konuşma dilinde doğal, akıcı ve kısa cevap ver. İlk cümlede doğrudan yanıtla. Normal sorularda 1-3 cümle yeterlidir; kullanıcı ayrıntı isterse genişlet. Gereksiz başlık, tablo, uzun madde listesi, kod biçimlendirmesi ve kaynak URL yığınları kullanma. Bilmediğini uydurma.':'');
   const messages=[{role:'system',content:system+(useSearch?'':' WEB ARAMASI YAPILMADI: Kaynak listesi veya uydurma atıf ekleme. Genel bilgiyle yanıtla; güncel doğrulama gerekiyorsa kullanıcıdan internet aramasını açmasını iste.')},...c.msgs.slice(-12).map(m=>{
    const content=[];for(const p of (m.parts||[])){if(p.text)content.push({type:'text',text:p.text});if(p.inlineData?.data)content.push({type:'image_url',image_url:{url:'data:'+(p.inlineData.mimeType||'application/octet-stream')+';base64,'+p.inlineData.data}})}
    return {role:m.role==='model'?'assistant':'user',content:content.length?content:[{type:'text',text:m.t||''}]};
   })];
-  const r=await apiFetch(PROXY+'/chat',{method:'POST',headers:{'Content-Type':'application/json'},signal:ctl.signal,body:JSON.stringify({messages,search:useSearch,agent:!!S.cfg.agent,userId:USER_ID})});
+  const r=await apiFetch(PROXY+'/chat',{method:'POST',headers:{'Content-Type':'application/json'},signal:ctl.signal,body:JSON.stringify({messages,search:useSearch,agent:!!(S.cfg.agent||S.cfg.research),userId:USER_ID})});
   if(!r.ok){let msg='HTTP '+r.status;try{const j=await r.json();msg=j.error||msg}catch{}throw new Error(msg)}
   const provider=r.headers.get('X-Linay-Provider')||'Cloudflare Workers AI';
   const searchState=r.headers.get('X-Linay-Search')||'off';let citations=[];try{citations=JSON.parse(decodeURIComponent(r.headers.get('X-Linay-Sources')||'%5B%5D'))}catch(e){}
@@ -596,7 +598,7 @@ async function send(){
  busy=false;$('go').textContent='➤';save();if(!el.classList.contains('err')&&!shown)render();if(voiceReplyPending){voiceReplyPending=false;if(!el.classList.contains('err'))speakAssistant(out);else if(voiceSessionActive)stopVoiceSession('Yanıt alınamadı. Tekrar deneyebilirsin.');}
 }
 function exportChat(){const c=cur();if(!c||!c.msgs.length){alert('Dışa aktarılacak sohbet yok.');return}const payload={title:c.title,exportedAt:new Date().toISOString(),messages:c.msgs.map(m=>({role:m.role,text:m.text||m.t||''}))};const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=(c.title||'linay-sohbet').replace(/[^a-z0-9-_ğüşöçıİĞÜŞÖÇ]/gi,'-')+'.json';a.click();URL.revokeObjectURL(url)}
-async function openSet(){$('keybox').style.display='block';$('memory').value=S.cfg.memory||'';$('metricsBox').textContent='';tg(false);dl.showModal();loadDocs();try{const r=await apiFetch(PROXY+'/memory?userId='+encodeURIComponent(USER_ID));const j=await r.json();if(j.content){S.cfg.memory=j.content;$('memory').value=j.content;save()}}catch(e){}}
+async function openSet(){$('keybox').style.display='block';$('memory').value=S.cfg.memory||'';$('metricsBox').textContent='';tg(false);dl.showModal();loadDocs();try{const r=await apiFetch(PROXY+'/memory?userId='+encodeURIComponent(USER_ID));const j=await r.json();S.cfg.memory=j.content||'';$('memory').value=S.cfg.memory;save()}catch(e){}}
 async function loadDocs(){try{const r=await apiFetch(PROXY+'/documents?userId='+encodeURIComponent(USER_ID));const j=await r.json();$('doclist').innerHTML=(j.documents||[]).map(d=>'<div style="display:flex;justify-content:space-between;gap:8px;padding:5px 0;border-bottom:1px solid #ffffff16"><span>'+esc(d.name)+'</span><button data-doc="'+d.id+'">Sil</button></div>').join('')||'Henüz belge yüklenmedi.';$('doclist').querySelectorAll('[data-doc]').forEach(b=>b.onclick=()=>deleteDoc(b.dataset.doc))}catch(e){$('doclist').textContent='Belge listesi alınamadı.'}}
 async function deleteDoc(id){if(!confirm('Bu belge hafızadan silinsin mi?'))return;const r=await apiFetch(PROXY+'/documents/'+encodeURIComponent(id)+'?userId='+encodeURIComponent(USER_ID),{method:'DELETE'});if(r.ok)loadDocs();else alert('Belge silinemedi.')}
 async function showMetrics(){const box=$('metricsBox');box.textContent='Sistem bilgileri alınıyor…';try{const [h,m]=await Promise.all([apiFetch(PROXY+'/health'),apiFetch(PROXY+'/metrics')]);const a=await h.json(),b=await m.json();box.textContent='API: '+(a.ok?'Çalışıyor':'Hata')+' · Ana model: '+a.model+' · Hafıza: '+(a.memory?'Açık':'Kapalı')+' · RAG: '+(a.rag?'Açık':'Kapalı')+' · Belgeler: '+(b.documents??'?')+'\\n'+(b.groups||[]).map(x=>x.kind+' / '+x.provider+': '+x.count+' işlem, ort. '+x.avg_ms+' ms'+(x.ok?'':' (hata)')).join('\\n')}catch(e){box.textContent='Durum alınamadı: '+e.message}}
@@ -611,6 +613,7 @@ $('web').title="Bağımsız internet araması: DuckDuckGo / SearXNG / Brave";
 $('web').setAttribute('aria-label',"Bağımsız web araması");
 $('web').onclick=()=>{S.cfg.search=!S.cfg.search;$('web').classList.toggle('on',S.cfg.search);save()};
 $('agent').onclick=()=>{S.cfg.agent=!S.cfg.agent;$('agent').classList.toggle('on',S.cfg.agent);save()};
+$('research').onclick=()=>{S.cfg.research=!S.cfg.research;$('research').classList.toggle('on',S.cfg.research);if(S.cfg.research){S.cfg.search=true;S.cfg.agent=true;$('web').classList.add('on');$('agent').classList.add('on')}save()};
 const SR=window.SpeechRecognition||window.webkitSpeechRecognition;let rec=null,voiceMode=true,voiceSessionActive=false,voiceReplyPending=false,voiceRetryCount=0;
 function setVoiceState(state,message){
  document.body.classList.remove('voice-listening','voice-thinking','voice-speaking','voice-error');
@@ -619,8 +622,8 @@ function setVoiceState(state,message){
  if(state==='speaking')document.body.classList.add('voice-speaking');
  if(state==='error')document.body.classList.add('voice-error');
  const status=$('voiceStatus');if(status&&message)status.textContent=message;
- $('voiceButtonLabel').textContent=voiceSessionActive?'Konuşmayı bitir':'Konuşmayı başlat';
- $('voiceOrbButton').setAttribute('aria-label',voiceSessionActive?'Sesli sohbeti bitir':'Sesli sohbeti başlat');
+ const interrupting=voiceSessionActive&&state==='speaking';$('voiceButtonLabel').textContent=interrupting?'Sözümü kes':voiceSessionActive?'Konuşmayı bitir':'Konuşmayı başlat';
+ $('voiceOrbButton').setAttribute('aria-label',interrupting?'Yanıtı kes ve konuş':'Sesli sohbeti başlat veya bitir');
  $('voiceSessionBtn').classList.toggle('active',voiceSessionActive);
 }
 function toggleMode(){
@@ -634,6 +637,7 @@ function stopVoiceSession(message){
  stopSpeech();setVoiceState(message?'error':'ready',message||'Konuşma durduruldu. Yeniden başlatmak için dokun.');
 }
 function toggleVoiceSession(){
+ if(voiceSessionActive&&window.speechSynthesis?.speaking){stopSpeech();$('voiceTranscript').textContent='';setVoiceState('listening','Tamam, seni dinliyorum.');startVoiceCapture();return}
  if(voiceSessionActive){stopVoiceSession();return}
  if(!SR){setVoiceState('error','Bu tarayıcı mikrofonla konuşmayı desteklemiyor. Yazı modunu kullanabilirsin.');return}
  if(!window.speechSynthesis){setVoiceState('error','Bu cihaz sesli yanıtı desteklemiyor.');return}
