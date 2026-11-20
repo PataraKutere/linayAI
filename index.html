@@ -179,7 +179,8 @@ body.text-mode #bar{display:flex}
 body.text-mode #chips{display:flex;max-width:850px;width:calc(100% - 28px);margin:0 auto}
 body.text-mode #features{display:block}
 body:not(.text-mode) #features{display:none}
-body.text-mode #hello{display:none}
+body.text-mode #hello{display:block}
+body:not(.text-mode) #modeGuide{display:none}
 #inp{color:#f3f6ff}
 #inp::placeholder{color:#8290aa}
 #bar button{color:#c5d2ed}
@@ -681,7 +682,7 @@ async function send(){
  const agentMode=!!(S.cfg.agent||S.cfg.research);
  const el=add('model',agentMode?'<span style="color:var(--mu)">Ajan görevi devraldı…</span>':'<span style="color:var(--mu)">Linay düşünüyor…</span>');
  let agentProgress=null;
- if(agentMode){agentProgress=document.createElement('div');agentProgress.className='agent-progress';agentProgress.innerHTML='<b><span class="pulse"></span>Ajan çalışıyor</b><div>İstek değerlendiriliyor; gerekli araç adımları yürütülecek.</div>';el.parentElement.appendChild(agentProgress)}
+ if(agentMode){agentProgress=document.createElement('div');agentProgress.className='agent-progress';agentProgress.innerHTML='<b><span class="pulse"></span>Ajan çalışıyor</b><div>Görev analiz ediliyor. Kullanılan araç adımları tamamlandığında burada listelenecek.</div>';el.parentElement.appendChild(agentProgress)}
  busy=true;$('go').textContent='■';ctl=new AbortController();
  if(text&&(imgMode||(!sf.length&&text.length<200&&IMG_RE.test(text)))){
   imgMode=false;$('img').classList.remove('on');
