@@ -4,7 +4,8 @@
 <meta name="theme-color" content="#080b13">
 <link rel="manifest" href="manifest.json">
 <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
-<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png?v=38">\n<link rel="apple-touch-icon" href="icon-192.png?v=38">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png?v=39">
+<link rel="apple-touch-icon" href="icon-192.png?v=39">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Linay">
 <title>Linay — Sesli Yapay Zekâ</title>
@@ -360,6 +361,11 @@ body.voice-speaking #voiceOrbButton:before,body.voice-speaking #voiceOrbButton:a
  #side .new-chat-btn,#list .ci,.project-item,#brandLogo{transition:none!important}
 }
 
+
+#bar button#agent{display:inline-flex;align-items:center;justify-content:center;gap:6px;width:auto;min-width:68px;padding:0 10px;border:1px solid #ffffff18;border-radius:10px;background:#111a2b;color:#c5d2ed;font-size:12px;white-space:nowrap}
+#bar button#agent svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+#bar button#agent.on{background:linear-gradient(135deg,#55418f,#344f91);border-color:#a99aff;color:#fff;box-shadow:0 0 16px #7666d833}
+@media(max-width:760px){#bar button#agent{min-width:58px;padding:0 7px;font-size:11px}}
 </style>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
@@ -400,7 +406,7 @@ body.voice-speaking #voiceOrbButton:before,body.voice-speaking #voiceOrbButton:a
  <div id="bar">
   <button onclick="$('f').click()" title="Dosya / fotoğraf"><svg viewBox="0 0 24 24"><path d="m8 12.5 7.2-7.2a3.2 3.2 0 0 1 4.5 4.5l-9.2 9.2a5 5 0 0 1-7.1-7.1l9-9"/></svg></button>
   <button id="research" title="Kaynaklı, çok aşamalı araştırma modu">Araştır</button><button id="web" title="Bağımsız internet araması"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0-18"/></svg></button>
-  <button id="agent" title="Ajan modu: araçlarla çok aşamalı görev">✧</button>
+  <button id="agent" type="button" title="Ajan modu: Linay'ın çok adımlı görevleri planlayıp araçlarla yürütmesini sağlar" aria-label="Ajan modunu aç veya kapat"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.8 14.2 9.8 21.2 12 14.2 14.2 12 21.2 9.8 14.2 2.8 12 9.8 9.8 12 2.8Z"/><path d="m19 2 .7 2.3L22 5l-2.3.7L19 8l-.7-2.3L16 5l2.3-.7L19 2Z"/></svg><span>Ajan</span></button>
   <button id="img" title="Resim oluştur"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="4"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg></button>
   <textarea id="inp" rows="1" placeholder="Bir şey sor…"></textarea>
   <button id="mic" title="Sesle yaz"><svg viewBox="0 0 24 24"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10v2a7 7 0 0 0 14 0v-2M12 19v3m-4 0h8"/></svg></button>
@@ -475,7 +481,7 @@ const cur=()=>S.chats.find(c=>c.id===S.cur);
 const FB='gemini-flash-lite-latest';
 const QUICK='<div class="quick-actions"><button data-p="Gökyüzünde dalgalanan Türk bayrağının etkileyici, sinematik bir görselini oluştur">✦ Resim oluştur</button><button data-p="Benimle yaratıcı fikirler üzerine beyin fırtınası yap">✧ Fikir üret</button><button data-p="Bugün yapmam gerekenler için uygulanabilir bir plan hazırla">▤ Plan yap</button></div>';
 const CARDS='<div class="cards">'+[['▧','Resim üretici','Metinden etkileyici görseller oluştur','Gökyüzünde dalgalanan Türk bayrağını sinematik bir fotoğraf olarak oluştur'],['◉','Bir şey öğren','Merak ettiğin konuyu sade ve anlaşılır öğren','Galatasaray Spor Kulübünün kuruluşundan bugüne tarihini ve başarılarını anlat'],['⌘','Kod asistanı','Kod yaz, hataları bul ve projeler geliştir','Python ile basit bir hesap makinesi yaz ve açıkla']].map(([i,t,d,p])=>`<div data-p="${p}"><span class="card-icon">${i}</span><b>${t}</b><small>${d}</small></div>`).join('')+'</div>';
-function logo(n,id){return '<img src="icon-192.png?v=38" width="'+n+'" height="'+n+'" alt="LinayAI" decoding="async">';}
+function logo(n,id){return '<svg viewBox="0 0 40 40" width="'+n+'" height="'+n+'" role="img" aria-label="LinayAI"><defs><radialGradient id="linayMarkGlow" cx="32%" cy="24%"><stop offset="0" stop-color="#f2d8ff"/><stop offset=".28" stop-color="#a879ff"/><stop offset=".68" stop-color="#526fe0"/><stop offset="1" stop-color="#111a3a"/></radialGradient></defs><rect x="1" y="1" width="38" height="38" rx="12" fill="#10152a" stroke="#9d8aff" stroke-opacity=".55"/><circle cx="20" cy="20" r="12.5" fill="url(#linayMarkGlow)"/><circle cx="16" cy="14" r="3.4" fill="#fff" opacity=".62"/><circle cx="20" cy="20" r="15.5" fill="none" stroke="#91a7ff" stroke-opacity=".3"/></svg>';}
 $('brandLogo').innerHTML=logo(32,'brand');
 $('brandLogo').onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();nc()}};
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -719,7 +725,7 @@ $('web').setAttribute('aria-label',"Bağımsız web araması");
 $('web').onclick=()=>{S.cfg.search=!S.cfg.search;$('web').classList.toggle('on',S.cfg.search);save()};
 $('agent').onclick=()=>{S.cfg.agent=!S.cfg.agent;$('agent').classList.toggle('on',S.cfg.agent);save()};
 $('research').onclick=()=>{if(!S.cfg.research){S.cfg.research=true;S.cfg.researchPrevious={search:!!S.cfg.search,agent:!!S.cfg.agent};S.cfg.search=true;S.cfg.agent=true}else{S.cfg.research=false;const p=S.cfg.researchPrevious||{};S.cfg.search=!!p.search;S.cfg.agent=!!p.agent;delete S.cfg.researchPrevious}$('research').classList.toggle('on',S.cfg.research);$('web').classList.toggle('on',S.cfg.search);$('agent').classList.toggle('on',S.cfg.agent);save()};
-const SR=window.SpeechRecognition||window.webkitSpeechRecognition;let rec=null,voiceMode=true,voiceSessionActive=false,voiceReplyPending=false,voiceRetryCount=0;
+const SR=window.SpeechRecognition||window.webkitSpeechRecognition;let rec=null,voiceMode=false,voiceSessionActive=false,voiceReplyPending=false,voiceRetryCount=0;
 function setVoiceState(state,message){
  document.body.classList.remove('voice-listening','voice-thinking','voice-speaking','voice-error');
  if(state==='listening')document.body.classList.add('voice-listening');
