@@ -632,6 +632,86 @@ dialog input,dialog textarea{background:#0b0f16!important;border-color:#303846!i
  .voice-orb-core,#voiceStage:before{animation:none!important}
 }
 
+
+/* =========================================================
+   LINAY UI POLISH — logo, sidebar controls, composer, scroll
+   ========================================================= */
+#brandLogo{
+ width:40px;height:40px;flex:0 0 40px;overflow:hidden;border-radius:50%;
+ display:grid;place-items:center;background:rgba(18,24,35,.78);
+ border:1px solid rgba(160,196,194,.22);
+ box-shadow:0 0 22px rgba(120,207,199,.10),inset 0 1px rgba(255,255,255,.07);
+ transition:border-color .2s,box-shadow .2s,transform .2s;
+}
+#brandLogo:hover{transform:scale(1.035);border-color:rgba(120,207,199,.48);box-shadow:0 0 26px rgba(120,207,199,.16),0 0 28px rgba(169,155,232,.10)}
+#brandLogo svg{display:block;width:32px;height:32px;overflow:visible}
+
+/* Sidebar controls share one charcoal surface language */
+#side button{
+ appearance:none;-webkit-appearance:none;
+ background:rgba(255,255,255,.035);border:1px solid rgba(220,231,240,.09);
+ color:#dce3ed;border-radius:10px;box-shadow:none;
+}
+#side button:hover{background:rgba(120,207,199,.075);border-color:rgba(120,207,199,.22);color:#f2f5fa}
+#side #sideClose{
+ align-self:flex-end;display:inline-flex;align-items:center;justify-content:center;
+ width:36px;height:36px;min-width:36px;min-height:36px;margin:-7px -2px 2px 0;
+ border-radius:11px;background:rgba(255,255,255,.045);
+ border:1px solid rgba(220,231,240,.12);color:#c8d0dc;font-size:17px;line-height:1;
+ cursor:pointer;
+}
+#side #sideClose:hover{background:rgba(169,155,232,.12);border-color:rgba(169,155,232,.32);color:#fff}
+#side .new-chat-btn{
+ background:linear-gradient(112deg,rgba(130,120,183,.19),rgba(82,127,131,.12))!important;
+ border:1px solid rgba(170,190,205,.17)!important;color:#edf0f5!important;
+ box-shadow:none!important;
+}
+#side .nb.ghost,#side .workspace-tools button,#side .project-edit,
+#side #list .ci button,#side>button:not(.new-chat-btn):not(#sideClose):not(.nb){
+ background:rgba(255,255,255,.035)!important;
+ border:1px solid rgba(220,231,240,.09)!important;
+ color:#c3ccd8!important;box-shadow:none!important;
+}
+#side .nb.ghost:hover,#side .workspace-tools button:hover,#side .project-edit:hover,
+#side #list .ci button:hover,#side>button:not(.new-chat-btn):not(#sideClose):not(.nb):hover{
+ background:rgba(120,207,199,.08)!important;border-color:rgba(120,207,199,.24)!important;color:#fff!important;
+}
+#side .project-item{background:transparent!important;border-color:transparent!important;color:#b8c2d0!important}
+#side .project-item.active{background:rgba(169,155,232,.11)!important;border-color:rgba(169,155,232,.22)!important;color:#f0edff!important}
+#side .ci{background:transparent!important}
+#side .ci.on{background:rgba(169,155,232,.10)!important;border-color:rgba(169,155,232,.20)!important}
+#side #q{
+ appearance:none;-webkit-appearance:none;background:rgba(255,255,255,.035)!important;
+ border:1px solid rgba(220,231,240,.12)!important;color:#eef1f6!important;
+ box-shadow:none!important;
+}
+#side #q:focus{outline:none;border-color:rgba(120,207,199,.36)!important;box-shadow:0 0 0 3px rgba(120,207,199,.07)!important}
+
+/* Remove the native textarea resize grip and tame its scrollbar */
+#inp{
+ resize:none!important;overflow-y:auto!important;overflow-x:hidden!important;
+ scrollbar-width:thin;scrollbar-color:rgba(143,166,177,.30) transparent;
+ background:rgba(9,13,20,.52)!important;
+}
+#inp::-webkit-resizer{display:none!important;background:transparent!important}
+#inp::-webkit-scrollbar{width:6px}
+#inp::-webkit-scrollbar-track{background:transparent}
+#inp::-webkit-scrollbar-thumb{background:rgba(143,166,177,.28);border-radius:8px}
+#inp::-webkit-scrollbar-thumb:hover{background:rgba(143,166,177,.48)}
+#bar{background:rgba(17,22,31,.72)!important;border-color:rgba(207,220,232,.13)!important}
+
+/* Keep chat position stable as generated/uploaded images finish loading */
+#msgs{overflow-anchor:none;scrollbar-gutter:stable}
+#msgs .media-gallery{display:flex;flex-wrap:wrap;gap:10px;margin-top:10px;align-items:flex-start}
+#msgs .media-gallery img{display:block;max-width:min(100%,520px);max-height:520px;width:auto;height:auto;object-fit:contain;border-radius:13px;background:#0b1018}
+#menu{font-size:15px;line-height:1;transition:background .18s,border-color .18s}
+#menu[aria-expanded="true"]{background:rgba(169,155,232,.12)!important;border-color:rgba(169,155,232,.28)!important}
+@media(max-width:760px){
+ #side #sideClose{width:40px;height:40px;min-width:40px;min-height:40px}
+ #brandLogo{width:36px;height:36px;flex-basis:36px}
+ #brandLogo svg{width:29px;height:29px}
+}
+
 </style><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
@@ -641,6 +721,7 @@ dialog input,dialog textarea{background:#0b0f16!important;border-color:#303846!i
 
 </head><body>
 <aside id="side" class="closed">
+ <button id="sideClose" type="button" onclick="tg(false)" aria-label="Sohbet geçmişini kapat" title="Paneli kapat">✕</button>
  <button class="new-chat-btn" onclick="nc()" aria-label="Yeni sohbet"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span>Yeni sohbet</span><kbd>＋</kbd></button>
  <button class="nb ghost" onclick="startPrivateChat()">◉ Gizli sohbet</button>
  <input id="q" placeholder="Sohbetlerde ara" oninput="render()">
@@ -743,12 +824,12 @@ let mediaDBPromise;
 function mediaDB(){if(!('indexedDB'in window))return Promise.reject(new Error('Kalıcı görsel saklama desteklenmiyor.'));if(!mediaDBPromise)mediaDBPromise=new Promise((resolve,reject)=>{const r=indexedDB.open('linay-media',1);r.onupgradeneeded=()=>{if(!r.result.objectStoreNames.contains('images'))r.result.createObjectStore('images')};r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error)});return mediaDBPromise}
 function mediaPut(id,value){return mediaDB().then(db=>new Promise((resolve,reject)=>{const t=db.transaction('images','readwrite');t.objectStore('images').put(value,id);t.oncomplete=resolve;t.onerror=()=>reject(t.error)}))}
 function mediaGet(id){return mediaDB().then(db=>new Promise((resolve,reject)=>{const r=db.transaction('images','readonly').objectStore('images').get(id);r.onsuccess=()=>resolve(r.result||'');r.onerror=()=>reject(r.error)}))}
-function showMedia(el,items){if(!items||!items.length)return;const box=document.createElement('div');box.className='media-gallery';el.appendChild(box);items.forEach(async item=>{try{const src=item.src||await mediaGet(item.id);if(!src)return;const im=document.createElement('img');im.src=src;im.alt=item.name||'Sohbet görseli';box.appendChild(im)}catch(e){}})}
+function showMedia(el,items){if(!items||!items.length)return;const box=document.createElement('div');box.className='media-gallery';el.appendChild(box);items.forEach(async item=>{try{const src=item.src||await mediaGet(item.id);if(!src)return;const im=document.createElement('img');im.src=src;im.alt=item.name||'Sohbet görseli';im.onload=()=>{const m=$('msgs');if(m&&m.dataset.keepBottom==='1'){requestAnimationFrame(()=>{m.scrollTop=m.scrollHeight})}};box.appendChild(im)}catch(e){}})}
 const cur=()=>S.chats.find(c=>c.id===S.cur);
 const FB='gemini-flash-lite-latest';
 const QUICK='<div class="quick-actions"><button data-p="Bana şu konuda kısa ve anlaşılır bilgi ver: yapay zekâ nasıl çalışır?">✦ Bir şey sor</button><button data-p="Bu hafta öğrenebileceğim üç yeni beceri öner">✧ Fikir üret</button></div>';
 const CARDS='<div class="cards">'+[['⌕','Araştır','Güncel bilgileri web kaynaklarıyla karşılaştır','2026 yılında Türkiye’de yapay zekâ alanındaki son gelişmeleri güvenilir kaynaklarla araştır'],['⌘','Kod yaz','Kod üret, hataları bul ve projeni geliştir','Python ile çalışan basit bir hesap makinesi yaz ve kodu açıkla'],['▤','Dosya incele','PDF, belge veya yüklediğin dosyadan bilgi çıkar','Yüklediğim dosyayı incele, önemli noktaları ve eksik bilgileri özetle'],['✧','Fikir üret','Yeni fikirler bul, seçenekleri değerlendir','Ücretsiz başlayabileceğim, gelir potansiyeli olan 5 web uygulaması fikri üret']].map(([i,t,d,p])=>`<div data-p="${p}"><span class="card-icon">${i}</span><b>${t}</b><small>${d}</small></div>`).join('')+'</div>';
-function logo(n,id){return '<svg viewBox="0 0 40 40" width="'+n+'" height="'+n+'" role="img" aria-label="LinayAI"><defs><radialGradient id="linayMarkGlow" cx="32%" cy="24%"><stop offset="0" stop-color="#f2d8ff"/><stop offset=".28" stop-color="#a879ff"/><stop offset=".68" stop-color="#526fe0"/><stop offset="1" stop-color="#111a3a"/></radialGradient></defs><rect x="1" y="1" width="38" height="38" rx="12" fill="#10152a" stroke="#9d8aff" stroke-opacity=".55"/><circle cx="20" cy="20" r="12.5" fill="url(#linayMarkGlow)"/><circle cx="16" cy="14" r="3.4" fill="#fff" opacity=".62"/><circle cx="20" cy="20" r="15.5" fill="none" stroke="#91a7ff" stroke-opacity=".3"/></svg>';}
+function logo(n,id){return '<svg viewBox="0 0 40 40" width="'+n+'" height="'+n+'" role="img" aria-label="LinayAI" focusable="false"><defs><linearGradient id="linayAuroraRing" x1="5%" y1="5%" x2="95%" y2="95%"><stop offset="0" stop-color="#c5b7ff"/><stop offset=".52" stop-color="#8c9fe9"/><stop offset="1" stop-color="#75d5cb"/></linearGradient><radialGradient id="linayAuroraCore"><stop offset="0" stop-color="#d9f5f0" stop-opacity=".9"/><stop offset=".42" stop-color="#a99be8" stop-opacity=".52"/><stop offset="1" stop-color="#111824" stop-opacity="0"/></radialGradient></defs><circle cx="20" cy="20" r="17.5" fill="none" stroke="url(#linayAuroraRing)" stroke-width="1.25" opacity=".78"/><circle cx="20" cy="20" r="12.5" fill="url(#linayAuroraCore)"/><circle cx="20" cy="20" r="9.2" fill="none" stroke="#b9c9e8" stroke-opacity=".62" stroke-width=".8"/><circle cx="20" cy="20" r="3.1" fill="#d9f5f0" fill-opacity=".86"/></svg>';}
 $('brandLogo').innerHTML=logo(32,'brand');
 $('brandLogo').onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();nc()}};
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -780,7 +861,7 @@ let activeUtterance=null,speakingButton=null,speechChatId=null;
 function stopSpeech(){const b=speakingButton;speakingButton=null;activeUtterance=null;speechChatId=null;try{if(window.speechSynthesis)speechSynthesis.cancel()}catch(e){}if(b)b.textContent='🔊'}
 const say=(t,btn,chatId)=>{if(btn&&btn===speakingButton){stopSpeech();return}stopSpeech();if(!window.speechSynthesis){if(voiceMode)setVoiceState('error','Bu cihaz sesli yanıtı desteklemiyor. Yazı moduna geçebilirsin.');return}const clean=String(t).replace(/\x60\x60\x60[\s\S]*?\x60\x60\x60/g,' Kod bloğu. ').replace(/\[([^\]]+)\]\(https?:[^)]+\)/g,'$1').replace(/https?:\/\/\S+/g,'').replace(/\*\*|__|[*_#>`]/g,'').replace(/\n+/g,'. ').trim().slice(0,6500);const u=new SpeechSynthesisUtterance(clean);u.lang='tr-TR';u.rate=1.02;u.pitch=1;const voices=speechSynthesis.getVoices();const preferred=voices.find(v=>v.lang&&v.lang.toLowerCase().startsWith(u.lang.toLowerCase()));if(preferred)u.voice=preferred;activeUtterance=u;speakingButton=btn||null;speechChatId=chatId;if(btn)btn.textContent='⏹';u.onstart=()=>{if(voiceMode)setVoiceState('speaking','Linay yanıtlıyor…')};u.onend=()=>{if(activeUtterance===u){stopSpeech();if(voiceSessionActive){setVoiceState('listening','Seni dinliyorum…');setTimeout(startVoiceCapture,350)}else if(voiceMode)setVoiceState('ready','Yanıtım hazır. Devam etmek istersen konuşmayı başlat.')}};u.onerror=()=>{if(activeUtterance===u){stopSpeech();if(voiceSessionActive){stopVoiceSession('Sesli yanıt başlatılamadı. Yazı modunu da kullanabilirsin.')}else if(voiceMode)setVoiceState('error','Sesli yanıt oynatılamadı.')}};speechSynthesis.speak(u)};
 window.addEventListener('pagehide',stopSpeech);
-function tg(force){const side=$('side'),shade=$('shade');if(matchMedia('(max-width:760px)').matches){const open=typeof force==='boolean'?force:!side.classList.contains('open');side.classList.toggle('open',open);shade.classList.toggle('open',open)}else{const closed=typeof force==='boolean'?!force:!side.classList.contains('closed');side.classList.toggle('closed',closed)}}
+function tg(force){const side=$('side'),shade=$('shade'),mobile=matchMedia('(max-width:760px)').matches;let open;if(mobile){open=typeof force==='boolean'?force:!side.classList.contains('open');side.classList.toggle('open',open);shade.classList.toggle('open',open)}else{open=typeof force==='boolean'?force:side.classList.contains('closed');side.classList.toggle('closed',!open)}$('menu').setAttribute('aria-expanded',String(open));$('menu').setAttribute('aria-label',open?'Sohbet geçmişini kapat':'Sohbet geçmişini aç');$('menu').textContent=open?'✕':'☰';}
 function endPrivateChat(){S.chats=S.chats.filter(c=>!c.hidden);privateChat=false}
 function nc(){stopSpeech();endPrivateChat();S.cur=null;render();tg(false);inp.focus()}
 function startPrivateChat(){stopSpeech();endPrivateChat();privateChat=true;S.cur=null;render();tg(false);inp.focus()}
@@ -1027,7 +1108,7 @@ const grow=()=>{inp.style.height='auto';inp.style.height=inp.scrollHeight+'px'};
 inp.oninput=grow;
 inp.onkeydown=e=>{if(e.key=='Enter'&&!e.shiftKey&&!matchMedia('(pointer:coarse)').matches){e.preventDefault();send()}};
 $('go').onclick=send;
-$('img').onclick=()=>{imgMode=!imgMode;$('img').classList.toggle('on',imgMode);if(imgMode)inp.placeholder='Nasıl bir resim istiyorsun?';else inp.placeholder='Bir şey sor…'};
+$('img').onclick=()=>{const m=$('msgs');const wasAtBottom=m.scrollHeight-m.scrollTop-m.clientHeight<100;m.dataset.keepBottom=wasAtBottom?'1':'0';const top=m.scrollTop;imgMode=!imgMode;$('img').classList.toggle('on',imgMode);$('img').setAttribute('aria-pressed',String(imgMode));if(imgMode)inp.placeholder='Nasıl bir resim istiyorsun?';else inp.placeholder='Bir şey sor…';requestAnimationFrame(()=>{m.scrollTop=wasAtBottom?m.scrollHeight:top});};
 $('web').title="Web araması: İnternette ara, güncel sonuçları ve kaynak bağlantılarını getir.";
 $('research').title="Araştırma: Ajan + web araması; çok adımlı ve kaynaklı inceleme.";
 $('agent').title="Ajan: Araçlarla çok adımlı görev yürütür.";
