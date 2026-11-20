@@ -215,6 +215,17 @@ dialog input,dialog textarea{background:#0b1220;border-color:#334765;color:#eef3
 }
 @media(prefers-reduced-motion:reduce){*,*:before,*:after{animation-duration:.01ms!important;animation-iteration-count:1!important;scroll-behavior:auto!important;transition-duration:.01ms!important}}
 
+
+/* Sidebar starts tucked away; the menu button is the only opener. */
+#side{transition:transform .24s cubic-bezier(.2,.75,.25,1)}
+#side.closed{transform:translateX(-105%)}
+@media(max-width:760px){#side.open{transform:translateX(0)}}
+.new-chat-btn{display:flex;align-items:center;gap:11px;width:100%;min-height:48px;padding:0 12px;border:1px solid #ffffff16;border-radius:13px;background:#111a2a;color:#e8edfb;text-align:left;font-size:13px;font-weight:600;box-shadow:none;transition:background .18s,border-color .18s,transform .18s}
+.new-chat-btn:hover{background:#192640;border-color:#6077aa;transform:translateY(-1px)}
+.new-chat-btn svg{width:19px;height:19px;fill:none;stroke:#a9bcff;stroke-width:1.8;stroke-linecap:round}
+.new-chat-btn span{flex:1}
+.new-chat-btn kbd{font:11px/1 system-ui;color:#8494b3;border:1px solid #ffffff1c;border-radius:6px;padding:4px 6px;background:#ffffff06}
+
 </style>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
