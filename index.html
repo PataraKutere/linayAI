@@ -255,6 +255,10 @@ body.voice-speaking .voice-orb-core{animation:orbSpeak .55s ease-in-out infinite
 @keyframes stageGlow{from{opacity:.55;transform:scale(.94)}to{opacity:1;transform:scale(1.07)}}
 @media(max-width:760px){#voiceStage{gap:10px;padding:20px 14px 14px}#voiceOrbButton{width:184px;height:184px;margin:2px 0}.voice-orb-core{width:124px;height:124px}#voiceGreeting{font-size:28px}body.has-chat:not(.text-mode) #voiceStage{flex-basis:245px;min-height:230px;padding:9px 12px 6px;gap:4px}body.has-chat:not(.text-mode) #voiceOrbButton{width:86px;height:86px}body.has-chat:not(.text-mode) .voice-orb-core{width:58px;height:58px}}
 @media(prefers-reduced-motion:reduce){#voiceStage:before,.voice-orb-core{animation:none!important}*{scroll-behavior:auto!important;}}
+
+/* Projects and saved answers */
+.workspace-tools{display:grid;grid-template-columns:1fr 1fr;gap:7px}.workspace-tools button{background:#121b2b;border:1px solid #ffffff16;border-radius:10px;color:#dce5ff;font-size:12px;padding:9px 7px}.workspace-tools span{color:#b8a0ff}.project-list{display:grid;gap:4px;max-height:180px;overflow:auto}.project-row{display:flex;align-items:center;gap:3px}.project-item{flex:1;text-align:left;color:#aebbd0;font-size:12px;padding:8px 10px;border-radius:9px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.project-item.active{background:#8d75dc24;color:#e2d8ff;border:1px solid #9b83eb45}.project-edit{color:#9ba8bf;padding:5px 8px}.project-filter{font-size:10px;color:#77869e;letter-spacing:.1em;text-transform:uppercase;padding:6px 9px 2px}.saved-list{display:grid;gap:10px;max-height:60vh;overflow:auto}.saved-card{padding:12px;border:1px solid #ffffff17;border-radius:12px;background:#0d1421}.saved-card p{font-size:13px;line-height:1.5;white-space:pre-wrap;max-height:180px;overflow:auto;color:#d3dced}.saved-actions{display:flex;gap:6px;flex-wrap:wrap}.saved-actions button{font-size:11px;background:#1a2639;border:1px solid #ffffff18}
+@media(max-width:760px){.workspace-tools{grid-template-columns:1fr 1fr}.project-list{max-height:145px}}
 </style>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
@@ -268,6 +272,9 @@ body.voice-speaking .voice-orb-core{animation:orbSpeak .55s ease-in-out infinite
  <button class="new-chat-btn" onclick="nc()" aria-label="Yeni sohbet"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span>Yeni sohbet</span><kbd>＋</kbd></button>
  <button class="nb ghost" onclick="startPrivateChat()">◉ Gizli sohbet</button>
  <input id="q" placeholder="Sohbetlerde ara" oninput="render()">
+ <div class="workspace-tools"><button type="button" onclick="createProject()">＋ Yeni proje</button><button type="button" onclick="showSaved()">☆ Kaydedilenler <span id="savedCount">0</span></button></div>
+ <div id="projectList" class="project-list"></div>
+ <div class="project-filter" id="projectFilterLabel">Tüm sohbetler</div>
  <div id="list"></div>
  <button onclick="openSet()">⚙ Ayarlar</button>
 </aside>
@@ -314,13 +321,24 @@ body.voice-speaking .voice-orb-core{animation:orbSpeak .55s ease-in-out infinite
   <button class="nb" onclick="saveSet()">Kaydet</button>
  </div>
 </dialog>
+<dialog id="projectDialog">
+ <h3 id="projectDialogTitle">Yeni proje</h3>
+ <label>Proje adı</label><input id="projectName" maxlength="60" placeholder="Örn. İş, yazılım, eğitim">
+ <label style="display:block;margin-top:12px">Proje talimatı <small>(isteğe bağlı)</small></label>
+ <textarea id="projectInstructions" rows="4" placeholder="Linay bu projede nasıl çalışsın? Örn. kısa cevap ver, sadece bu projedeki dosyaları dikkate al…"></textarea>
+ <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px"><button type="button" onclick="$('projectDialog').close()">Vazgeç</button><button class="nb" type="button" onclick="saveProject()">Kaydet</button></div>
+</dialog>
+<dialog id="savedDialog">
+ <h3>Kaydedilen yanıtlar</h3><div id="savedList" class="saved-list"></div>
+ <div style="display:flex;justify-content:flex-end;margin-top:12px"><button onclick="$('savedDialog').close()">Kapat</button></div>
+</dialog>
 <dialog id="pv"><div style="display:flex;justify-content:space-between;align-items:center;padding:6px 14px"><b>Önizleme</b><button onclick="$('pv').close()">✕</button></div><iframe id="pvf" sandbox="allow-scripts"></iframe></dialog>
 <script>window.onerror=function(m,s,l){var d=document.createElement('div');d.style.cssText='position:fixed;top:0;left:0;right:0;z-index:99;background:#e8707a;color:#000;padding:8px 12px;font:13px system-ui';d.textContent='Kod hatası: '+m+' (satır '+l+')';document.body.appendChild(d)}</script>
 <script src="config.js"></script>
 <script>
 const $=id=>document.getElementById(id),dl=$('dl'),inp=$('inp');
 let S=JSON.parse(localStorage.getItem('ai1')||'null')||{chats:[],cur:null,cfg:{key:'',model:'gpt-oss-120b',mode:'gen',search:false,agent:false,v:2}};
-if(S.cfg.v!==6){S.cfg.v=6;S.cfg.model='qwen3.8-27b';S.cfg.search=false;S.cfg.agent=false}if(typeof S.cfg.memory!=='string')S.cfg.memory='';if(typeof S.cfg.agent!=='boolean')S.cfg.agent=false;
+if(S.cfg.v!==6){S.cfg.v=6;S.cfg.model='qwen3.8-27b';S.cfg.search=false;S.cfg.agent=false}if(typeof S.cfg.memory!=='string')S.cfg.memory='';if(typeof S.cfg.agent!=='boolean')S.cfg.agent=false;\nif(!Array.isArray(S.projects))S.projects=[];if(!Array.isArray(S.saved))S.saved=[];if(!('activeProjectId'in S))S.activeProjectId=null;let editingProjectId=null;
 const USER_ID=localStorage.getItem('linay_uid')||(()=>{const id=crypto.randomUUID();localStorage.setItem('linay_uid',id);return id})();
 const RAW=String(window.LINAY_PROXY||window.LINAY_KEY||'').trim();
 const PROXY=/^https?:\/\//i.test(RAW)?RAW.replace(/\/+$/,''):'';
@@ -393,14 +411,16 @@ function startPrivateChat(){stopSpeech();endPrivateChat();privateChat=true;S.cur
 function add(role,html,last,media){
  const w=document.createElement('div');w.className='w';
  const d=document.createElement('div');d.className=role=='user'?'u':'a';d.innerHTML=html;w.appendChild(d);
- if(role!='user'){const a=document.createElement('div');a.className='act';a.innerHTML='<button>🔊</button><button>📋</button>'+(last?'<button>🔄</button>':'');
-  a.children[0].onclick=()=>say(d.innerText,a.children[0],cur()?.id);a.children[1].onclick=async()=>{const ok=await copyText(d.innerText);a.children[1].textContent=ok?'Kopyalandı':'Kopyalanamadı';setTimeout(()=>a.children[1].textContent='📋',1200)};if(last)a.children[2].onclick=regen;w.appendChild(a)}
+ if(role!='user'){const a=document.createElement('div');a.className='act';a.innerHTML='<button>🔊</button><button>📋</button><button title="Yanıtı kaydet">☆</button>'+(last?'<button>🔄</button>':'');
+  a.children[0].onclick=()=>say(d.innerText,a.children[0],cur()?.id);a.children[1].onclick=async()=>{const ok=await copyText(d.innerText);a.children[1].textContent=ok?'Kopyalandı':'Kopyalanamadı';setTimeout(()=>a.children[1].textContent='📋',1200)};a.children[2].onclick=()=>bookmarkMessage(d.innerText);if(last)a.children[3].onclick=regen;w.appendChild(a)}
  $('msgs').appendChild(w);return d;
 }
 function render(){
  const c=cur();document.body.classList.toggle('has-chat',!!(c&&c.msgs.length));document.body.classList.toggle('text-mode',!voiceMode);$('modeBtn').textContent=voiceMode?'Yazı modu':'Sesli mod';$('agent').classList.toggle('on',!!S.cfg.agent);$('ttl').textContent=privateChat?'Gizli sohbet':(c?c.title:'Linay');$('web').classList.toggle('on',S.cfg.search);
  $('list').innerHTML='';
- const q=($('q').value||'').toLowerCase();S.chats.filter(x=>!x.hidden).slice().reverse().filter(x=>!q||(x.title+' '+x.msgs.map(m=>m.text||m.t||'').join(' ')).toLowerCase().includes(q)).forEach(x=>{const r=document.createElement('div');r.className='ci'+(x.id==S.cur?' on':'');
+ renderProjects();
+ $('savedCount').textContent=String(S.saved.length);
+ const q=($('q').value||'').toLowerCase();S.chats.filter(x=>!x.hidden&&(!S.activeProjectId||x.projectId===S.activeProjectId)).slice().reverse().filter(x=>!q||(x.title+' '+x.msgs.map(m=>m.text||m.t||'').join(' ')).toLowerCase().includes(q)).forEach(x=>{const r=document.createElement('div');r.className='ci'+(x.id==S.cur?' on':'');
   r.innerHTML='<span></span><button>✕</button>';r.firstChild.textContent=x.title;
   r.firstChild.onclick=()=>{stopSpeech();endPrivateChat();S.cur=x.id;render();tg(false)};
   r.lastChild.onclick=()=>{if(speechChatId===x.id)stopSpeech();S.chats=S.chats.filter(y=>y.id!=x.id);if(S.cur==x.id)S.cur=null;save();render()};
@@ -410,7 +430,19 @@ function render(){
  else c.msgs.forEach((x,i)=>{const d=add(x.role==='user'?'user':'model',x.role==='user'?esc(x.t||'')+(x.att&&x.att.length?`<div class="att">📎 ${esc(x.att.join(', '))}</div>`: ''):md(x.text),i==c.msgs.length-1);if(x.media)showMedia(d,x.media);});
  m.querySelectorAll('.quick-actions button').forEach(d=>d.onclick=()=>{inp.value=d.dataset.p;inp.focus();grow()});$('features').querySelectorAll('.cards div').forEach(d=>d.onclick=()=>{inp.value=d.dataset.p;inp.focus();grow()});if(c&&c.msgs.length)$('features').innerHTML='';m.scrollTop=m.scrollHeight;
 }
-function chips(){$('chips').innerHTML='';files.forEach((f,i)=>{const s=document.createElement('span');s.textContent='📎 '+f.name+' ✕';s.onclick=()=>{files.splice(i,1);chips()};$('chips').appendChild(s)})}
+
+function renderProjects(){
+ const box=$('projectList');if(!box)return;box.innerHTML='';
+ const all=document.createElement('button');all.className='project-item'+(!S.activeProjectId?' active':'');all.textContent='▦  Tüm sohbetler';all.onclick=()=>{S.activeProjectId=null;save();render()};box.appendChild(all);
+ S.projects.forEach(p=>{const row=document.createElement('div');row.className='project-row';const b=document.createElement('button');b.className='project-item'+(S.activeProjectId===p.id?' active':'');b.textContent='▰  '+p.name;b.onclick=()=>{S.activeProjectId=p.id;save();render()};const edit=document.createElement('button');edit.className='project-edit';edit.textContent='⋯';edit.title='Projeyi düzenle';edit.onclick=()=>editProject(p.id);row.append(b,edit);box.appendChild(row)});
+ $('projectFilterLabel').textContent=S.activeProjectId?(S.projects.find(p=>p.id===S.activeProjectId)?.name||'Proje')+' sohbetleri':'Tüm sohbetler';
+}
+function createProject(){editingProjectId=null;$('projectDialogTitle').textContent='Yeni proje';$('projectName').value='';$('projectInstructions').value='';$('projectDialog').showModal()}
+function editProject(id){const p=S.projects.find(x=>x.id===id);if(!p)return;editingProjectId=id;$('projectDialogTitle').textContent='Projeyi düzenle';$('projectName').value=p.name;$('projectInstructions').value=p.instructions||'';$('projectDialog').showModal()}
+function saveProject(){const name=$('projectName').value.trim();if(!name){$('projectName').focus();return}const instructions=$('projectInstructions').value.trim().slice(0,2000);if(editingProjectId){const p=S.projects.find(x=>x.id===editingProjectId);if(p){p.name=name;p.instructions=instructions}}else{const p={id:'p-'+Date.now()+'-'+Math.random().toString(36).slice(2,7),name,instructions};S.projects.push(p);S.activeProjectId=p.id}save();$('projectDialog').close();render()}
+function bookmarkMessage(text){const value=String(text||'').trim();if(!value)return;const c=cur();if(S.saved.some(x=>x.chatId===c?.id&&x.text===value)){alert('Bu yanıt zaten kaydedilmiş.');return}S.saved.unshift({id:'s-'+Date.now(),chatId:c?.id||null,title:c?.title||'Linay yanıtı',text:value,createdAt:new Date().toISOString()});S.saved=S.saved.slice(0,100);save();$('savedCount').textContent=String(S.saved.length)}
+function showSaved(){const box=$('savedList');box.innerHTML='';if(!S.saved.length){box.textContent='Henüz kaydedilmiş yanıt yok.'}else S.saved.forEach(item=>{const card=document.createElement('article');card.className='saved-card';const title=document.createElement('b');title.textContent=item.title;const body=document.createElement('p');body.textContent=item.text;const actions=document.createElement('div');actions.className='saved-actions';const copy=document.createElement('button');copy.textContent='Kopyala';copy.onclick=()=>copyText(item.text);const remove=document.createElement('button');remove.textContent='Kaldır';remove.onclick=()=>{S.saved=S.saved.filter(x=>x.id!==item.id);save();showSaved()};const open=document.createElement('button');open.textContent='Sohbeti aç';open.disabled=!S.chats.some(c=>c.id===item.chatId);open.onclick=()=>{S.cur=item.chatId;S.activeProjectId=null;save();$('savedDialog').close();render()};actions.append(copy,open,remove);card.append(title,body,actions);box.appendChild(card) });$('savedDialog').showModal()}
+\nfunction chips(){$('chips').innerHTML='';files.forEach((f,i)=>{const s=document.createElement('span');s.textContent='📎 '+f.name+' ✕';s.onclick=()=>{files.splice(i,1);chips()};$('chips').appendChild(s)})}
 const CDN='https://cdnjs.cloudflare.com/ajax/libs/',libLoads={};
 function loadLib(src,ready){if(ready())return Promise.resolve();if(libLoads[src])return libLoads[src];libLoads[src]=new Promise((resolve,reject)=>{const tag=document.createElement('script');tag.src=src;tag.onload=resolve;tag.onerror=()=>{delete libLoads[src];reject(new Error('Gerekli dosya okuyucu yüklenemedi.'))};document.head.appendChild(tag)});return libLoads[src]}
 const needPdf=()=>loadLib(CDN+'pdf.js/3.11.174/pdf.min.js',()=>!!window.pdfjsLib),needDocx=()=>loadLib(CDN+'mammoth/1.8.0/mammoth.browser.min.js',()=>!!window.mammoth),needXlsx=()=>loadLib(CDN+'xlsx/0.18.5/xlsx.full.min.js',()=>!!window.XLSX);
@@ -510,7 +542,7 @@ async function send(){
   }
  }
  if(localAnswer!==null){
-  let cc=currentChat;if(!cc){cc={id:Date.now(),title:text.slice(0,40),msgs:[],hidden:privateChat};S.chats.push(cc);S.cur=cc.id;}
+  let cc=currentChat;if(!cc){cc={id:Date.now(),title:text.slice(0,40),msgs:[],hidden:privateChat,projectId:privateChat?null:S.activeProjectId};S.chats.push(cc);S.cur=cc.id;}
   cc.msgs.push({role:'user',parts:[{text}],t:text,att:[],media:[]});
   cc.msgs.push({role:'model',parts:[{text:localAnswer}],text:localAnswer});
   inp.value='';grow();save();render();if(voiceReplyPending){voiceReplyPending=false;speakAssistant(localAnswer)}return;
@@ -518,7 +550,7 @@ async function send(){
  const explicitSearch=/(internetten ara|web(?:de)? ara|google(?:'da|da)? ara|araştır|araştırma yap|kaynak (?:bul|göster|ver)|kaynakları bul|internetten kontrol et|güncel kaynak)/i.test(text);
  const useSearch=!!text&&(S.cfg.search||explicitSearch);
  let c=cur();
- if(!c){c={id:Date.now(),title:(text||files[0].name).slice(0,40),msgs:[],hidden:privateChat};S.chats.push(c);S.cur=c.id}
+ if(!c){c={id:Date.now(),title:(text||files[0].name).slice(0,40),msgs:[],hidden:privateChat,projectId:privateChat?null:S.activeProjectId};S.chats.push(c);S.cur=c.id}
  const sf=files;const imageFiles=sf.filter(f=>f.part&&f.part.inlineData&&String(f.part.inlineData.mimeType||'').startsWith('image/'));const media=imageFiles.map((f,i)=>({id:'up-'+c.id+'-'+Date.now()+'-'+i,name:f.name,src:privateChat?'data:'+f.part.inlineData.mimeType+';base64,'+f.part.inlineData.data:undefined}));if(!privateChat)await Promise.all(media.map((m,i)=>{const f=imageFiles[i].part.inlineData;return mediaPut(m.id,'data:'+f.mimeType+';base64,'+f.data)}));const parts=sf.map(f=>f.part);if(text)parts.push({text});const um={role:'user',parts,t:text,att:sf.map(f=>f.name),media};c.msgs.push(um);files=[];chips();inp.value='';grow();render();
  const el=add('model','<span style="color:var(--mu)">Linay düşünüyor…</span>');busy=true;$('go').textContent='■';ctl=new AbortController();
  if(text&&(imgMode||(!sf.length&&text.length<200&&IMG_RE.test(text)))){
@@ -532,7 +564,7 @@ async function send(){
    try{const dr=await apiFetch(PROXY+'/documents',{method:'POST',headers:{'Content-Type':'application/json'},signal:ctl.signal,body:JSON.stringify({userId:USER_ID,name:f.name,text:f.docText})});const dj=await dr.json();if(!dr.ok)throw new Error(dj.error||'Belge indekslenemedi');docNotice+='\n\n📚 '+f.name+' belge hafızasına eklendi ('+dj.document.chunks+' parça).'}
    catch(de){docNotice+='\n\n⚠️ '+f.name+' belge hafızasına eklenemedi: '+de.message}
   }
-  const system=GEN+' KİMLİK KURALI: Adın Linay. Kendini yalnızca Linay veya LinayAI olarak tanıt. Asla Sıfır, ChatGPT, Gemini veya başka bir ad kullanma. Kullanıcı adını sorarsa kısa biçimde “Ben LinayAI.” de. '+' Şu an: '+new Date().toLocaleString('tr-TR',{timeZone:'Europe/Istanbul'})+' (Europe/Istanbul). KISA VE DOĞRU CEVAP KURALLARI: Kullanıcının son mesajını önceki konuşma bağlamıyla birlikte yorumla; yazım hatalarını makul biçimde düzelt. Kullanıcı yalnızca kısa selam verirse kısa selamla karşılık ver, gereksiz soru listesi veya uzun açıklama üretme. Önceki asistan yanıtlarını kesin bilgi kabul etme; kullanıcı hata gösterirse yeniden değerlendir, hatayı tekrarlama ve açıkça düzelt. Bilmediğin bilgiyi uydurma; emin değilsen bunu söyle veya tek netleştirici soru sor. Mantık ve matematik sorularında yalnızca verilen bilgilerden çıkan sonucu ver; varsayım ekleme. Bulmacanın koşullarını değiştirme, cevabı ilk cümlede açıkla ve açıklamanı sonuçla tutarlı tut. Cevap göndermeden önce kendi içinde çelişki veya hesap hatası olup olmadığını kontrol et. Saat/tarih ve konum sorularında şehir ya da ülkeyi doğru belirle; konum belirsizse İstanbul varsayma, netleştir. Güncel bilgi gerekiyorsa web araması yapılmadıysa bunu açıkça söyle ve kesin konuşma. '+(S.cfg.memory?'\\n\\nKULLANICI HAFIZASI:\\n'+S.cfg.memory+'\\nYalnızca ilgili olduğunda kullan.':'')+(voiceReplyPending?'\\n\\nSESLİ SOHBET MODU: Konuşma dilinde doğal, akıcı ve kısa cevap ver. İlk cümlede doğrudan yanıtla. Normal sorularda 1-3 cümle yeterlidir; kullanıcı ayrıntı isterse genişlet. Gereksiz başlık, tablo, uzun madde listesi, kod biçimlendirmesi ve kaynak URL yığınları kullanma. Bilmediğini uydurma.':'');
+  const activeProject=S.projects.find(p=>p.id===c.projectId);const projectPrompt=activeProject?.instructions?'\\n\\nAKTİF PROJE: '+activeProject.name+'\\nPROJE TALİMATLARI: '+activeProject.instructions+'\\nBu talimatlar yalnızca bu projedeki sohbette geçerlidir.':'';\n  const system=GEN+projectPrompt+' KİMLİK KURALI: Adın Linay. Kendini yalnızca Linay veya LinayAI olarak tanıt. Asla Sıfır, ChatGPT, Gemini veya başka bir ad kullanma. Kullanıcı adını sorarsa kısa biçimde “Ben LinayAI.” de. '+' Şu an: '+new Date().toLocaleString('tr-TR',{timeZone:'Europe/Istanbul'})+' (Europe/Istanbul). KISA VE DOĞRU CEVAP KURALLARI: Kullanıcının son mesajını önceki konuşma bağlamıyla birlikte yorumla; yazım hatalarını makul biçimde düzelt. Kullanıcı yalnızca kısa selam verirse kısa selamla karşılık ver, gereksiz soru listesi veya uzun açıklama üretme. Önceki asistan yanıtlarını kesin bilgi kabul etme; kullanıcı hata gösterirse yeniden değerlendir, hatayı tekrarlama ve açıkça düzelt. Bilmediğin bilgiyi uydurma; emin değilsen bunu söyle veya tek netleştirici soru sor. Mantık ve matematik sorularında yalnızca verilen bilgilerden çıkan sonucu ver; varsayım ekleme. Bulmacanın koşullarını değiştirme, cevabı ilk cümlede açıkla ve açıklamanı sonuçla tutarlı tut. Cevap göndermeden önce kendi içinde çelişki veya hesap hatası olup olmadığını kontrol et. Saat/tarih ve konum sorularında şehir ya da ülkeyi doğru belirle; konum belirsizse İstanbul varsayma, netleştir. Güncel bilgi gerekiyorsa web araması yapılmadıysa bunu açıkça söyle ve kesin konuşma. '+(S.cfg.memory?'\\n\\nKULLANICI HAFIZASI:\\n'+S.cfg.memory+'\\nYalnızca ilgili olduğunda kullan.':'')+(voiceReplyPending?'\\n\\nSESLİ SOHBET MODU: Konuşma dilinde doğal, akıcı ve kısa cevap ver. İlk cümlede doğrudan yanıtla. Normal sorularda 1-3 cümle yeterlidir; kullanıcı ayrıntı isterse genişlet. Gereksiz başlık, tablo, uzun madde listesi, kod biçimlendirmesi ve kaynak URL yığınları kullanma. Bilmediğini uydurma.':'');
   const messages=[{role:'system',content:system+(useSearch?'':' WEB ARAMASI YAPILMADI: Kaynak listesi veya uydurma atıf ekleme. Genel bilgiyle yanıtla; güncel doğrulama gerekiyorsa kullanıcıdan internet aramasını açmasını iste.')},...c.msgs.slice(-12).map(m=>{
    const content=[];for(const p of (m.parts||[])){if(p.text)content.push({type:'text',text:p.text});if(p.inlineData?.data)content.push({type:'image_url',image_url:{url:'data:'+(p.inlineData.mimeType||'application/octet-stream')+';base64,'+p.inlineData.data}})}
    return {role:m.role==='model'?'assistant':'user',content:content.length?content:[{type:'text',text:m.t||''}]};
