@@ -291,7 +291,7 @@ dialog input,dialog textarea{background:#0b1220;border-color:#334765;color:#eef3
 <script>
 const $=id=>document.getElementById(id),dl=$('dl'),inp=$('inp');
 let S=JSON.parse(localStorage.getItem('ai1')||'null')||{chats:[],cur:null,cfg:{key:'',model:'gpt-oss-120b',mode:'gen',search:false,agent:false,v:2}};
-if(S.cfg.v!==5){S.cfg.v=5;S.cfg.model='gpt-oss-120b'}if(typeof S.cfg.memory!=='string')S.cfg.memory='';if(typeof S.cfg.agent!=='boolean')S.cfg.agent=false;
+if(S.cfg.v!==6){S.cfg.v=6;S.cfg.model='qwen3.8-27b';S.cfg.search=false;S.cfg.agent=false}if(typeof S.cfg.memory!=='string')S.cfg.memory='';if(typeof S.cfg.agent!=='boolean')S.cfg.agent=false;
 const USER_ID=localStorage.getItem('linay_uid')||(()=>{const id=crypto.randomUUID();localStorage.setItem('linay_uid',id);return id})();
 const RAW=String(window.LINAY_PROXY||window.LINAY_KEY||'').trim();
 const PROXY=/^https?:\/\//i.test(RAW)?RAW.replace(/\/+$/,''):'';
@@ -470,8 +470,8 @@ async function send(){
   cc.msgs.push({role:'model',parts:[{text:localAnswer}],text:localAnswer});
   inp.value='';grow();save();render();if(voiceReplyPending){voiceReplyPending=false;speakAssistant(localAnswer)}return;
  }
- const freshQuery=/(en yeni|en son|son çıkan|güncel|son dakika|bugün|şu an|şuanda|latest|current|this week|today|2026|kaçta çıktı|ne zaman çıktı|çıkış tarihi|oynanıyor mu|kaç para|fiyatı|döviz|kur|hava durumu)/i.test(text);
- const useSearch=!!text&&(S.cfg.search||freshQuery);
+ const explicitSearch=/(internetten ara|web(?:de)? ara|google(?:'da|da)? ara|araştır|araştırma yap|kaynak (?:bul|göster|ver)|kaynakları bul|internetten kontrol et|güncel kaynak)/i.test(text);
+ const useSearch=!!text&&(S.cfg.search||explicitSearch);
  let c=cur();
  if(!c){c={id:Date.now(),title:(text||files[0].name).slice(0,40),msgs:[],hidden:privateChat};S.chats.push(c);S.cur=c.id}
  const sf=files;const imageFiles=sf.filter(f=>f.part&&f.part.inlineData&&String(f.part.inlineData.mimeType||'').startsWith('image/'));const media=imageFiles.map((f,i)=>({id:'up-'+c.id+'-'+Date.now()+'-'+i,name:f.name,src:privateChat?'data:'+f.part.inlineData.mimeType+';base64,'+f.part.inlineData.data:undefined}));if(!privateChat)await Promise.all(media.map((m,i)=>{const f=imageFiles[i].part.inlineData;return mediaPut(m.id,'data:'+f.mimeType+';base64,'+f.data)}));const parts=sf.map(f=>f.part);if(text)parts.push({text});const um={role:'user',parts,t:text,att:sf.map(f=>f.name),media};c.msgs.push(um);files=[];chips();inp.value='';grow();render();
@@ -488,7 +488,7 @@ async function send(){
    catch(de){docNotice+='\n\n⚠️ '+f.name+' belge hafızasına eklenemedi: '+de.message}
   }
   const system=GEN+' KİMLİK KURALI: Adın Linay. Kendini yalnızca Linay veya LinayAI olarak tanıt. Asla Sıfır, ChatGPT, Gemini veya başka bir ad kullanma. Kullanıcı adını sorarsa kısa biçimde “Ben LinayAI.” de. '+' Şu an: '+new Date().toLocaleString('tr-TR',{timeZone:'Europe/Istanbul'})+' (Europe/Istanbul). KISA VE DOĞRU CEVAP KURALLARI: Kullanıcının son mesajını önceki konuşma bağlamıyla birlikte yorumla; yazım hatalarını makul biçimde düzelt. Kullanıcı yalnızca kısa selam verirse kısa selamla karşılık ver, gereksiz soru listesi veya uzun açıklama üretme. Önceki asistan yanıtlarını kesin bilgi kabul etme; kullanıcı hata gösterirse yeniden değerlendir, hatayı tekrarlama ve açıkça düzelt. Bilmediğin bilgiyi uydurma; emin değilsen bunu söyle veya tek netleştirici soru sor. Mantık ve matematik sorularında yalnızca verilen bilgilerden çıkan sonucu ver; varsayım ekleme. Bulmacanın koşullarını değiştirme, cevabı ilk cümlede açıkla ve açıklamanı sonuçla tutarlı tut. Cevap göndermeden önce kendi içinde çelişki veya hesap hatası olup olmadığını kontrol et. Saat/tarih ve konum sorularında şehir ya da ülkeyi doğru belirle; konum belirsizse İstanbul varsayma, netleştir. Güncel bilgi gerekiyorsa web araması yapılmadıysa bunu açıkça söyle ve kesin konuşma. '+(S.cfg.memory?'\\n\\nKULLANICI HAFIZASI:\\n'+S.cfg.memory+'\\nYalnızca ilgili olduğunda kullan.':'')+(voiceReplyPending?'\\n\\nSESLİ SOHBET MODU: Konuşma dilinde doğal, akıcı ve kısa cevap ver. İlk cümlede doğrudan yanıtla. Normal sorularda 1-3 cümle yeterlidir; kullanıcı ayrıntı isterse genişlet. Gereksiz başlık, tablo, uzun madde listesi, kod biçimlendirmesi ve kaynak URL yığınları kullanma. Bilmediğini uydurma.':'');
-  const messages=[{role:'system',content:system},...c.msgs.map(m=>{
+  const messages=[{role:'system',content:system+(useSearch?'':' WEB ARAMASI YAPILMADI: Kaynak listesi veya uydurma atıf ekleme. Genel bilgiyle yanıtla; güncel doğrulama gerekiyorsa kullanıcıdan internet aramasını açmasını iste.')},...c.msgs.slice(-12).map(m=>{
    const content=[];for(const p of (m.parts||[])){if(p.text)content.push({type:'text',text:p.text});if(p.inlineData?.data)content.push({type:'image_url',image_url:{url:'data:'+(p.inlineData.mimeType||'application/octet-stream')+';base64,'+p.inlineData.data}})}
    return {role:m.role==='model'?'assistant':'user',content:content.length?content:[{type:'text',text:m.t||''}]};
   })];
@@ -503,7 +503,7 @@ async function send(){
   const rd=r.body.getReader(),dc=new TextDecoder();let buf='';
   for(;;){const {done,value}=await rd.read();if(done)break;buf+=dc.decode(value,{stream:true});const ls=buf.split('\n');buf=ls.pop();for(const l of ls){if(!l.startsWith('data:'))continue;const raw=l.slice(5).trim();if(!raw||raw==='[DONE]')continue;let j;try{j=JSON.parse(raw)}catch{continue}if(j.error)throw new Error(j.error.message||'Model yanıt hatası');out+=(j.choices?.[0]?.delta?.content||'');el.innerHTML=md(out);$('msgs').scrollTop=$('msgs').scrollHeight;}}
   if(!out)out='(Boş yanıt geldi, tekrar dene.)';if(docNotice)out+=docNotice;
-  if(citations.length)out+='\n\n**Kaynaklar**\n'+citations.map(x=>'- ['+(x.title||'Kaynak')+']('+x.url+')').join('\n');
+  if(useSearch&&citations.length)out+='\n\n**Kaynaklar**\n'+citations.map(x=>'- ['+(x.title||'Kaynak')+']('+x.url+')').join('\n');
   if(S.cfg.agent)out+='\n\n*Linay ajanı '+agentSteps+' araç adımı kullandı.*';
   const mi=out.match(/\[RESIM:\s*([^\]]+)\]/i);
   if(mi){out=out.replace(mi[0],'').trim();el.innerHTML=md(out);const ie=add('model','');const generated=await genImg(mi[1].trim(),ie,true),mediaId='gen-'+c.id+'-'+Date.now();if(!privateChat)await mediaPut(mediaId,generated.src);generatedMedia=[{id:mediaId,name:'Oluşturulan resim',src:privateChat?generated.src:undefined}];out+='\\n\\n🖼 *Resim oluşturuldu: '+generated.prompt+'*';shown=true}
