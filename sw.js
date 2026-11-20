@@ -1,13 +1,17 @@
 // Linay Service Worker — ağ öncelikli, çevrimdışı geri dönüşlü önbellek.
 // Sürüm değişince yeni Worker beklemeye alınır; açık sekmeler/oturumlar kapatılmadan
 // eski Worker zorla değiştirilmez. Yenileme mevcut sohbeti otomatik kesmez.
-const V='linay-v40';
+const V='linay-v41';
+
+// Yeni sürüm kurulduğunda beklemeden etkinleştir; eski sekmeler güncel dosyaları alabilsin.
+self.addEventListener('install',event=>event.waitUntil(self.skipWaiting()));
 
 self.addEventListener('activate',event=>event.waitUntil((async()=>{
   // Yalnızca Linay'a ait eski cache'leri temizle; aynı origin'deki diğer uygulamalara dokunma.
   const stale=(await caches.keys()).filter(key=>key.startsWith('linay-')&&key!==V);
   await Promise.all(stale.map(key=>caches.delete(key)));
-  // clients.claim() intentionally omitted: mevcut sekmeler kendi oturumlarını tamamlar.
+  // Yeni Worker açık sekmeleri de kontrol ederek güncel HTML/CSS'i sunar.
+  await self.clients.claim();
 })()));
 
 const clean=async response=>{
