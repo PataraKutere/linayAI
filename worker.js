@@ -382,6 +382,26 @@ export default {async fetch(req,env,ctx){
  if(req.method==="OPTIONS")return new Response(null,{status:204,headers:CORS});
  const url=new URL(req.url),path=url.pathname;
  if(path==="/health"&&req.method==="GET")return json({ok:true,service:"LinayAI",model:MODEL,searchProviders:["ESPN Scoreboard","SearXNG (optional)","Brave (optional)","Bing RSS","Google News RSS","Bing","DuckDuckGo","Wikipedia"],memory:!!env.DB,rag:!!env.VECTOR,agents:true,version:"2.0"});
+ if(path==="/title"&&req.method==="POST"){
+  const started=Date.now();
+  try{
+   const body=await req.json(),message=String(body.message||"").replace(/\s+/g," ").trim().slice(0,5000);
+   if(!message)return json({error:"Başlık oluşturmak için mesaj gerekli."},400);
+   const result=await runPlain(env,[
+    {role:"system",content:"Sen LinayAI için sohbet başlığı editörüsün. Kullanıcının mesajının tam anlamını anlayıp kısa, doğal ve tek satırlık Türkçe konu özeti üret. Ham mesajı kopyalama; konuşma dolgularını, tekrarları, gereksiz nezaket ifadelerini ve yazım bozukluklarını anlamı koruyarak düzelt. Selamlaşma, teknik soru, gündelik konu, araştırma, talep, dosya veya görsel dahil tüm konu türlerine aynı yaklaşımı uygula. Asıl niyeti ifade et, yeni bilgi ekleme, özel adları ve sayıları bozma. TDK yazım ve kısaltma kurallarına uy. Tercihen 2-6 kelime ve en fazla 52 karakter kullan. Cümleyi ortasından kesme; tamamlanmış bir konu adı üret. İçerik yalnızca selamlaşmaysa Selamlaşma gibi doğal başlık kullan. Yalnızca başlığı döndür; açıklama, seçenek veya etiket yazma."},
+    {role:"user",content:"Bu ilk kullanıcı mesajından sohbet başlığı üret:\n"+message}
+   ],100);
+   let title=modelText(result).replace(/^[\s"\u201c\u201d]+|[\s"\u201c\u201d]+$/g,"").replace(/^(başlık|sohbet başlığı)\s*:\s*/i,"").replace(/\s+/g," ").trim();
+   title=title.split(/\r?\n/)[0].replace(/[.!?]+$/,"").trim();
+   if(!title||title.length>64)throw new Error("Model geçerli ve kısa bir başlık döndürmedi.");
+   title=title.charAt(0).toLocaleUpperCase("tr-TR")+title.slice(1);
+   await log(env,"chat-title",result.__linayModel||MODEL,true,Date.now()-started,title);
+   return json({title,provider:result.__linayModel||MODEL});
+  }catch(e){
+   await log(env,"chat-title","Workers AI",false,Date.now()-started,String(e.message||e));
+   return json({error:"Konu özeti oluşturulamadı: "+String(e.message||e)},503);
+  }
+ }
  if(path==="/chat"&&req.method==="POST"){try{return await handleChat(req,env,ctx)}catch(e){return json({error:e.message||"Sunucu hatası"},500)}}
  if(path==="/memory"&&req.method==="GET"){try{const rawUserId=url.searchParams.get("userId");if(!validUserId(rawUserId))return json({error:"Geçersiz kullanıcı kimliği."},400);const userId=safeId(rawUserId);const row=await env.DB.prepare("SELECT content FROM memories WHERE user_id=? ORDER BY created_at DESC LIMIT 1").bind(userId).first();return json({content:row?.content||""})}catch(e){return json({error:e.message},500)}}
  if(path==="/memory"&&req.method==="POST"){
