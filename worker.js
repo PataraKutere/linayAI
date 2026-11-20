@@ -401,6 +401,41 @@ async function handleChat(req,env,ctx){
   return new Response(pair[0],{headers:{...CORS,"Content-Type":"text/event-stream; charset=utf-8","Cache-Control":"no-cache","X-Linay-Provider":result.provider,"X-Linay-Search":searchState+(searchProvider?":"+searchProvider:""),"X-Linay-Trace":trace,"X-Linay-Sources":encodeURIComponent(JSON.stringify(searchSources.slice(0,7))),"X-Linay-Documents":encodeURIComponent(JSON.stringify(documentSources.slice(0,5))),"X-Linay-Memory-Candidate":encodeURIComponent(JSON.stringify(memoryCandidate||null)),"X-Linay-Self-Audit":"not-needed"}});
  }catch(e){await log(env,"chat","all-models",false,Date.now()-start,e.message);return json({error:"Tüm modeller başarısız oldu: "+e.message},503)}
 }
+
+async function prepareFluxPrompt(env,rawPrompt,style,ratio){
+ const styleHints={
+  photo:"Photorealistic rendering with natural materials and believable light.",
+  cinematic:"Subtle cinematic lighting and composition, while the requested subject remains dominant.",
+  illustration:"A clean, coherent illustration with restrained complementary detail.",
+  logo:"A minimal, professional logo treatment with clean shapes and a plain background; depict only the requested subject."
+ };
+ const ratioHints={
+  "1:1":"Square composition (1:1).",
+  "16:9":"Wide landscape composition (16:9).",
+  "9:16":"Tall portrait composition (9:16)."
+ };
+ let subject=String(rawPrompt||"").trim().slice(0,1500),description="";
+ try{
+  const translated=await runPlain(env,[
+   {role:"system",content:"You prepare prompts for an image model. Understand the user's request in any language, including very short requests, single nouns, symbols, flags, objects, and scenes. Translate it into concise, concrete English. Return ONLY valid JSON with exactly two string fields: {\\"subject\\":\\"...\\",\\"description\\":\\"...\\"}. The subject must be a short English noun phrase naming the exact main requested thing, never a person or scene unless explicitly requested. Put the subject first. The description must continue with only details explicitly requested or strictly necessary to depict that subject; do not invent people, portraits, locations, props, stories, text, or background. Preserve named symbols, flags, objects, colors, and requested wording exactly in meaning. For a short request, infer only the ordinary visual appearance of the named thing. Do not mention style or aspect ratio."},
+   {role:"user",content:String(rawPrompt||"").slice(0,1500)}
+  ],350);
+  const raw=modelText(translated).trim().replace(/^```(?:json)?/i,"").replace(/```$/,"").trim();
+  const match=raw.match(/\{[\s\S]*\}/);
+  if(match){
+   const parsed=JSON.parse(match[0]);
+   if(typeof parsed.subject==="string"&&parsed.subject.trim())subject=parsed.subject.trim().slice(0,300);
+   if(typeof parsed.description==="string")description=parsed.description.trim().slice(0,900);
+  }else if(raw&&raw.length<1200){
+   subject=raw.replace(/^["']|["']$/g,"").trim().slice(0,500);
+  }
+ }catch(e){
+  await log(env,"image-prompt-translation","Prompt preparation",false,0,String(e?.message||e));
+ }
+ const details=description&&description.toLowerCase().startsWith(subject.toLowerCase())?description.slice(subject.length).replace(/^[,;:.\s-]+/,""):description;
+ return [subject,details,styleHints[style]||styleHints.photo,ratioHints[ratio]||ratioHints["1:1"],"The requested subject is the unmistakable main focus. Keep the composition simple and faithful to the request. Add no unrelated subjects, people, props, scenery, lettering, or watermarks. Maintain accurate shapes, proportions, and perspective."].filter(Boolean).join(". ").replace(/\s+/g," ").trim();
+}
+
 export default {async fetch(req,env,ctx){
  const origin=req.headers.get("Origin");
  if(origin&&origin!==ALLOWED_ORIGIN)return json({error:"Origin izinli değil."},403);
@@ -461,60 +496,51 @@ export default {async fetch(req,env,ctx){
  }
  if(path==="/image"&&req.method==="POST"){
   const started=Date.now();
-  let body={};try{body=await req.json()}catch{return json({error:"Geçersiz istek gövdesi.",provider:"LinayAI",model:null},400)}
+  let body={};try{body=await req.json()}catch{return json({error:"Geçersiz istek gövdesi.",code:"INVALID_JSON",provider:"LinayAI",model:null},400)}
   const prompt=String(body.prompt||"").trim().slice(0,3000);
   const image=body.image&&typeof body.image.data==="string"?body.image:null;
   const ratio=["1:1","16:9","9:16"].includes(body.ratio)?body.ratio:"1:1";
   const style=["photo","cinematic","illustration","logo"].includes(body.style)?body.style:"photo";
-  if(!prompt)return json({error:"Görsel açıklaması boş olamaz.",provider:"LinayAI"},400);
-  if(image&&(!/^image\/(jpeg|png|webp)$/.test(String(image.mimeType||""))||image.data.length>12000000))return json({error:"Düzenleme için JPEG, PNG veya WebP görseli (en fazla 9 MB) gerekli.",provider:"LinayAI"},400);
-  // Short, consistent English template. Subject first; style/ratio are applied only when generating (not when editing).
-  const subject=prompt.slice(0,1500);
-  const styleText={photo:"a natural, realistic photograph",cinematic:"a cinematic still with dramatic, motivated lighting",illustration:"a clean, coherent illustration",logo:"a simple, professional logo on a plain background"}[style];
-  const textRule=style==="logo"?"Include text only if the request contains it, spelled exactly as given.":"Do not add any text, letters, numbers or watermarks unless the request asks for them.";
+  if(!prompt)return json({error:"Görsel açıklaması boş olamaz.",code:"EMPTY_PROMPT",provider:"LinayAI"},400);
+  if(image&&(!/^image\/(jpeg|png|webp)$/.test(String(image.mimeType||""))||image.data.length>12000000))return json({error:"Düzenleme için JPEG, PNG veya WebP görseli (en fazla 9 MB) gerekli.",code:"INVALID_SOURCE_IMAGE",provider:"LinayAI"},400);
   const fullPrompt=image
-   ?["Edit the provided image according to this request: "+subject,"Change only what the request asks for. Keep the identity, faces, pose, clothing, background, camera angle, framing and aspect ratio of the original image unchanged. If the request conflicts with the original, apply the smallest possible change."].join("\n\n")
-   :["Create a single image: "+subject,"The requested subject must be the clear main focus. Do not add people, objects or scenery that were not requested. Preserve any names exactly as written. "+textRule,"Style: "+styleText+". Aspect ratio: "+ratio+". Keep anatomy, proportions and perspective correct and the result free of artifacts."].join("\n\n");
-  // New image generation uses Cloudflare Workers AI (FLUX); Gemini remains only for source-image edits.
+   ?["Edit the provided image according to this request: "+prompt.slice(0,1500),"Change only what the request asks for. Preserve all unrelated elements and the original framing."].join("\n\n")
+   :"";
+  // New image generation always calls FLUX directly. Gemini image generation is never used.
   if(!image){
-   if(!env.AI)return json({error:"Cloudflare Workers AI bağlantısı bulunamadı.",provider:"Cloudflare Workers AI"},503);
-   // Shared daily safety cap to prevent unexpected paid usage after the free allocation.
+   const fluxModel="@cf/black-forest-labs/flux-1-schnell";
+   if(!env.AI||typeof env.AI.run!=="function")return json({error:"Cloudflare Workers AI bağlantısı (env.AI) bulunamadı. Görsel üretimi şu anda kullanılamıyor.",code:"WORKERS_AI_BINDING_MISSING",provider:"Cloudflare Workers AI",model:fluxModel},503);
    if(env.DB){
     try{
      await env.DB.prepare("CREATE TABLE IF NOT EXISTS image_usage (day TEXT PRIMARY KEY, count INTEGER NOT NULL DEFAULT 0)").run();
      const day=new Date().toISOString().slice(0,10);
      const usage=await env.DB.prepare("INSERT INTO image_usage(day,count) VALUES(?,1) ON CONFLICT(day) DO UPDATE SET count=count+1 WHERE count<30 RETURNING count").bind(day).first();
-     if(!usage)return json({error:"LinayAI günlük görsel üretim sınırı (30 görsel) doldu. Yarın tekrar deneyebilirsin.",provider:"Cloudflare Workers AI",model:"@cf/black-forest-labs/flux-1-schnell",dailyLimit:30},429);
+     if(!usage)return json({error:"LinayAI günlük görsel üretim sınırı (30 görsel) doldu. Yarın tekrar deneyebilirsin.",code:"LINAY_DAILY_IMAGE_LIMIT",provider:"Cloudflare Workers AI",model:fluxModel,dailyLimit:30},429);
     }catch(e){
      await log(env,"image-generation","Cloudflare Workers AI",false,Date.now()-started,"Günlük sınır kontrolü yapılamadı: "+String(e.message||e));
-     return json({error:"Güvenli kullanım sınırı doğrulanamadığı için görsel üretimi durduruldu. Lütfen daha sonra tekrar dene.",provider:"Cloudflare Workers AI"},503);
+     return json({error:"Güvenli kullanım sınırı doğrulanamadığı için görsel üretimi durduruldu. Lütfen daha sonra tekrar dene.",code:"IMAGE_LIMIT_CHECK_FAILED",provider:"Cloudflare Workers AI",model:fluxModel},503);
     }
    }
-   const fluxModel="@cf/black-forest-labs/flux-1-schnell";
-   let fluxPrompt=fullPrompt;
-   // Translate Turkish requests into a concise, concrete English image prompt for better FLUX results.
+   const fluxPrompt=await prepareFluxPrompt(env,prompt,style,ratio);
    try{
-    const translated=await runPlain(env,[
-     {role:"system",content:"You are an expert image-prompt translator. Convert the user's image request into a precise, natural English prompt for FLUX. Preserve the exact subject, objects, colors, composition, text requested, and style. Do not invent extra subjects or details. Return only the English image prompt, no explanation."},
-     {role:"user",content:fullPrompt}
-    ],500);
-    const value=modelText(translated).trim();
-    if(value)fluxPrompt=value;
-   }catch(e){await log(env,"image-prompt-translation","Workers AI",false,Date.now()-started,String(e.message||e));}
-   try{
-    const ratioHint=ratio==="16:9"?" Compose as a wide landscape image (16:9).":ratio==="9:16"?" Compose as a tall portrait image (9:16).":" Compose as a square image (1:1).";
-    const result=await env.AI.run(fluxModel,{prompt:fluxPrompt+ratioHint,steps:4});
-    if(!result?.image)throw new Error("FLUX görsel verisi döndürmedi.");
-    const bytes=result.image instanceof Uint8Array?result.image:new Uint8Array(result.image);
+    const result=await env.AI.run(fluxModel,{prompt:fluxPrompt,steps:4});
+    if(!result||!result.image)return json({error:"FLUX isteği tamamlandı ancak görsel verisi dönmedi. Lütfen tekrar dene.",code:"IMAGE_DATA_MISSING",provider:"Cloudflare Workers AI",model:fluxModel},502);
+    const rawImage=result.image;
+    const bytes=rawImage instanceof Uint8Array?rawImage:rawImage instanceof ArrayBuffer?new Uint8Array(rawImage):ArrayBuffer.isView(rawImage)?new Uint8Array(rawImage.buffer,rawImage.byteOffset,rawImage.byteLength):null;
+    if(!bytes||!bytes.length)return json({error:"FLUX boş veya geçersiz görsel verisi döndürdü.",code:"IMAGE_DATA_INVALID",provider:"Cloudflare Workers AI",model:fluxModel},502);
     let binary="";
     for(let i=0;i<bytes.length;i+=0x8000)binary+=String.fromCharCode(...bytes.subarray(i,i+0x8000));
     const base64=btoa(binary);
-    await log(env,"image-generation","Cloudflare Workers AI "+fluxModel,true,Date.now()-started,"ratio="+ratio+"; style="+style+"; translated="+(fluxPrompt!==fullPrompt));
-    return json({image:base64,type:"image/jpeg",provider:"Cloudflare Workers AI",model:fluxModel,apiVersion:"Workers AI",edited:false,ratio,style,promptTranslated:fluxPrompt!==fullPrompt,dailyLimit:30});
+    await log(env,"image-generation","Cloudflare Workers AI "+fluxModel,true,Date.now()-started,"ratio="+ratio+"; style="+style);
+    return json({image:base64,type:"image/jpeg",provider:"Cloudflare Workers AI",model:fluxModel,apiVersion:"Workers AI",edited:false,ratio,style,promptTranslated:true,dailyLimit:30});
    }catch(e){
-    const detail="Cloudflare FLUX görsel üretimi başarısız: "+String(e?.message||e);
-    await log(env,"image-generation","Cloudflare Workers AI "+fluxModel,false,Date.now()-started,detail);
-    return json({error:detail,provider:"Cloudflare Workers AI",model:fluxModel,apiVersion:"Workers AI",dailyLimit:30},503);
+    const rawError=String(e?.message||e||"Bilinmeyen Workers AI hatası");
+    const quota=isWorkersAIQuotaError(e)||/4006|daily free allocation|10,000 neurons/i.test(rawError);
+    const detail=quota
+     ?"Cloudflare Workers AI ücretsiz günlük 10.000 neuron kotası doldu. Kota yenilendiğinde tekrar deneyebilirsin."
+     :"Cloudflare FLUX görsel üretimi başarısız: "+rawError.slice(0,700);
+    await log(env,"image-generation","Cloudflare Workers AI "+fluxModel,false,Date.now()-started,rawError);
+    return json({error:detail,code:quota?"WORKERS_AI_DAILY_QUOTA_EXHAUSTED":"FLUX_GENERATION_FAILED",provider:"Cloudflare Workers AI",model:fluxModel,apiVersion:"Workers AI",retryable:quota,dailyLimit:30},quota?429:503);
    }
   }
   const model="gemini-2.5-flash-image";
