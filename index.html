@@ -712,6 +712,20 @@ dialog input,dialog textarea{background:#0b0f16!important;border-color:#303846!i
  #brandLogo svg{width:29px;height:29px}
 }
 
+/* Image mode selectors, clear errors and compact chat titles */
+.img-option{display:none;max-width:108px;min-width:0;height:34px;padding:0 7px;border-radius:9px;border:1px solid rgba(207,220,232,.12);background:rgba(17,22,31,.92);color:#cbd5e1;font-size:10px}
+#img.on~.img-option{display:block}
+.generated-image-card{margin:10px 0;padding:10px;max-width:min(100%,620px);border:1px solid rgba(120,207,199,.18);border-radius:15px;background:rgba(12,17,25,.82)}
+.generated-image-card img{display:block;max-width:100%;max-height:650px;object-fit:contain;border-radius:10px}
+.generated-image-actions{display:flex;gap:12px;align-items:center;margin-top:9px;font-size:12px;color:var(--mu)}
+.generated-image-actions a{color:#b8e5df;text-decoration:none;border:1px solid rgba(120,207,199,.22);padding:6px 11px;border-radius:8px}
+.image-error{padding:14px;border:1px solid rgba(240,130,130,.24);border-radius:13px;background:rgba(100,35,40,.12);color:#f1dada}
+.image-error p{margin:7px 0 12px;color:#c6aeb0;font-size:13px;overflow-wrap:anywhere}
+.image-error button{padding:8px 13px;border-radius:9px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.15);color:#fff}
+#list .ci{display:flex!important;align-items:center;gap:4px;min-width:0;max-width:100%;overflow:hidden}
+#list .ci span{display:block;flex:1 1 auto!important;min-width:0!important;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;word-break:normal;overflow-wrap:normal;padding:10px 7px!important}
+#list .ci button{flex:0 0 30px!important;min-width:30px!important;width:30px!important;height:30px!important;padding:0!important}
+@media(max-width:760px){.img-option{height:40px;max-width:94px;font-size:10px}#list .ci button{flex-basis:34px!important;width:34px!important;min-width:34px!important;height:34px!important}}
 </style><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
@@ -753,7 +767,7 @@ dialog input,dialog textarea{background:#0b0f16!important;border-color:#303846!i
   <button onclick="$('f').click()" title="Dosya / fotoğraf"><svg viewBox="0 0 24 24"><path d="m8 12.5 7.2-7.2a3.2 3.2 0 0 1 4.5 4.5l-9.2 9.2a5 5 0 0 1-7.1-7.1l9-9"/></svg></button>
   <button id="research" title="Kaynaklı, çok aşamalı araştırma modu">Araştır</button><button id="web" title="Bağımsız internet araması"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0-18"/></svg></button>
   <button id="agent" type="button" title="Ajan modu: Linay'ın çok adımlı görevleri planlayıp araçlarla yürütmesini sağlar" aria-label="Ajan modunu aç veya kapat"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.8 14.2 9.8 21.2 12 14.2 14.2 12 21.2 9.8 14.2 2.8 12 9.8 9.8 12 2.8Z"/><path d="m19 2 .7 2.3L22 5l-2.3.7L19 8l-.7-2.3L16 5l2.3-.7L19 2Z"/></svg><span>Ajan</span></button>
-  <button id="img" title="Resim oluştur" aria-label="Resim oluştur"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="4"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg></button>
+  <button id="img" title="Resim oluştur" aria-label="Resim oluştur"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="4"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg></button><select id="imgRatio" class="img-option" aria-label="Görsel oranı"><option value="1:1">Kare 1:1</option><option value="16:9">Yatay 16:9</option><option value="9:16">Dikey 9:16</option></select><select id="imgStyle" class="img-option" aria-label="Görsel stili"><option value="photo">Doğal fotoğraf</option><option value="cinematic">Sinematik</option><option value="illustration">İllüstrasyon</option><option value="logo">Logo</option></select>
   <textarea id="inp" rows="1" enterkeyhint="send" aria-label="Mesajını yaz" placeholder="Bir şey sor…"></textarea>
   <button id="mic" title="Sesle yaz" aria-label="Sesle yaz"><svg viewBox="0 0 24 24"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10v2a7 7 0 0 0 14 0v-2M12 19v3m-4 0h8"/></svg></button>
   <button id="go" aria-label="Mesajı gönder">➤</button>
@@ -962,86 +976,38 @@ $('f').onchange=async e=>{
  }catch(err){alert(f.name+' okunamadı: '+(err?.message||err))}chips()}
 };
 function regen(){if(busy)return;const c=cur();if(!c)return;while(c.msgs.length&&c.msgs[c.msgs.length-1].role=='model')c.msgs.pop();const u=c.msgs.pop();if(!u)return;inp.value=u.t||'';send()}
-async function enPrompt(t){
+async function genImg(text,el,raw,sourceImage=null){
+ const m=$('msgs'),wasAtBottom=m.scrollHeight-m.scrollTop-m.clientHeight<120,oldTop=m.scrollTop;
+ el.innerHTML='<span style="color:var(--mu)">Görsel hazırlanıyor…</span>';
+ const ratio=$('imgRatio')?.value||'1:1',style=$('imgStyle')?.value||'photo';
  try{
-  const messages=[{role:'system',content:"Kullanıcının isteğini bir yapay zeka resim üretici için tek paragraflık, ayrıntılı bir İngilizce prompta çevir. Sadece promptu yaz."},{role:'user',content:t}];
-  const r=await apiFetch(PROXY+'/chat',{method:'POST',headers:{'Content-Type':'application/json'},signal:AbortSignal.timeout(120000),body:JSON.stringify({messages})});
-  if(!r.ok)return t;const rd=r.body.getReader(),dc=new TextDecoder();let buf='',o='';
-  for(;;){const {done,value}=await rd.read();if(done)break;buf+=dc.decode(value,{stream:true});const ls=buf.split('\n');buf=ls.pop();for(const l of ls){if(!l.startsWith('data:'))continue;const raw=l.slice(5).trim();if(!raw||raw==='[DONE]')continue;try{const j=JSON.parse(raw);o+=j.choices?.[0]?.delta?.content||''}catch(e){}}}
-  return o.trim()||t;
- }catch(e){return t}
+  if(!PROXY)throw new Error('Görsel sunucusuna bağlantı yapılandırılmamış.');
+  const r=await apiFetch(PROXY+'/image',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt:text,ratio,style,image:sourceImage}),signal:AbortSignal.timeout(120000)});
+  const j=await r.json().catch(()=>({}));if(!r.ok||!j.image)throw new Error(j.error||('HTTP '+r.status));
+  const src='data:'+(j.type||'image/png')+';base64,'+j.image;
+  el.innerHTML='<div class="generated-image-card"><img alt="Oluşturulan görsel"><div class="generated-image-actions"><a download="linay-gorsel.png">İndir</a><span>'+esc(j.provider||'LinayAI')+(j.edited?' · Görsel düzenlendi':'')+'</span></div><div class="att">'+esc(text)+'</div></div>';
+  const img=el.querySelector('img');img.src=src;el.querySelector('a').href=src;
+  img.onload=()=>requestAnimationFrame(()=>{m.scrollTop=wasAtBottom?m.scrollHeight:Math.max(oldTop,el.offsetTop-m.offsetTop-24)});
+  return {prompt:text,src,provider:j.provider,edited:!!j.edited};
+ }catch(e){const message=String(e.message||e);el.innerHTML='<div class="image-error"><b>Görsel oluşturulamadı</b><p>'+esc(message)+'</p><button type="button" class="image-retry">Tekrar dene</button></div>';el.querySelector('.image-retry').onclick=()=>genImg(text,el,raw,sourceImage);return {prompt:text,src:null,error:message}}
 }
-async function genImg(text,el,raw){
- el.innerHTML='<span style="color:var(--mu)">Resim hazırlanıyor… (10-40 sn)</span>';
- const p=raw?text:await enPrompt(text);let src=null,werr='';
- if(PROXY){try{
-  const r=await apiFetch(PROXY+'/image',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt:p}),signal:AbortSignal.timeout(90000)});
-  const j=await r.json().catch(()=>({}));
-  if(r.ok&&j.image)src='data:'+(j.type||'image/jpeg')+';base64,'+j.image;else werr=j.error||('HTTP '+r.status);
- }catch(e){werr=String(e.message||e)}}
- const dl=!!src;
- if(!src)src='https://image.pollinations.ai/prompt/'+encodeURIComponent(p).replace(/[!'()*]/g,c=>'%'+c.charCodeAt(0).toString(16).toUpperCase())+'?width=1024&height=1024&nologo=true&seed='+Math.floor(Math.random()*1e6);
- el.innerHTML=`<div style="margin:10px 0;border-radius:12px;overflow:hidden;border:1px solid var(--bd);background:var(--card);padding:10px;width:fit-content;max-width:100%"><img src="${src}" alt="" style="max-width:100%;max-height:500px;border-radius:10px;display:block">`+(dl?`<div style="margin-top:8px"><a download="linay.jpg" href="${src}" style="background:var(--ub);padding:6px 12px;border-radius:8px;font-size:13px;color:var(--fg);text-decoration:none;border:1px solid var(--bd)">İndir</a></div>`:'')+`<div class="att">${esc(p)}</div></div>`+(werr&&!dl?`<div class="att">Not: ana resim servisi çalışmadı (${esc(werr)}), yedek servis kullanıldı.</div>`:'');
- el.querySelector('img').onerror=()=>{el.innerHTML='Resim oluşturulamadı.'+(werr?`<div class="att">Resim servisi hatası: ${esc(werr)}</div>`:'')+'<div class="att">Biraz sonra tekrar dene.</div>'};
- return {prompt:p,src};
+function makeChatTitle(value){
+ const stop=new Set(['lütfen','bana','bir','şey','hakkında','ile','için','nasıl','nedir','ne','kadar','mi','mı','mu','mü','acaba','yardım','eder','misin','misiniz','istiyorum','yapar','yapabilir','anlat','açıkla']);
+ let text=String(value||'').replace(/https?:\/\/\S+/gi,' ').replace(/[\r\n\t]+/g,' ').replace(/[“”\"']/g,'').replace(/\s+/g,' ').trim();
+ text=text.replace(/^(selam|merhaba|hey|hello)\b[\s,!.]*/i,'').replace(/^(şunu|bunu|bana)\s+/i,'');
+ const words=text.split(' ').filter(w=>w&&!stop.has(w.toLocaleLowerCase('tr-TR')));
+ let title=words.slice(0,7).join(' ').replace(/[.!?,;:]+$/,'').trim();
+ if(!title)title=String(value||'Yeni sohbet').trim().split(/\s+/).slice(0,5).join(' ');
+ title=title.charAt(0).toLocaleUpperCase('tr-TR')+title.slice(1);
+ return title.length>52?title.slice(0,49).trimEnd()+'…':title;
 }
 async function send(){
  if(busy){ctl&&ctl.abort();return}
  const text=inp.value.trim();if(!text&&!files.length)return;
- const currentChat=cur();
- const previousUser=currentChat?.msgs?.slice().reverse().find(m=>m.role==='user')?.t||'';
- const clean=text.toLocaleLowerCase('tr-TR').replace(/[’']/g,'').trim();
- const zones=[
-  {names:['istanbul','Türkiye','turkiye'],zone:'Europe/Istanbul',label:'İstanbul'},
-  {names:['pekin','beijing','pelin'],zone:'Asia/Shanghai',label:'Pekin'},
-  {names:['tokyo'],zone:'Asia/Tokyo',label:'Tokyo'},
-  {names:['seul'],zone:'Asia/Seoul',label:'Seul'},
-  {names:['londra','london'],zone:'Europe/London',label:'Londra'},
-  {names:['berlin'],zone:'Europe/Berlin',label:'Berlin'},
-  {names:['paris'],zone:'Europe/Paris',label:'Paris'},
-  {names:['moskova'],zone:'Europe/Moscow',label:'Moskova'},
-  {names:['dubai'],zone:'Asia/Dubai',label:'Dubai'},
-  {names:['bahreyn','bahrain','manama'],zone:'Asia/Bahrain',label:'Bahreyn'},
-  {names:['katar','qatar','doha'],zone:'Asia/Qatar',label:'Katar'},
-  {names:['suudi arabistan','riyad','riyadh'],zone:'Asia/Riyadh',label:'Riyad'},
-  {names:['kuveyt','kuwait'],zone:'Asia/Kuwait',label:'Kuveyt'},
-  {names:['muskat','muscat','umman','oman'],zone:'Asia/Muscat',label:'Muskat'},
-  {names:['bakü','baku','azerbaycan'],zone:'Asia/Baku',label:'Bakü'},
-  {names:['tiflis','tbilisi','gürcistan'],zone:'Asia/Tbilisi',label:'Tiflis'},
-  {names:['delhi','yeni delhi','hindistan'],zone:'Asia/Kolkata',label:'Yeni Delhi'},
-  {names:['bangkok','tayland'],zone:'Asia/Bangkok',label:'Bangkok'},
-  {names:['singapur'],zone:'Asia/Singapore',label:'Singapur'},
-  {names:['new york','newyork'],zone:'America/New_York',label:'New York'},
-  {names:['sırbistan','sirbistan','belgrad','belgrade'],zone:'Europe/Belgrade',label:'Sırbistan'}
- ];
- let target=zones.find(z=>z.names.some(n=>clean.includes(n)));
- const asksClock=/saat kaç|kaç saat|what time is it/i.test(clean);
- const previousAskedClock=/saat kaç|kaç saat|what time is it/i.test(previousUser);
- const isClockFollowup=!asksClock&&!!target&&previousAskedClock;
- let localAnswer=null;
- if(!files.length&&/^(sa|selamünaleyküm|selamun aleykum)$/i.test(clean))localAnswer='Aleykümselam.';
- else if(!files.length&&/^(selam|merhaba|hey|hello)$/i.test(clean))localAnswer='Selam! Nasıl yardımcı olayım?';
- else if(!files.length&&(asksClock||isClockFollowup)){
-  if(!target){
-   const hasLocationHint=/\b(de|da|nde|nda|in|at)\b/i.test(clean)||clean.split(/\s+/).length>2;
-   if(hasLocationHint)localAnswer='Hangi şehir veya ülkeyi kastediyorsun? Yanlış saat vermemek için konumu netleştireyim.';
-   else target=zones[0];
-  }
-  if(target){
-   const now=new Intl.DateTimeFormat('tr-TR',{timeZone:target.zone,hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).format(new Date());
-   localAnswer=target.label+'’de şu an saat '+now+'.';
-  }
- }
- if(localAnswer!==null){
-  let cc=currentChat;if(!cc){cc={id:Date.now(),title:text.slice(0,40),msgs:[],hidden:privateChat,projectId:privateChat?null:S.activeProjectId};S.chats.push(cc);S.cur=cc.id;}
-  cc.msgs.push({role:'user',parts:[{text}],t:text,att:[],media:[]});
-  cc.msgs.push({role:'model',parts:[{text:localAnswer}],text:localAnswer});
-  inp.value='';grow();save();render();if(voiceReplyPending){voiceReplyPending=false;speakAssistant(localAnswer)}return;
- }
  const explicitSearch=/(internetten ara|web(?:de)? ara|google(?:'da|da)? ara|araştır|araştırma yap|kaynak (?:bul|göster|ver)|kaynakları bul|internetten kontrol et|güncel kaynak)/i.test(text);
  const useSearch=!!text&&(S.cfg.search||S.cfg.research||explicitSearch);
  let c=cur();
- if(!c){c={id:Date.now(),title:(text||files[0].name).slice(0,40),msgs:[],hidden:privateChat,projectId:privateChat?null:S.activeProjectId};S.chats.push(c);S.cur=c.id}
+ if(!c){c={id:Date.now(),title:makeChatTitle(text||files[0].name),msgs:[],hidden:privateChat,projectId:privateChat?null:S.activeProjectId};S.chats.push(c);S.cur=c.id}
  const sf=files;const imageFiles=sf.filter(f=>f.part&&f.part.inlineData&&String(f.part.inlineData.mimeType||'').startsWith('image/'));const media=imageFiles.map((f,i)=>({id:'up-'+c.id+'-'+Date.now()+'-'+i,name:f.name,src:privateChat?'data:'+f.part.inlineData.mimeType+';base64,'+f.part.inlineData.data:undefined}));if(!privateChat)await Promise.all(media.map((m,i)=>{const f=imageFiles[i].part.inlineData;return mediaPut(m.id,'data:'+f.mimeType+';base64,'+f.data)}));const parts=sf.map(f=>f.part);if(text)parts.push({text});const um={role:'user',parts,t:text,att:sf.map(f=>f.name),media};c.msgs.push(um);files=[];chips();inp.value='';grow();render();
  const agentMode=!!(S.cfg.agent||S.cfg.research);
  const el=add('model',agentMode?'<span style="color:var(--mu)">Ajan görevi devraldı…</span>':'<span style="color:var(--mu)">Linay düşünüyor…</span>');
@@ -1049,8 +1015,10 @@ async function send(){
  if(agentMode){agentProgress=document.createElement('div');agentProgress.className='agent-progress';agentProgress.innerHTML='<b><span class="pulse"></span>Ajan çalışıyor</b><div>Görev planlanıyor ve araç adımları canlı olarak gösteriliyor.</div><ol id="agentLiveSteps"></ol>';el.parentElement.appendChild(agentProgress)}
  busy=true;$('go').textContent='■';ctl=new AbortController();
  if(text&&(imgMode||(!sf.length&&text.length<200&&IMG_RE.test(text)))){
-  imgMode=false;$('img').classList.remove('on');
-  const generated=await genImg(text,el),mediaId='gen-'+c.id+'-'+Date.now();if(!privateChat)await mediaPut(mediaId,generated.src);c.msgs.push({role:'model',parts:[{text:'[Resim oluşturuldu: '+generated.prompt+']'}],text:'🖼 Resim oluşturuldu: '+generated.prompt,media:[{id:mediaId,name:'Oluşturulan resim',src:privateChat?generated.src:undefined}]});busy=false;$('go').textContent='➤';save();render();return;
+  const source=imageFiles[0]?.part?.inlineData||null;const generated=await genImg(text,el,false,source);
+  if(generated.src){const mediaId='gen-'+c.id+'-'+Date.now();if(!privateChat)await mediaPut(mediaId,generated.src);c.msgs.push({role:'model',parts:[{text:'[Resim oluşturuldu: '+generated.prompt+']'}],text:'🖼 Resim oluşturuldu: '+generated.prompt,media:[{id:mediaId,name:source?'Düzenlenmiş resim':'Oluşturulan resim',src:privateChat?generated.src:undefined}]})}
+  else c.msgs.push({role:'model',parts:[{text:'[Görsel oluşturma hatası: '+generated.error+']'}],text:'Görsel oluşturulamadı: '+generated.error});
+  busy=false;$('go').textContent='➤';save();render();return;
  }
  let out='',shown=false,generatedMedia=[];
  try{
