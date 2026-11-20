@@ -922,7 +922,7 @@ function render(){
  $('list').innerHTML='';
  renderProjects();
  $('savedCount').textContent=String(S.saved.length);
- const q=($('q').value||'').toLowerCase();S.chats.filter(x=>!x.hidden&&(!S.activeProjectId||x.projectId===S.activeProjectId)).slice().reverse().filter(x=>!q||(x.title+' '+x.msgs.map(m=>m.text||m.t||'').join(' ')).toLowerCase().includes(q)).forEach(x=>{const r=document.createElement('div');r.className='ci'+(x.id==S.cur?' on':'');
+ const q=($('q').value||'').toLowerCase();S.chats.filter(x=>!x.hidden&&(!S.activeProjectId||x.projectId===S.activeProjectId)).slice().reverse().filter(x=>!q||(x.title+' '+x.msgs.map(m=>m.text||m.t||'').join(' ')).toLowerCase().includes(q)).forEach(x=>{const r=document.createElement('div');r.className='ci'+(x.id==S.cur?' on':'');r.dataset.chatId=String(x.id);
   r.innerHTML='<span></span><button title="Projeye taşı">↗</button><button title="Sohbeti sil">✕</button>';r.firstChild.textContent=x.title;
   r.firstChild.onclick=()=>{stopSpeech();endPrivateChat();S.cur=x.id;render();tg(false)};
   r.children[1].onclick=()=>moveChatToProject(x.id);r.lastChild.onclick=()=>{if(speechChatId===x.id)stopSpeech();S.chats=S.chats.filter(y=>y.id!=x.id);if(S.cur==x.id)S.cur=null;save();render()};
@@ -1004,23 +1004,44 @@ async function genImg(text,el,raw,sourceImage=null){
  }
 }
 function makeChatTitle(value){
- const stop=new Set(['lütfen','bana','bir','şey','hakkında','ile','için','nasıl','nedir','ne','kadar','mi','mı','mu','mü','acaba','yardım','eder','misin','misiniz','istiyorum','yapar','yapabilir','anlat','açıkla']);
- let text=String(value||'').replace(/https?:\/\/\S+/gi,' ').replace(/[\r\n\t]+/g,' ').replace(/[“”\"']/g,'').replace(/\s+/g,' ').trim();
- text=text.replace(/^(selam|merhaba|hey|hello)\b[\s,!.]*/i,'').replace(/^(şunu|bunu|bana)\s+/i,'');
- const words=text.split(' ').filter(w=>w&&!stop.has(w.toLocaleLowerCase('tr-TR')));
- let title=words.slice(0,7).join(' ').replace(/[.!?,;:]+$/,'').trim();
- if(!title)title=String(value||'Yeni sohbet').trim().split(/\s+/).slice(0,5).join(' ');
- title=title.charAt(0).toLocaleUpperCase('tr-TR')+title.slice(1);
- return title.length>52?title.slice(0,49).trimEnd()+'…':title;
+ const raw=String(value||"").replace(/https?:\/\/\S+/gi," ").replace(/[\r\n\t]+/g," ").replace(/\s+/g," ").trim();
+ if(!raw)return "Yeni sohbet";
+ const normalized=raw.replace(/^(?:selam(?:ünaleyküm)?|merhaba|hey|hello)\b[\s,!.]*/i,"").trim();
+ if(!normalized)return "Selamlaşma";
+ const firstSentence=(normalized.match(/^.*?(?:[.!?](?:\s|$)|$)/)||[normalized])[0].trim();
+ if(firstSentence.length<=52)return firstSentence.charAt(0).toLocaleUpperCase("tr-TR")+firstSentence.slice(1);
+ const words=firstSentence.split(/\s+/);
+ const stop=new Set(["ve","ile","ama","fakat","çünkü","ki","de","da","mi","mı","mu","mü","bir","bu","şu","o","için","gibi","olarak","acaba","lütfen","yani","hani","şey","bana","benim","senin","şunu","bunu","nasıl","ne","neden","hangi","kaç","eder","misin","misiniz"]);
+ const meaningful=words.filter((word,index)=>!stop.has(word.toLocaleLowerCase("tr-TR"))||index===0);
+ let phrase=meaningful.slice(0,6).join(" ").replace(/[,:;]+$/,"").trim();
+ if(phrase.length>52)phrase=phrase.split(/\s+/).slice(0,4).join(" ");
+ return phrase.charAt(0).toLocaleUpperCase("tr-TR")+phrase.slice(1)||"Yeni sohbet";
+}
+async function refreshChatTitle(chatId,message){
+ try{
+  if(privateChat||!PROXY)return;
+  const response=await apiFetch(PROXY+"/title",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({message}),signal:AbortSignal.timeout(18000)});
+  const data=await response.json().catch(()=>({}));
+  if(!response.ok||!data.title)throw new Error(data.error||"Başlık servisi yanıt vermedi.");
+  const chat=S.chats.find(item=>String(item.id)===String(chatId));
+  if(!chat||chat.hidden)return;
+  const firstUser=chat.msgs.find(item=>item.role==="user");
+  if(!firstUser||String(firstUser.t||"")!==String(message||""))return;
+  chat.title=String(data.title).replace(/\s+/g," ").trim().slice(0,64);
+  const row=[...document.querySelectorAll("#list .ci")].find(item=>item.dataset.chatId===String(chatId));
+  if(row){row.querySelector("span").textContent=chat.title;row.querySelector("span").title=chat.title}
+  if(String(S.cur)===String(chatId))$("ttl").textContent=chat.title;
+  save();
+ }catch(error){console.warn("LinayAI sohbet başlığı özeti:",error?.message||error)}
 }
 async function send(){
  if(busy){ctl&&ctl.abort();return}
  const text=inp.value.trim();if(!text&&!files.length)return;
  const explicitSearch=/(internetten ara|web(?:de)? ara|google(?:'da|da)? ara|araştır|araştırma yap|kaynak (?:bul|göster|ver)|kaynakları bul|internetten kontrol et|güncel kaynak)/i.test(text);
  const useSearch=!!text&&(S.cfg.search||S.cfg.research||explicitSearch);
- let c=cur();
+ let c=cur();const isNewChat=!c;
  if(!c){c={id:Date.now(),title:makeChatTitle(text||files[0].name),msgs:[],hidden:privateChat,projectId:privateChat?null:S.activeProjectId};S.chats.push(c);S.cur=c.id}
- const sf=files;const imageFiles=sf.filter(f=>f.part&&f.part.inlineData&&String(f.part.inlineData.mimeType||'').startsWith('image/'));const media=imageFiles.map((f,i)=>({id:'up-'+c.id+'-'+Date.now()+'-'+i,name:f.name,src:privateChat?'data:'+f.part.inlineData.mimeType+';base64,'+f.part.inlineData.data:undefined}));if(!privateChat)await Promise.all(media.map((m,i)=>{const f=imageFiles[i].part.inlineData;return mediaPut(m.id,'data:'+f.mimeType+';base64,'+f.data)}));const parts=sf.map(f=>f.part);if(text)parts.push({text});const um={role:'user',parts,t:text,att:sf.map(f=>f.name),media};c.msgs.push(um);files=[];chips();inp.value='';grow();render();
+ const sf=files;const imageFiles=sf.filter(f=>f.part&&f.part.inlineData&&String(f.part.inlineData.mimeType||'').startsWith('image/'));const media=imageFiles.map((f,i)=>({id:'up-'+c.id+'-'+Date.now()+'-'+i,name:f.name,src:privateChat?'data:'+f.part.inlineData.mimeType+';base64,'+f.part.inlineData.data:undefined}));if(!privateChat)await Promise.all(media.map((m,i)=>{const f=imageFiles[i].part.inlineData;return mediaPut(m.id,'data:'+f.mimeType+';base64,'+f.data)}));const parts=sf.map(f=>f.part);if(text)parts.push({text});const um={role:'user',parts,t:text,att:sf.map(f=>f.name),media};c.msgs.push(um);if(isNewChat)refreshChatTitle(c.id,text||files[0]?.name||'Yeni sohbet');files=[];chips();inp.value='';grow();render();
  const agentMode=!!(S.cfg.agent||S.cfg.research);
  const el=add('model',agentMode?'<span style="color:var(--mu)">Ajan görevi devraldı…</span>':'<span style="color:var(--mu)">Linay düşünüyor…</span>');
  let agentProgress=null;
