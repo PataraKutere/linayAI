@@ -475,6 +475,48 @@ export default {async fetch(req,env,ctx){
   const fullPrompt=image
    ?["Edit the provided image according to this request: "+subject,"Change only what the request asks for. Keep the identity, faces, pose, clothing, background, camera angle, framing and aspect ratio of the original image unchanged. If the request conflicts with the original, apply the smallest possible change."].join("\n\n")
    :["Create a single image: "+subject,"The requested subject must be the clear main focus. Do not add people, objects or scenery that were not requested. Preserve any names exactly as written. "+textRule,"Style: "+styleText+". Aspect ratio: "+ratio+". Keep anatomy, proportions and perspective correct and the result free of artifacts."].join("\n\n");
+  // New image generation uses Cloudflare Workers AI (FLUX); Gemini remains only for source-image edits.
+  if(!image){
+   if(!env.AI)return json({error:"Cloudflare Workers AI bağlantısı bulunamadı.",provider:"Cloudflare Workers AI"},503);
+   // Shared daily safety cap to prevent unexpected paid usage after the free allocation.
+   if(env.DB){
+    try{
+     await env.DB.prepare("CREATE TABLE IF NOT EXISTS image_usage (day TEXT PRIMARY KEY, count INTEGER NOT NULL DEFAULT 0)").run();
+     const day=new Date().toISOString().slice(0,10);
+     const usage=await env.DB.prepare("INSERT INTO image_usage(day,count) VALUES(?,1) ON CONFLICT(day) DO UPDATE SET count=count+1 WHERE count<30 RETURNING count").bind(day).first();
+     if(!usage)return json({error:"LinayAI günlük görsel üretim sınırı (30 görsel) doldu. Yarın tekrar deneyebilirsin.",provider:"Cloudflare Workers AI",model:"@cf/black-forest-labs/flux-1-schnell",dailyLimit:30},429);
+    }catch(e){
+     await log(env,"image-generation","Cloudflare Workers AI",false,Date.now()-started,"Günlük sınır kontrolü yapılamadı: "+String(e.message||e));
+     return json({error:"Güvenli kullanım sınırı doğrulanamadığı için görsel üretimi durduruldu. Lütfen daha sonra tekrar dene.",provider:"Cloudflare Workers AI"},503);
+    }
+   }
+   const fluxModel="@cf/black-forest-labs/flux-1-schnell";
+   let fluxPrompt=fullPrompt;
+   // Translate Turkish requests into a concise, concrete English image prompt for better FLUX results.
+   try{
+    const translated=await runPlain(env,[
+     {role:"system",content:"You are an expert image-prompt translator. Convert the user's image request into a precise, natural English prompt for FLUX. Preserve the exact subject, objects, colors, composition, text requested, and style. Do not invent extra subjects or details. Return only the English image prompt, no explanation."},
+     {role:"user",content:fullPrompt}
+    ],500);
+    const value=modelText(translated).trim();
+    if(value)fluxPrompt=value;
+   }catch(e){await log(env,"image-prompt-translation","Workers AI",false,Date.now()-started,String(e.message||e));}
+   const dimensions=ratio==="16:9"?{width:1024,height:576}:ratio==="9:16"?{width:576,height:1024}:{width:1024,height:1024};
+   try{
+    const result=await env.AI.run(fluxModel,{prompt:fluxPrompt,steps:4,...dimensions});
+    if(!result?.image)throw new Error("FLUX görsel verisi döndürmedi.");
+    const bytes=result.image instanceof Uint8Array?result.image:new Uint8Array(result.image);
+    let binary="";
+    for(let i=0;i<bytes.length;i+=0x8000)binary+=String.fromCharCode(...bytes.subarray(i,i+0x8000));
+    const base64=btoa(binary);
+    await log(env,"image-generation","Cloudflare Workers AI "+fluxModel,true,Date.now()-started,"ratio="+ratio+"; style="+style+"; translated="+(fluxPrompt!==fullPrompt));
+    return json({image:base64,type:"image/jpeg",provider:"Cloudflare Workers AI",model:fluxModel,apiVersion:"Workers AI",edited:false,ratio,style,promptTranslated:fluxPrompt!==fullPrompt,dailyLimit:30});
+   }catch(e){
+    const detail="Cloudflare FLUX görsel üretimi başarısız: "+String(e?.message||e);
+    await log(env,"image-generation","Cloudflare Workers AI "+fluxModel,false,Date.now()-started,detail);
+    return json({error:detail,provider:"Cloudflare Workers AI",model:fluxModel,apiVersion:"Workers AI",dailyLimit:30},503);
+   }
+  }
   const model="gemini-2.5-flash-image";
   const apiVersion="v1beta";
   if(env.GEMINI_API_KEY){
