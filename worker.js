@@ -4,10 +4,11 @@ const FALLBACK_MODELS=["@cf/openai/gpt-oss-120b"];
 const VISION_MODEL="@cf/qwen/qwen3.8-27b";
 const EMBED_MODEL="@cf/baai/bge-m3";
 const GEMINI_MODEL="gemini-flash-lite-latest";
-const CORS={"Access-Control-Allow-Origin":"*","Access-Control-Allow-Headers":"Accept, Content-Type, X-Linay-Admin","Access-Control-Allow-Methods":"GET, POST, DELETE, OPTIONS","Access-Control-Expose-Headers":"X-Linay-Provider, X-Linay-Search, X-Linay-Trace, X-Linay-Sources, X-Linay-Agent-Steps","Access-Control-Max-Age":"86400","Vary":"Origin"};
+const CORS={"Access-Control-Allow-Origin":ALLOWED_ORIGIN,"Access-Control-Allow-Headers":"Accept, Content-Type, X-Linay-Admin","Access-Control-Allow-Methods":"GET, POST, DELETE, OPTIONS","Access-Control-Expose-Headers":"X-Linay-Provider, X-Linay-Search, X-Linay-Trace, X-Linay-Sources, X-Linay-Agent-Steps","Access-Control-Max-Age":"86400","Vary":"Origin"};
 const json=(data,status=200,extra={})=>new Response(JSON.stringify(data),{status,headers:{...CORS,"Content-Type":"application/json",...extra}});
 const uid=()=>crypto.randomUUID();
-const safeId=x=>String(x||"").replace(/[^a-zA-Z0-9_-]/g,"").slice(0,80)||"anonymous";
+const safeId=x=>String(x||"").trim();
+const validUserId=x=>typeof x==="string"&&/^[a-zA-Z0-9_-]{8,80}$/.test(x);
 const lastUser=messages=>[...messages].reverse().find(m=>m.role==="user");
 const contentText=m=>typeof m?.content==="string"?m.content:(m?.content||[]).filter(p=>p.type==="text").map(p=>p.text||"").join("\n");
 async function log(env,kind,provider,ok,latency,detail=""){
@@ -166,7 +167,13 @@ async function saveDocument(env,userId,name,text){
 }
 async function loadMemory(env,userId){
  if(!env.DB)return {memories:[],recent:[]};
- try{const m=await env.DB.prepare("SELECT content FROM memories WHERE user_id=? ORDER BY created_at DESC LIMIT 8").bind(userId).all();return {memories:m.results||[],recent:[]}}catch(e){return {memories:[],recent:[]}}
+ let memories=[],recent=[];
+ try{const m=await env.DB.prepare("SELECT content FROM memories WHERE user_id=? ORDER BY created_at DESC LIMIT 8").bind(userId).all();memories=m.results||[]}catch(e){}
+ try{
+  const r=await env.DB.prepare("SELECT role,content FROM conversations WHERE user_id=? ORDER BY rowid DESC LIMIT 6").bind(userId).all();
+  recent=(r.results||[]).reverse().filter(x=>x&&["user","assistant"].includes(x.role)&&typeof x.content==="string").map(x=>({role:x.role,content:x.content.slice(0,3000)}));
+ }catch(e){}
+ return {memories,recent};
 }
 function sseFromText(text,provider,searchState,trace,sources=[],agentSteps=0){
  const enc=new TextEncoder();const chunks=[];for(let i=0;i<text.length;i+=90)chunks.push(text.slice(i,i+90));
@@ -253,6 +260,7 @@ async function agentRun(env,userId,messages){
 }
 async function handleChat(req,env,ctx){
  const body=await req.json(),messages=Array.isArray(body.messages)?body.messages:[];if(!messages.length)return json({error:"Mesaj bulunamadı"},400);
+ if(!validUserId(body.userId))return json({error:"Geçersiz kullanıcı kimliği."},400);
  const userId=safeId(body.userId),start=Date.now(),last=lastUser(messages),question=contentText(last).slice(0,1200),searchQuery=searchQueryFromMessages(messages);
  let searchState="off",searchContext="",searchProvider="",searchSources=[];
  if(body.search===true){
@@ -263,7 +271,9 @@ async function handleChat(req,env,ctx){
  const asksAboutDocuments=/(yüklediğim|yukledigim|eklediğim|ekledigim|paylaştığım|paylastigim|dosya|belge|doküman|dokuman|pdf|dosyanın|dosyanin|belgenin|belge içeriği|dosya içeriği|içinde ne yazıyor|içeriğinde ne var)/i.test(question);
  const rag=asksAboutDocuments?await ragSearch(env,userId,question):[];
  const originalSystem=messages.filter(m=>m.role==="system").map(m=>contentText(m)).join("\n");
- const sys=originalSystem+"\n\nLinayAI: Be accurate, concise and honest. For logic, distinguish what follows from what does not follow. Never invent current facts or sources. If sources are supplied, cite them using their numbered URLs. "+(mem.memories.length?"\nUSER SAVED MEMORY:\n"+mem.memories.map(x=>x.content).join("\n"):"")+(mem.recent.length?"\nRECENT SERVER CONTEXT:\n"+mem.recent.map(x=>x.role+": "+x.content).join("\n"):"")+(rag.length?"\nIMPORTANT: THE USER DOCUMENT SEARCH FOUND THE FOLLOWING EXCERPTS FROM THE USER UPLOADED FILES. YOU CAN READ THESE EXCERPTS. Use them to answer questions about those files. Never claim you cannot access a file when an excerpt is provided.\nUSER DOCUMENT EXCERPTS:\n"+rag.map(x=>"[Document: "+(x.name||"uploaded file")+"]\n"+x.content).join("\n---\n"):"")+searchContext;
+ const requestContext=new Set(messages.filter(m=>m&&["user","assistant"].includes(m.role)).map(m=>m.role+"\n"+contentText(m)));
+ const recentContext=mem.recent.filter(m=>!requestContext.has(m.role+"\n"+m.content));
+ const sys=originalSystem+"\n\nLinayAI: Be accurate, concise and honest. For logic, distinguish what follows from what does not follow. Never invent current facts or sources. If sources are supplied, cite them using their numbered URLs. "+(mem.memories.length?"\nUSER SAVED MEMORY:\n"+mem.memories.map(x=>x.content).join("\n"):"")+(recentContext.length?"\nRECENT SERVER CONTEXT (older messages not already present in this request):\n"+recentContext.map(x=>x.role+": "+x.content).join("\n"):"")+(rag.length?"\nIMPORTANT: THE USER DOCUMENT SEARCH FOUND THE FOLLOWING EXCERPTS FROM THE USER UPLOADED FILES. YOU CAN READ THESE EXCERPTS. Use them to answer questions about those files. Never claim you cannot access a file when an excerpt is provided.\nUSER DOCUMENT EXCERPTS:\n"+rag.map(x=>"[Document: "+(x.name||"uploaded file")+"]\n"+x.content).join("\n---\n"):"")+searchContext;
  const enriched=[{role:"system",content:sys},...messages.filter(m=>m.role!=="system")];
  if(body.agent===true){
   try{const a=await agentRun(env,userId,enriched);const answer=a.answer+(searchSources.length?"\n\nKaynaklar:\n"+searchSources.map((x,i)=>"["+ (i+1)+"] ["+x.title+"]("+x.url+")").join("\n"):"");ctx.waitUntil((async()=>{await log(env,"agent", "Workers AI",true,Date.now()-start,"steps="+a.steps);if(question)await env.DB?.prepare("INSERT INTO conversations(id,user_id,role,content) VALUES(?,?,?,?)").bind(uid(),userId,"user",question).run();if(answer)await env.DB?.prepare("INSERT INTO conversations(id,user_id,role,content) VALUES(?,?,?,?)").bind(uid(),userId,"assistant",answer.slice(0,6000)).run()})());return sseFromText(answer,"Workers AI Agent · "+(a.model||MODEL),searchState,uid(),searchSources,a.steps)}
@@ -293,22 +303,24 @@ async function handleChat(req,env,ctx){
  }catch(e){await log(env,"chat","all-models",false,Date.now()-start,e.message);return json({error:"Tüm modeller başarısız oldu: "+e.message},503)}
 }
 export default {async fetch(req,env,ctx){
+ const origin=req.headers.get("Origin");
+ if(origin&&origin!==ALLOWED_ORIGIN)return json({error:"Origin izinli değil."},403);
  if(req.method==="OPTIONS")return new Response(null,{status:204,headers:CORS});
  const url=new URL(req.url),path=url.pathname;
  if(path==="/health"&&req.method==="GET")return json({ok:true,service:"LinayAI",model:MODEL,searchProviders:["ESPN Scoreboard","SearXNG (optional)","Brave (optional)","Bing RSS","Google News RSS","Bing","DuckDuckGo","Wikipedia"],memory:!!env.DB,rag:!!env.VECTOR,agents:true,version:"2.0"});
  if(path==="/chat"&&req.method==="POST"){try{return await handleChat(req,env,ctx)}catch(e){return json({error:e.message||"Sunucu hatası"},500)}}
- if(path==="/memory"&&req.method==="GET"){try{const userId=safeId(url.searchParams.get("userId"));const row=await env.DB.prepare("SELECT content FROM memories WHERE user_id=? ORDER BY created_at DESC LIMIT 1").bind(userId).first();return json({content:row?.content||""})}catch(e){return json({error:e.message},500)}}
+ if(path==="/memory"&&req.method==="GET"){try{const rawUserId=url.searchParams.get("userId");if(!validUserId(rawUserId))return json({error:"Geçersiz kullanıcı kimliği."},400);const userId=safeId(rawUserId);const row=await env.DB.prepare("SELECT content FROM memories WHERE user_id=? ORDER BY created_at DESC LIMIT 1").bind(userId).first();return json({content:row?.content||""})}catch(e){return json({error:e.message},500)}}
  if(path==="/memory"&&req.method==="POST"){
-  try{const b=await req.json(),userId=safeId(b.userId),content=String(b.content||"").trim().slice(0,6000);if(!env.DB)return json({error:"Hafıza veritabanı bağlı değil"},503);await env.DB.prepare("DELETE FROM memories WHERE user_id=?").bind(userId).run();if(content)await env.DB.prepare("INSERT INTO memories(id,user_id,content) VALUES(?,?,?)").bind(uid(),userId,content).run();return json({ok:true})}catch(e){return json({error:e.message},500)}
+  try{const b=await req.json();if(!validUserId(b.userId))return json({error:"Geçersiz kullanıcı kimliği."},400);const userId=safeId(b.userId),content=String(b.content||"").trim().slice(0,6000);if(!env.DB)return json({error:"Hafıza veritabanı bağlı değil"},503);await env.DB.prepare("DELETE FROM memories WHERE user_id=?").bind(userId).run();if(content)await env.DB.prepare("INSERT INTO memories(id,user_id,content) VALUES(?,?,?)").bind(uid(),userId,content).run();return json({ok:true})}catch(e){return json({error:e.message},500)}
  }
  if(path==="/documents"&&req.method==="POST"){
-  try{const b=await req.json(),userId=safeId(b.userId),d=await saveDocument(env,userId,b.name,b.text);await log(env,"document-index","Workers AI",true,0,d.chunks+" chunks");return json({ok:true,document:d})}catch(e){await log(env,"document-index","Workers AI",false,0,e.message);return json({error:e.message},500)}
+  try{const b=await req.json();if(!validUserId(b.userId))return json({error:"Geçersiz kullanıcı kimliği."},400);const userId=safeId(b.userId),d=await saveDocument(env,userId,b.name,b.text);await log(env,"document-index","Workers AI",true,0,d.chunks+" chunks");return json({ok:true,document:d})}catch(e){await log(env,"document-index","Workers AI",false,0,e.message);return json({error:e.message},500)}
  }
  if(path==="/documents"&&req.method==="GET"){
-  const userId=safeId(url.searchParams.get("userId"));if(!env.DB)return json({documents:[]});const r=await env.DB.prepare("SELECT id,name,created_at FROM documents WHERE user_id=? ORDER BY created_at DESC LIMIT 50").bind(userId).all();return json({documents:r.results||[]});
+  const rawUserId=url.searchParams.get("userId");if(!validUserId(rawUserId))return json({error:"Geçersiz kullanıcı kimliği."},400);const userId=safeId(rawUserId);if(!env.DB)return json({documents:[]});const r=await env.DB.prepare("SELECT id,name,created_at FROM documents WHERE user_id=? ORDER BY created_at DESC LIMIT 50").bind(userId).all();return json({documents:r.results||[]});
  }
  if(path.startsWith("/documents/")&&req.method==="DELETE"){
-  const id=path.split("/").pop(),userId=safeId(url.searchParams.get("userId"));try{const r=await env.DB.prepare("SELECT id FROM chunks WHERE user_id=? AND document_id=?").bind(userId,id).all();const ids=(r.results||[]).map(x=>x.id);if(ids.length)await env.VECTOR.deleteByIds(ids);await env.DB.prepare("DELETE FROM chunks WHERE user_id=? AND document_id=?").bind(userId,id).run();await env.DB.prepare("DELETE FROM documents WHERE user_id=? AND id=?").bind(userId,id).run();return json({ok:true})}catch(e){return json({error:e.message},500)}
+  const id=path.split("/").pop(),rawUserId=url.searchParams.get("userId");if(!validUserId(rawUserId))return json({error:"Geçersiz kullanıcı kimliği."},400);const userId=safeId(rawUserId);try{const r=await env.DB.prepare("SELECT id FROM chunks WHERE user_id=? AND document_id=?").bind(userId,id).all();const ids=(r.results||[]).map(x=>x.id);if(ids.length&&env.VECTOR)await env.VECTOR.deleteByIds(ids);await env.DB.prepare("DELETE FROM chunks WHERE user_id=? AND document_id=?").bind(userId,id).run();await env.DB.prepare("DELETE FROM documents WHERE user_id=? AND id=?").bind(userId,id).run();return json({ok:true})}catch(e){return json({error:e.message},500)}
  }
  if(path==="/metrics"&&req.method==="GET"){
   try{const r=await env.DB.prepare("SELECT kind,provider,ok,COUNT(*) AS count,ROUND(AVG(latency_ms)) AS avg_ms,MAX(created_at) AS last_seen FROM events WHERE created_at>=datetime('now','-7 days') GROUP BY kind,provider,ok ORDER BY count DESC LIMIT 30").all();const d=await env.DB.prepare("SELECT COUNT(*) AS documents FROM documents").first();return json({window:"7 days",groups:r.results||[],documents:d?.documents||0})}catch(e){return json({error:"Metrikler okunamadı: "+e.message},500)}
