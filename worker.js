@@ -4,13 +4,34 @@ const FALLBACK_MODELS=["@cf/openai/gpt-oss-120b"];
 const VISION_MODEL="@cf/qwen/qwen3.8-27b";
 const EMBED_MODEL="@cf/baai/bge-m3";
 const GEMINI_MODEL="gemini-flash-lite-latest";
-const CORS={"Access-Control-Allow-Origin":ALLOWED_ORIGIN,"Access-Control-Allow-Headers":"Accept, Content-Type, X-Linay-Admin","Access-Control-Allow-Methods":"GET, POST, DELETE, OPTIONS","Access-Control-Expose-Headers":"X-Linay-Provider, X-Linay-Search, X-Linay-Trace, X-Linay-Sources, X-Linay-Documents, X-Linay-Agent-Steps, X-Linay-Agent-Trace","Access-Control-Max-Age":"86400","Vary":"Origin"};
+const CORS={"Access-Control-Allow-Origin":ALLOWED_ORIGIN,"Access-Control-Allow-Headers":"Accept, Content-Type, X-Linay-Admin","Access-Control-Allow-Methods":"GET, POST, DELETE, OPTIONS","Access-Control-Expose-Headers":"X-Linay-Provider, X-Linay-Search, X-Linay-Trace, X-Linay-Sources, X-Linay-Documents, X-Linay-Agent-Steps, X-Linay-Agent-Trace, X-Linay-Memory-Candidate, X-Linay-Self-Audit","Access-Control-Max-Age":"86400","Vary":"Origin"};
 const json=(data,status=200,extra={})=>new Response(JSON.stringify(data),{status,headers:{...CORS,"Content-Type":"application/json",...extra}});
 const uid=()=>crypto.randomUUID();
 const safeId=x=>String(x||"").trim();
 const validUserId=x=>typeof x==="string"&&/^[a-zA-Z0-9_-]{8,80}$/.test(x);
 const lastUser=messages=>[...messages].reverse().find(m=>m.role==="user");
 const contentText=m=>typeof m?.content==="string"?m.content:(m?.content||[]).filter(p=>p.type==="text").map(p=>p.text||"").join("\n");
+function extractMemoryCandidate(messages){
+ const text=String(contentText(lastUser(messages))||"").replace(/\s+/g," ").trim();
+ if(!text||text.length>500)return null;
+ if(/\b(sağlık|saglik|hastalık|hastalik|ilaç|ilac|tedavi|teşhis|teshis|astım|astim|sigara|hamile|gebelik|dinim|mezhebim|oy ver|siyasi görüş|cinsel|seksüel|şifre|parola|kimlik numarası|tc kimlik)\b/i.test(text))return null;
+ const explicit=text.match(/(?:hatırla|aklında tut|unutma)\s*[:：,]?\s*(.{10,180})/i);
+ const preference=text.match(/(?:tercih ederim|tercihim|tercih ediyorum|istemiyorum|seviyorum|sevmiyorum|her zaman|bundan sonra|yanıtlarımı|cevaplarımı)\b.{0,150}/i);
+ const project=text.match(/(?:projem(?:in)? adı|projemizin adı|bu projede|projemiz|projem)\b.{0,150}/i);
+ const picked=explicit?.[1]||preference?.[0]||project?.[0];if(!picked)return null;
+ const candidate=picked.replace(/[.!?]+$/,"").trim().slice(0,180);if(candidate.length<10)return null;
+ return {text:candidate,reason:explicit?"Açık hafıza isteği":project?"Proje bilgisi":"Kalıcı tercih",status:"pending"};
+}
+function shouldSelfAudit(question){return /(?:\b(?:logic|logical|math|mathemat|calculate|calculation|code|coding|debug|date|timeline|compare|contradict|prove|proof|formula|equation)\b|mantık|matematik|hesap|kod|programla|hata ayıkla|tarih|kronoloji|çeliş|ispat|formül|denklem|kaç gün|kaç yıl|ne zaman)/i.test(String(question||""));}
+async function selfAudit(env,question,draft){
+ const answer=String(draft||"").trim();if(!answer||!shouldSelfAudit(question))return {answer,checked:false,corrected:false};
+ try{
+  const review=await runPlain(env,[{role:"system",content:"You are LinayAI final-answer verifier. Independently check contradictions, arithmetic, dates, units, code logic, and unsupported claims. Do not browse or invent sources. Return ONLY valid JSON: {\\"issues\\":[short Turkish issue strings],\\"correctedAnswer\\":\\"complete corrected answer in Turkish\\"}. If sound, issues=[] and correctedAnswer exactly equals the draft. If uncertainty cannot be resolved, state it explicitly. Preserve formatting."},{role:"user",content:"Question:\\n"+String(question||"").slice(0,1800)+"\\n\\nDraft answer:\\n"+answer.slice(0,9000)}],900);
+  const raw=modelText(review),match=raw.match(/\{[\s\S]*\}/);if(!match)return {answer,checked:false,corrected:false};
+  const parsed=JSON.parse(match[0]),corrected=typeof parsed.correctedAnswer==="string"&&parsed.correctedAnswer.trim()?parsed.correctedAnswer.trim():answer;
+  return {answer:corrected,checked:true,corrected:corrected!==answer,issues:Array.isArray(parsed.issues)?parsed.issues.slice(0,4):[]};
+ }catch(e){await log(env,"self-audit","Workers AI",false,0,String(e.message||e));return {answer,checked:false,corrected:false}}
+}
 async function log(env,kind,provider,ok,latency,detail=""){
  try{if(env.DB)await env.DB.prepare("INSERT INTO events(id,kind,provider,ok,latency_ms,detail) VALUES(?,?,?,?,?,?)").bind(uid(),kind,provider||"unknown",ok?1:0,Math.max(0,Math.round(latency||0)),String(detail).slice(0,350)).run()}catch(e){}
 }
@@ -205,10 +226,10 @@ async function loadMemory(env,userId){
  }catch(e){}
  return {memories,recent};
 }
-function sseFromText(text,provider,searchState,trace,sources=[],agentSteps=0,documents=[],agentTrace=[]){
+function sseFromText(text,provider,searchState,trace,sources=[],agentSteps=0,documents=[],agentTrace=[],memoryCandidate=null,auditChecked=false){
  const enc=new TextEncoder();const chunks=[];for(let i=0;i<text.length;i+=90)chunks.push(text.slice(i,i+90));
  const stream=new ReadableStream({start(c){for(const t of chunks)c.enqueue(enc.encode("data: "+JSON.stringify({choices:[{delta:{content:t},index:0}]})+"\n\n"));c.enqueue(enc.encode("data: [DONE]\n\n"));c.close()}});
- return new Response(stream,{headers:{...CORS,"Content-Type":"text/event-stream; charset=utf-8","Cache-Control":"no-cache","X-Linay-Provider":provider,"X-Linay-Search":searchState,"X-Linay-Trace":trace,"X-Linay-Sources":encodeURIComponent(JSON.stringify(sources.slice(0,7))),"X-Linay-Documents":encodeURIComponent(JSON.stringify(documents.slice(0,5))),"X-Linay-Agent-Steps":String(agentSteps),"X-Linay-Agent-Trace":encodeURIComponent(JSON.stringify(agentTrace.slice(0,8)))}});
+ return new Response(stream,{headers:{...CORS,"Content-Type":"text/event-stream; charset=utf-8","Cache-Control":"no-cache","X-Linay-Provider":provider,"X-Linay-Search":searchState,"X-Linay-Trace":trace,"X-Linay-Sources":encodeURIComponent(JSON.stringify(sources.slice(0,7))),"X-Linay-Documents":encodeURIComponent(JSON.stringify(documents.slice(0,5))),"X-Linay-Agent-Steps":String(agentSteps),"X-Linay-Agent-Trace":encodeURIComponent(JSON.stringify(agentTrace.slice(0,8))),"X-Linay-Memory-Candidate":encodeURIComponent(JSON.stringify(memoryCandidate||null)),"X-Linay-Self-Audit":auditChecked?"checked":"not-needed"}});
 }
 async function callModel(env,messages,vision=false){
  const models=vision?[VISION_MODEL]:[MODEL,...FALLBACK_MODELS];let last;
@@ -288,12 +309,13 @@ async function agentRun(env,userId,messages,projectId=null,onProgress=()=>{}){
  }
  const context=[{role:"system",content:messages.filter(m=>m.role==="system").map(m=>contentText(m)).join("\n")+"\n\nAraç gözlemleri (yalnızca bunlara dayan): "+JSON.stringify(observations).slice(0,12000)+"\nTarihleri, rakamları ve aynı iddiaya ilişkin kaynakları karşılaştır. Çelişen değerleri ve kaynaklarını açıkça yaz; eksik veya bağımsız doğrulaması olmayan bilgiyi belirt. Yayın tarihi ile olay tarihini ayır. Araç başarısızsa bunu belirt. Kaynak, skor veya istatistik uydurma."},...messages.filter(m=>m.role!=="system")];
  const out=await runPlain(env,context,1800);
- return {answer:modelText(out)||"Ajan yanıt üretemedi.",steps,observations,model:out.__linayModel||MODEL};
+ const audit=await selfAudit(env,requestText,modelText(out)||"Ajan yanıt üretemedi.");
+ return {answer:audit.answer,steps,observations,model:out.__linayModel||MODEL,audit};
 }
 async function handleChat(req,env,ctx){
  const body=await req.json(),messages=Array.isArray(body.messages)?body.messages:[];if(!messages.length)return json({error:"Mesaj bulunamadı"},400);
  if(!validUserId(body.userId))return json({error:"Geçersiz kullanıcı kimliği."},400);
- const userId=safeId(body.userId),projectId=typeof body.projectId==="string"&&/^[a-zA-Z0-9_-]{1,100}$/.test(body.projectId)?body.projectId:null,start=Date.now(),last=lastUser(messages),question=contentText(last).slice(0,1200),searchQuery=searchQueryFromMessages(messages);
+ const userId=safeId(body.userId),projectId=typeof body.projectId==="string"&&/^[a-zA-Z0-9_-]{1,100}$/.test(body.projectId)?body.projectId:null,start=Date.now(),last=lastUser(messages),question=contentText(last).slice(0,1200),searchQuery=searchQueryFromMessages(messages),memoryCandidate=extractMemoryCandidate(messages);
  let searchState="off",searchContext="",searchProvider="",searchSources=[];
  if(body.search===true){
   try{const sr=await searchWeb(searchQuery||question,env);searchProvider=sr.provider;searchSources=sr.results;searchState="success";searchContext="\n\nWEB SEARCH RESULTS — Use these results, compare dates and sources, cite each factual paragraph with [n]. Do not claim you opened pages unless you did.\n"+sr.results.map((x,i)=>"["+ (i+1)+"] "+x.title+"\nURL: "+x.url+"\nSnippet: "+x.snippet).join("\n\n")}
@@ -319,23 +341,29 @@ async function handleChat(req,env,ctx){
    ctx.waitUntil((async()=>{await log(env,"agent","Workers AI",true,Date.now()-start,"steps="+a.steps);if(question)await env.DB?.prepare("INSERT INTO conversations(id,user_id,role,content) VALUES(?,?,?,?)").bind(uid(),userId,"user",question).run();if(answer)await env.DB?.prepare("INSERT INTO conversations(id,user_id,role,content) VALUES(?,?,?,?)").bind(uid(),userId,"assistant",answer.slice(0,6000)).run()})());
    const agentDocs=(a.observations||[]).filter(x=>x.tool==="knowledge_search").flatMap(x=>x.results||[]).map(x=>({documentId:x.document_id,chunkId:x.chunk_id||x.id,title:x.name||"Belge",projectId:x.project_id||null,excerpt:String(x.content||"").replace(/\s+/g," ").slice(0,220)}));
    const agentTrace=(a.observations||[]).map(x=>({tool:x.tool,label:({search_web:"Web araması",read_url:"Bağlantı okuma",calculator:"Hesaplama",current_time:"Güncel saat",knowledge_search:"Proje / belge araması"})[x.tool]||"Araç",status:x.error?"failed":"done",detail:x.error?String(x.error).slice(0,120):""}));
-   emit({meta:{sources:searchSources,documents:agentDocs,steps:a.steps,trace:agentTrace}});
+   emit({meta:{sources:searchSources,documents:agentDocs,steps:a.steps,trace:agentTrace,memoryCandidate,audit:a.audit||{checked:false}}});
    for(let i=0;i<answer.length;i+=90)emit({choices:[{delta:{content:answer.slice(i,i+90)},index:0}]});
    emit("[DONE]");streamController.close();
   }catch(e){await log(env,"agent","Workers AI",false,Date.now()-start,e.message);emit({error:{message:"Ajan görevi tamamlayamadı: "+String(e.message||e)}});emit("[DONE]");try{streamController.close()}catch(x){}}})();
-  return new Response(stream,{headers:{...CORS,"Content-Type":"text/event-stream; charset=utf-8","Cache-Control":"no-cache","X-Linay-Provider":"Workers AI Agent","X-Linay-Search":searchState,"X-Linay-Trace":uid(),"X-Linay-Sources":"%5B%5D","X-Linay-Documents":"%5B%5D","X-Linay-Agent-Steps":"0","X-Linay-Agent-Trace":"%5B%5D"}});
+  return new Response(stream,{headers:{...CORS,"Content-Type":"text/event-stream; charset=utf-8","Cache-Control":"no-cache","X-Linay-Provider":"Workers AI Agent","X-Linay-Search":searchState,"X-Linay-Trace":uid(),"X-Linay-Sources":"%5B%5D","X-Linay-Documents":"%5B%5D","X-Linay-Agent-Steps":"0","X-Linay-Agent-Trace":"%5B%5D","X-Linay-Memory-Candidate":encodeURIComponent(JSON.stringify(memoryCandidate||null)),"X-Linay-Self-Audit":"not-needed"}});
  }
  const vision=messages.some(m=>Array.isArray(m.content)&&m.content.some(p=>p.type==="image_url"));
  try{
   if(body.search===true&&!vision){
-   const plain=await runPlain(env,enriched,1800),answer=modelText(plain);
-   if(!answer)throw new Error("Arama sonuçları geldi ancak model boş yanıt üretti.");
-   await log(env,"web-chat",plain.__linayModel||MODEL,true,Date.now()-start,searchProvider||searchState);
-   return sseFromText(answer,String(plain.__linayModel||"").startsWith("Gemini Backup")?plain.__linayModel:"Workers AI · "+(plain.__linayModel||MODEL),searchState,uid(),searchSources,0,documentSources);
+   const plain=await runPlain(env,enriched,1800),draft=modelText(plain);
+   if(!draft)throw new Error("Arama sonuçları geldi ancak model boş yanıt üretti.");
+   const audit=await selfAudit(env,question,draft);
+   await log(env,"web-chat",plain.__linayModel||MODEL,true,Date.now()-start,searchProvider||searchState+(audit.checked?"; self-audit":""));
+   return sseFromText(audit.answer,String(plain.__linayModel||"").startsWith("Gemini Backup")?plain.__linayModel:"Workers AI · "+(plain.__linayModel||MODEL),searchState,uid(),searchSources,0,documentSources,[],memoryCandidate,audit.checked);
+  }
+  if(!vision&&shouldSelfAudit(question)){
+   const plain=await runPlain(env,enriched,1800),draft=modelText(plain);if(!draft)throw new Error("Model boş yanıt döndürdü.");
+   const audit=await selfAudit(env,question,draft);ctx.waitUntil(log(env,"chat",plain.__linayModel||MODEL,true,Date.now()-start,audit.checked?"self-audit":"self-audit-unavailable"));
+   return sseFromText(audit.answer,plain.__linayModel||MODEL,searchState,uid(),searchSources,0,documentSources,[],memoryCandidate,audit.checked);
   }
   const result=await callModel(env,enriched,vision);
   const trace=uid();
-  if(result.text){const answer=result.text+(body.search===true&&result.sources?.length?"\n\nSources: "+result.sources.map(x=>x.title+" — "+x.uri).join(" | "):"");ctx.waitUntil(log(env,"chat",result.provider,true,Date.now()-start,"backup"));return sseFromText(answer,result.provider,searchState,uid(),searchSources,0,documentSources)}
+  if(result.text){const draft=result.text+(body.search===true&&result.sources?.length?"\n\nSources: "+result.sources.map(x=>x.title+" — "+x.uri).join(" | "):"");const audit=vision?{answer:draft,checked:false}:await selfAudit(env,question,draft);ctx.waitUntil(log(env,"chat",result.provider,true,Date.now()-start,"backup"));return sseFromText(audit.answer,result.provider,searchState,uid(),searchSources,0,documentSources,[],memoryCandidate,audit.checked)}
   const stream=result.stream;
   const pair=stream.tee();
   ctx.waitUntil((async()=>{try{
