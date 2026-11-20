@@ -59,7 +59,7 @@ const saved=await get("/memory?userId="+encodeURIComponent(USER));
 assert.equal(saved.body.content,memoryText,"Persistent memory round-trip failed");
 console.log("PASS persistent memory");
 
-const memoryProposal=await chat("Please remember: I prefer concise Turkish answers.");
+const memoryProposal=await chat("Lütfen hatırla: Türkçe kısa cevapları tercih ederim.");
 assert.ok(memoryProposal.memoryCandidate?.text,"No explicit memory suggestion returned");
 const stillUnchanged=await get("/memory?userId="+encodeURIComponent(USER));
 assert.equal(stillUnchanged.body.content,memoryText,"A memory suggestion was saved without user approval");
