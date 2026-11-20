@@ -413,10 +413,31 @@ export default {async fetch(req,env,ctx){
   }
  }
  if(path==="/image"&&req.method==="POST"){
-  if(!env.AI)return json({error:"Workers AI bağlantısı yok"},500);let prompt="";try{prompt=String((await req.json()).prompt||"").slice(0,1800)}catch{}if(!prompt)prompt="A beautiful landscape";const errs=[];
-  try{const r=await env.AI.run("@cf/black-forest-labs/flux-1-schnell",{prompt,steps:4});if(r?.image)return json({image:r.image});errs.push("flux: görsel dönmedi")}catch(e){errs.push("flux: "+(e.message||e))}
-  try{const r=await env.AI.run("@cf/bytedance/stable-diffusion-xl-lightning",{prompt});const buf=await new Response(r).arrayBuffer();if(buf.byteLength>1000){let s="";const a=new Uint8Array(buf);for(let i=0;i<a.length;i+=0x8000)s+=String.fromCharCode(...a.subarray(i,i+0x8000));return json({image:btoa(s),type:"image/png"})}errs.push("sdxl: boş yanıt")}catch(e){errs.push("sdxl: "+(e.message||e))}
-  return json({error:errs.join(" | ")},500);
+  let body={};try{body=await req.json()}catch{return json({error:"Geçersiz istek gövdesi."},400)}
+  const prompt=String(body.prompt||"").trim().slice(0,3000);
+  const image=body.image&&typeof body.image.data==="string"?body.image:null;
+  const ratio=["1:1","16:9","9:16"].includes(body.ratio)?body.ratio:"1:1";
+  const style=["photo","cinematic","illustration","logo"].includes(body.style)?body.style:"photo";
+  if(!prompt)return json({error:"Görsel açıklaması boş olamaz."},400);
+  if(image&&(!/^image\/(jpeg|png|webp)$/.test(String(image.mimeType||""))||image.data.length>12000000))return json({error:"Düzenleme için JPEG, PNG veya WebP görseli (en fazla 9 MB) gerekli."},400);
+  const styleText={photo:"natural photorealistic photography, realistic materials and lighting",cinematic:"cinematic composition, expressive film lighting and refined color grading",illustration:"high-quality editorial illustration, coherent shapes and polished detail",logo:"minimal professional logo design, clean vector-like geometry"}[style];
+  const editGuard=image?"EDIT THE PROVIDED IMAGE. Preserve the original subject identity, facial features, age, body, pose, clothing and scene unless explicitly asked to change them. Make only requested edits; do not replace the subject or create an unrelated image. ":"";
+  const fullPrompt=editGuard+"User request: "+prompt+". Style: "+styleText+". Aspect ratio: "+ratio+". Interpret Turkish naturally; preserve named details and scene constraints. Output the resulting image.";
+  const errs=[];
+  if(env.GEMINI_API_KEY){try{
+   const parts=[{text:fullPrompt}];if(image)parts.push({inlineData:{mimeType:image.mimeType,data:image.data}});
+   const r=await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent",{method:"POST",headers:{"Content-Type":"application/json","x-goog-api-key":env.GEMINI_API_KEY},body:JSON.stringify({contents:[{role:"user",parts}],generationConfig:{responseModalities:["IMAGE","TEXT"]}}),signal:AbortSignal.timeout(110000)});
+   if(!r.ok)throw new Error("Gemini image "+r.status+": "+(await r.text()).slice(0,300));
+   const j=await r.json();const out=(j.candidates?.[0]?.content?.parts||[]).find(p=>p.inlineData?.data||p.inline_data?.data);
+   const data=out?.inlineData?.data||out?.inline_data?.data;const mime=out?.inlineData?.mimeType||out?.inline_data?.mime_type||"image/png";
+   if(data)return json({image:data,type:mime,provider:"Gemini",edited:!!image});throw new Error("Gemini yanıtında görsel verisi bulunamadı.");
+  }catch(e){errs.push(String(e.message||e))}}else errs.push("GEMINI_API_KEY tanımlı değil.");
+  // Workers AI text-to-image fallback cannot perform faithful image editing.
+  if(!image&&env.AI){
+   try{const r=await env.AI.run("@cf/black-forest-labs/flux-1-schnell",{prompt:fullPrompt,steps:4});if(r?.image)return json({image:r.image,type:"image/jpeg",provider:"Workers AI"});throw new Error("Flux görsel döndürmedi.")}catch(e){errs.push("Flux: "+(e.message||e))}
+   try{const r=await env.AI.run("@cf/bytedance/stable-diffusion-xl-lightning",{prompt:fullPrompt});const buf=await new Response(r).arrayBuffer();if(buf.byteLength>1000){let binary="";const bytes=new Uint8Array(buf);for(let i=0;i<bytes.length;i+=0x8000)binary+=String.fromCharCode(...bytes.subarray(i,i+0x8000));return json({image:btoa(binary),type:"image/png",provider:"Workers AI"})}throw new Error("SDXL boş yanıt döndürdü.")}catch(e){errs.push("SDXL: "+(e.message||e))}
+  }
+  return json({error:(image?"Görsel düzenleme başarısız; orijinal görsel korunarak işlem yapılamadı. ":"Görsel üretilemedi. ")+errs.join(" | ")},503);
  }
  return new Response("Linay API",{status:404,headers:CORS});
 }};
