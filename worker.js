@@ -288,13 +288,13 @@ async function handleChat(req,env,ctx){
  if(body.agent===true){
   const enc=new TextEncoder();let streamController;
   const stream=new ReadableStream({start(controller){streamController=controller}});
-  const emit=value=>{try{streamController.enqueue(enc.encode("data: "+JSON.stringify(value)+"\\n\\n"))}catch(e){}};
+  const emit=value=>{try{streamController.enqueue(enc.encode("data: "+JSON.stringify(value)+"\n\n"))}catch(e){}};
   (async()=>{try{
    emit({progress:{label:"Görev planlanıyor",status:"started"}});
    const a=await agentRun(env,userId,enriched,projectId,event=>emit({progress:event}));
-   const answer=a.answer+(searchSources.length?"\\n\\nKaynaklar:\\n"+searchSources.map((x,i)=>"["+ (i+1)+"] ["+x.title+"]("+x.url+")").join("\\n"):"");
+   const answer=a.answer+(searchSources.length?"\n\nKaynaklar:\n"+searchSources.map((x,i)=>"["+ (i+1)+"] ["+x.title+"]("+x.url+")").join("\n"):"");
    ctx.waitUntil((async()=>{await log(env,"agent","Workers AI",true,Date.now()-start,"steps="+a.steps);if(question)await env.DB?.prepare("INSERT INTO conversations(id,user_id,role,content) VALUES(?,?,?,?)").bind(uid(),userId,"user",question).run();if(answer)await env.DB?.prepare("INSERT INTO conversations(id,user_id,role,content) VALUES(?,?,?,?)").bind(uid(),userId,"assistant",answer.slice(0,6000)).run()})());
-   const agentDocs=(a.observations||[]).filter(x=>x.tool==="knowledge_search").flatMap(x=>x.results||[]).map(x=>({documentId:x.document_id,chunkId:x.chunk_id||x.id,title:x.name||"Belge",projectId:x.project_id||null,excerpt:String(x.content||"").replace(/\\s+/g," ").slice(0,220)}));
+   const agentDocs=(a.observations||[]).filter(x=>x.tool==="knowledge_search").flatMap(x=>x.results||[]).map(x=>({documentId:x.document_id,chunkId:x.chunk_id||x.id,title:x.name||"Belge",projectId:x.project_id||null,excerpt:String(x.content||"").replace(/\s+/g," ").slice(0,220)}));
    const agentTrace=(a.observations||[]).map(x=>({tool:x.tool,label:({search_web:"İnternette arama yapıldı",read_url:"Verilen bağlantı okundu",calculator:"Hesaplama aracı çalıştırıldı",current_time:"Güncel saat bilgisi alındı",knowledge_search:"Proje / belge hafızasında arama yapıldı"})[x.tool]||"Araç çalıştırıldı"}));
    emit({meta:{sources:searchSources,documents:agentDocs,steps:a.steps,trace:agentTrace}});
    for(let i=0;i<answer.length;i+=90)emit({choices:[{delta:{content:answer.slice(i,i+90)},index:0}]});
