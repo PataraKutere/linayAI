@@ -341,7 +341,7 @@ async function agentRun(env,userId,messages,projectId=null,onProgress=()=>{},sea
 async function handleChat(req,env,ctx){
  const body=await req.json(),messages=Array.isArray(body.messages)?body.messages:[];if(!messages.length)return json({error:"Mesaj bulunamadı"},400);
  if(!validUserId(body.userId))return json({error:"Geçersiz kullanıcı kimliği."},400);
- const userId=safeId(body.userId),projectId=typeof body.projectId==="string"&&/^[a-zA-Z0-9_-]{1,100}$/.test(body.projectId)?body.projectId:null,start=Date.now(),last=lastUser(messages),question=contentText(last).slice(0,1200),searchQuery=searchQueryFromMessages(messages),memoryCandidate=extractMemoryCandidate(messages) ,searchRequested=body.search===true||shouldSearchMessages(messages);
+ const userId=safeId(body.userId),projectId=typeof body.projectId==="string"&&/^[a-zA-Z0-9_-]{1,100}$/.test(body.projectId)?body.projectId:null,start=Date.now(),last=lastUser(messages),question=contentText(last).slice(0,1200),searchQuery=searchQueryFromMessages(messages),memoryCandidate=extractMemoryCandidate(messages),simpleCalculation=/\d[\d.,]*\s*(?:[+×x*÷/\-]|çarpı|çarp|topla|bölü|eksi|artı)\s*\d[\d.,]*/i.test(question)&&!/(internetten|webde|web\x27de|araştır|güncel|bugün|şu an|kaynak)/i.test(question),searchRequested=!simpleCalculation&&(body.search===true||shouldSearchMessages(messages));
  let searchState="off",searchContext="",searchProvider="",searchSources=[];
  if(searchRequested){
   try{const sr=await searchWeb(searchQuery||question,env);searchProvider=sr.provider;searchSources=sr.results;searchState="success";searchContext="\n\nWEB SEARCH RESULTS — Use these results, compare dates and sources, cite each factual paragraph with [n]. Do not claim you opened pages unless you did.\n"+sr.results.map((x,i)=>"["+ (i+1)+"] "+x.title+"\nURL: "+x.url+"\nSnippet: "+x.snippet).join("\n\n")}
@@ -496,7 +496,7 @@ export default {async fetch(req,env,ctx){
     let payload={};try{payload=JSON.parse(raw)}catch{}
     if(!response.ok){
      const apiMessage=payload.error?.message||raw.slice(0,700)||"Açıklama içermeyen API hatası";
-     return {error:"Gemini API HTTP "+response.status+" ("+model+", "+apiVersion+"): "+apiMessage,status:response.status===429?429:502,retry:[429,500,502,503,504].includes(response.status),modalityRejected:response.status===400&&/modalit/i.test(apiMessage)};
+     return {error:"Gemini API HTTP "+response.status+" ("+model+", "+apiVersion+"): "+apiMessage,status:response.status===429?429:502,retry:response.status!==429&&[500,502,503,504].includes(response.status),modalityRejected:response.status===400&&/modalit/i.test(apiMessage)};
     }
     const candidate=payload.candidates?.[0];
     const partsOut=candidate?.content?.parts||[];
@@ -526,6 +526,21 @@ export default {async fetch(req,env,ctx){
    }
    const detail=outcome.error+(retried?" (yeniden deneme yapıldı)":"");
    await log(env,"image-generation","Gemini "+model,false,Date.now()-started,detail);
+   // A free-tier Gemini 429 must not block new image generation: switch to FLUX.
+   // Do not use a generation-only fallback for edits, because it cannot preserve the source image.
+   if(outcome.status===429&&!image&&env.AI){
+    const fallbackModel="@cf/black-forest-labs/flux-1-schnell";
+    try{
+     const result=await env.AI.run(fallbackModel,{prompt:fullPrompt,steps:4});
+     if(!result?.image)throw new Error("Model görsel verisi döndürmedi.");
+     await log(env,"image-generation","Workers AI "+fallbackModel,true,Date.now()-started,"Gemini 429 kotası nedeniyle otomatik yedek kullanıldı.");
+     return json({image:result.image,type:"image/jpeg",provider:"Workers AI",model:fallbackModel,apiVersion:"Cloudflare Workers AI",edited:false,fallbackReason:"Gemini API ücretsiz kota sınırı (HTTP 429)",ratio,style});
+    }catch(e){
+     const fallbackError="Gemini kotası dolu; FLUX yedek modeli de başarısız: "+String(e?.message||e);
+     await log(env,"image-generation","Workers AI "+fallbackModel,false,Date.now()-started,fallbackError);
+     return json({error:fallbackError,provider:"Workers AI",model:fallbackModel,apiVersion:"Cloudflare Workers AI",fallbackReason:"Gemini API HTTP 429"},503);
+    }
+   }
    return json({error:detail,provider:"Gemini",model,apiVersion,edited:!!image},outcome.status||502);
   }
   // Fallback is allowed only when Gemini is not configured, never after a Gemini API failure.
