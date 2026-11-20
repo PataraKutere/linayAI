@@ -1,5 +1,5 @@
 // Linay service worker: önce internet, olmazsa önbellek.
-// Eski önbelleği zorla temizlemek istersen V değerini değiştir (linay-v4 gibi).
+// Eski önbelleği zorla temizlemek istersen V değerini değiştir (linay-v5 gibi).
 const V='linay-v29';
 let upgrade=false;
 self.addEventListener('install',e=>{upgrade=!!self.registration.active;e.waitUntil(self.skipWaiting())});
