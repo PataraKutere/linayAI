@@ -38,10 +38,23 @@ async function log(env,kind,provider,ok,latency,detail=""){
 function decodeHtml(s){return String(s||"").replace(/&amp;/g,"&").replace(/&quot;/g,'"').replace(/&#39;|&apos;/g,"'").replace(/&lt;/g,"<").replace(/&gt;/g,">").replace(/&#x([0-9a-f]+);/gi,(_,x)=>String.fromCharCode(parseInt(x,16))).replace(/&#(\d+);/g,(_,x)=>String.fromCharCode(+x));}
 function cleanHtml(s){return decodeHtml(String(s||"").replace(/<script[\s\S]*?<\/script>/gi," ").replace(/<style[\s\S]*?<\/style>/gi," ").replace(/<[^>]+>/g," ").replace(/\s+/g," ").trim()).slice(0,1800)}
 function safeUrl(raw){try{const u=new URL(raw);if(!["http:","https:"].includes(u.protocol)||/^(localhost|127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|169\.254\.|0\.|100\.(6[4-9]|[7-9]\d)\.|\[::1\]|\[f[cd][0-9a-f:]*\]|\[fe80:)/i.test(u.hostname))return null;return u}catch{return null}}
+function isSearchCommand(value){
+ return /^(?:ara|ara lütfen|ara lutfen|internetten ara|web'de ara|webde ara|araştır|arastir|bul|kontrol et)[.!?\s]*$/i.test(String(value||"").trim());
+}
+function needsLiveSearch(value){
+ const q=String(value||"").toLocaleLowerCase("tr-TR");
+ if(/(?:internetten|web(?:'de|de)?|google(?:'da|da)?)\s+ara|araştır|araştırma yap|kaynak(?:ları)?\s+(?:bul|göster|ver)|internetten kontrol et|güncel kaynak/i.test(q))return true;
+ const freshness=/(güncel|bugün|dün|yarın|şu an|şimdi|canlı|son durum|son dakika|en son|latest|live|today|tonight|current)/i.test(q);
+ const sports=/(spor|futbol|basketbol|voleybol|tenis|maç|skor|puan durumu|fikstür|transfer|kadro|şampiyon|lig|takım|oyuncu)/i.test(q);
+ return freshness||(sports&&/(maç|skor|puan durumu|fikstür|transfer|kadro|sonuç|oynan|canlı|bugün|şu an|güncel|ne zaman)/i.test(q));
+}
 function searchQueryFromMessages(messages){
- const users=(messages||[]).filter(m=>m.role==="user").map(m=>contentText(m).trim()).filter(Boolean).slice(-5);
+ const users=(messages||[]).filter(m=>m.role==="user").map(m=>contentText(m).trim()).filter(Boolean).slice(-6);
  if(!users.length)return "";
- const combined=users.join(" ");
+ const commandOnly=isSearchCommand(users[users.length-1]);
+ const usable=commandOnly?users.slice(0,-1):users;
+ const combined=usable.join(" ").replace(/\b(?:internetten|web(?:'de|de)?)\s+ara\b/ig," ").replace(/\b(?:araştır|araştırma yap|güncel kaynakları? bul)\b/ig," ").replace(/\s+/g," ").trim();
+ if(!combined)return "";
  const football=/(fransa|france)/i.test(combined)&&/(türkiye|turkiye|turkey)/i.test(combined)&&/(maç|mac|score|kaç kaç|skor|football|futbol)/i.test(combined);
  if(football){
   const date=combined.match(/(\d{1,2}\s+(?:ocak|şubat|subat|mart|nisan|mayıs|mayis|haziran|temmuz|ağustos|agustos|eylül|eylul|ekim|kasım|kasim|aralık|aralik)(?:\s+\d{4})?)/i)?.[1]||"";
@@ -49,8 +62,15 @@ function searchQueryFromMessages(messages){
   const englishDate=date.replace(/ocak/ig,"January").replace(/şubat|subat/ig,"February").replace(/mart/ig,"March").replace(/nisan/ig,"April").replace(/mayıs|mayis/ig,"May").replace(/haziran/ig,"June").replace(/temmuz/ig,"July").replace(/ağustos|agustos/ig,"August").replace(/eylül|eylul/ig,"September").replace(/ekim/ig,"October").replace(/kasım|kasim/ig,"November").replace(/aralık|aralik/ig,"December");
   return ("France Türkiye football match "+englishDate+" "+year+" final score result").trim();
  }
- const last=users[users.length-1];
- return users.length>1&&last.length<90?users.slice(-3).join(" "):combined.slice(-450);
+ return combined.slice(-450);
+}
+function shouldSearchMessages(messages){
+ const question=contentText(lastUser(messages)).trim();
+ if(needsLiveSearch(question))return true;
+ if(!isSearchCommand(question))return false;
+ const prior=(messages||[]).filter(m=>m.role==="user").slice(0,-1).map(contentText).join(" ");
+ const assistantContext=(messages||[]).filter(m=>m.role==="assistant").slice(-2).map(contentText).join(" ");
+ return needsLiveSearch(prior)||/(ara|arama|web|güncel|kaynak|internet)/i.test(assistantContext);
 }
 function searchNorm(value){return String(value||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLocaleLowerCase("en").replace(/ı/g,"i").replace(/[^a-z0-9]+/g," ").trim()}
 function relevantResults(query,results){
@@ -279,7 +299,7 @@ function modelText(value){
  for(const c of candidates){if(typeof c==="string"&&c.trim())return c;if(Array.isArray(c)){const t=c.map(x=>typeof x==="string"?x:(x?.text||x?.content||"")).join("").trim();if(t)return t}}
  return "";
 }
-async function agentRun(env,userId,messages,projectId=null,onProgress=()=>{}){
+async function agentRun(env,userId,messages,projectId=null,onProgress=()=>{},searchAlreadyDone=false){
  const tools=["search_web","read_url","calculator","current_time","knowledge_search"];
  let observations=[],steps=0;
  const requestText=contentText(lastUser(messages));onProgress({label:"İsteğin kapsamı belirleniyor",status:"started"});
@@ -287,7 +307,7 @@ async function agentRun(env,userId,messages,projectId=null,onProgress=()=>{}){
  if(mult&&/calculator|calculate|multiply|çarp|hesap/i.test(requestText)){onProgress({tool:"calculator",label:"Hesaplama yapılıyor",status:"started"});const expression=mult[1].replace(",",".")+"*"+mult[2].replace(",","." );observations.push({tool:"calculator",expression,result:calc(expression)});onProgress({tool:"calculator",label:"Hesaplama tamamlandı",status:"done"});steps++}
  else if(/what time|current time|saat kaç|şu an saat/i.test(requestText)){onProgress({tool:"current_time",label:"Güncel saat bilgisi alınıyor",status:"started"});observations.push({tool:"current_time",...{time:new Intl.DateTimeFormat("tr-TR",{timeZone:"Europe/Istanbul",dateStyle:"full",timeStyle:"long"}).format(new Date()),timezone:"Europe/Istanbul"}});onProgress({tool:"current_time",label:"Saat bilgisi alındı",status:"done"});steps++}
  else if(/https?:\/\//i.test(requestText)&&/read|open|summarize|özet|incele|oku/i.test(requestText)){const url=requestText.match(/https?:\/\/[^\s)]+/i)?.[0];onProgress({tool:"read_url",label:"Bağlantı okunuyor",status:"started"});try{if(url)observations.push({tool:"read_url",...await readPage(url)})}catch(e){observations.push({tool:"read_url",error:String(e.message||e)})}onProgress({tool:"read_url",label:"Bağlantı okundu",status:"done"});steps++}
- else if(/research|search|look up|araştır|güncel|latest|news/i.test(requestText)){onProgress({tool:"search_web",label:"Web’de arama yapılıyor",status:"started"});try{const result=await searchWeb(requestText,env);observations.push({tool:"search_web",...result})}catch(e){observations.push({tool:"search_web",error:String(e.message||e)})}onProgress({tool:"search_web",label:"Web araması tamamlandı",status:"done"});steps++}
+ else if(!searchAlreadyDone&&(/research|search|look up|araştır|güncel|latest|news/i.test(requestText)||isSearchCommand(requestText))){onProgress({tool:"search_web",label:"Web’de arama yapılıyor",status:"started"});try{const result=await searchWeb(searchQueryFromMessages(messages)||requestText,env);observations.push({tool:"search_web",...result})}catch(e){observations.push({tool:"search_web",error:String(e.message||e)})}onProgress({tool:"search_web",label:"Web araması tamamlandı",status:"done"});steps++}
  else if(/belge|document|dosya|file/i.test(requestText)){onProgress({tool:"knowledge_search",label:"Proje ve belge hafızası aranıyor",status:"started"});observations.push({tool:"knowledge_search",results:await ragSearch(env,userId,requestText,projectId)});onProgress({tool:"knowledge_search",label:"Belge araması tamamlandı",status:"done"});steps++}
  for(;steps<4;steps++){
   const planner=[{role:"system",content:messages.filter(m=>m.role==="system").map(m=>contentText(m)).join("\n")+"\n\nSen Linay araç kullanan ajansın. Araç bulgularını birleştirirken tarihleri, sayıları ve kaynak iddialarını karşılaştır. Aynı olgu için çelişki varsa iki değeri kaynaklarıyla belirt; eksik doğrulama varsa açıkça söyle. Yayın tarihi ile olay tarihini karıştırma. Kaynak, skor veya sayı uydurma. Gerekiyorsa tam olarak tek JSON nesnesi üret: {\"tool\":\"search_web|read_url|calculator|current_time|knowledge_search|final\",\"args\":{\"query\":\"...\",\"url\":\"...\",\"expression\":\"...\"},\"answer\":\"...\"}. Araçları gerektiğinde kullan. Kullanıcı açıkça bir araç istediyse MUTLAKA çalıştır. Matematik işlemi varsa calculator kullan; güncel araştırma isteniyorsa search_web kullan; URL verilmişse read_url kullan; saat soruluyorsa current_time kullan; kullanıcı belgesi soruluyorsa knowledge_search kullan. En fazla dört araç adımı. Kaynakları uydurma. Sonuca ulaştıysan tool=final ile cevap ver. Gözlemler: "+JSON.stringify(observations).slice(0,10000)},...messages.filter(m=>m.role!=="system")];
@@ -315,9 +335,9 @@ async function agentRun(env,userId,messages,projectId=null,onProgress=()=>{}){
 async function handleChat(req,env,ctx){
  const body=await req.json(),messages=Array.isArray(body.messages)?body.messages:[];if(!messages.length)return json({error:"Mesaj bulunamadı"},400);
  if(!validUserId(body.userId))return json({error:"Geçersiz kullanıcı kimliği."},400);
- const userId=safeId(body.userId),projectId=typeof body.projectId==="string"&&/^[a-zA-Z0-9_-]{1,100}$/.test(body.projectId)?body.projectId:null,start=Date.now(),last=lastUser(messages),question=contentText(last).slice(0,1200),searchQuery=searchQueryFromMessages(messages),memoryCandidate=extractMemoryCandidate(messages);
+ const userId=safeId(body.userId),projectId=typeof body.projectId==="string"&&/^[a-zA-Z0-9_-]{1,100}$/.test(body.projectId)?body.projectId:null,start=Date.now(),last=lastUser(messages),question=contentText(last).slice(0,1200),searchQuery=searchQueryFromMessages(messages),memoryCandidate=extractMemoryCandidate(messages) ,searchRequested=body.search===true||shouldSearchMessages(messages);
  let searchState="off",searchContext="",searchProvider="",searchSources=[];
- if(body.search===true){
+ if(searchRequested){
   try{const sr=await searchWeb(searchQuery||question,env);searchProvider=sr.provider;searchSources=sr.results;searchState="success";searchContext="\n\nWEB SEARCH RESULTS — Use these results, compare dates and sources, cite each factual paragraph with [n]. Do not claim you opened pages unless you did.\n"+sr.results.map((x,i)=>"["+ (i+1)+"] "+x.title+"\nURL: "+x.url+"\nSnippet: "+x.snippet).join("\n\n")}
   catch(e){try{if(env.GEMINI_API_KEY){const searchSystem={role:"system",content:"Current date: "+new Intl.DateTimeFormat("en-CA",{timeZone:"Europe/Istanbul",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date())+" (Europe/Istanbul). Resolve short follow-up messages using the earlier conversation. Search the exact teams and date for sports scores. Prefer official football federations, UEFA, or reputable live-score providers. Never invent a score or claim a past event is in the future. Cite the exact result and its source."};const g=await gemini(env,[searchSystem,...messages.filter(m=>m.role!=="system")],true);const groundedSources=(g.sources||[]).map(x=>({title:x.title||"Kaynak",url:x.uri,snippet:"Google Search grounding"})).filter(x=>safeUrl(x.url));if(!groundedSources.length)throw new Error("Google Search yedek yanıtı doğrulanabilir kaynak bağlantısı içermiyor.");searchState="gemini-backup";searchProvider="Gemini Google Search";searchSources=groundedSources;searchContext="\n\nIndependent search unavailable; Gemini Google Search fallback findings:\n"+g.text+"\nSources:\n"+groundedSources.map(x=>x.title+" "+x.url).join("\n");}else throw e}catch(g){searchState="failed";searchContext="\n\nAll web search providers failed. Do not pretend to have verified current facts. Tell the user web search failed. Error: "+String(g.message||g)}}
  }
@@ -336,7 +356,7 @@ async function handleChat(req,env,ctx){
   const emit=value=>{try{streamController.enqueue(enc.encode("data: "+JSON.stringify(value)+"\n\n"))}catch(e){}};
   (async()=>{try{
    emit({progress:{label:"Görev planlanıyor",status:"started"}});
-   const a=await agentRun(env,userId,enriched,projectId,event=>emit({progress:event}));
+   const a=await agentRun(env,userId,enriched,projectId,event=>emit({progress:event}),searchState==="success"||searchState==="gemini-backup");
    const answer=a.answer+(searchSources.length?"\n\nKaynaklar:\n"+searchSources.map((x,i)=>"["+ (i+1)+"] ["+x.title+"]("+x.url+")").join("\n"):"");
    ctx.waitUntil((async()=>{await log(env,"agent","Workers AI",true,Date.now()-start,"steps="+a.steps);if(question)await env.DB?.prepare("INSERT INTO conversations(id,user_id,role,content) VALUES(?,?,?,?)").bind(uid(),userId,"user",question).run();if(answer)await env.DB?.prepare("INSERT INTO conversations(id,user_id,role,content) VALUES(?,?,?,?)").bind(uid(),userId,"assistant",answer.slice(0,6000)).run()})());
    const agentDocs=(a.observations||[]).filter(x=>x.tool==="knowledge_search").flatMap(x=>x.results||[]).map(x=>({documentId:x.document_id,chunkId:x.chunk_id||x.id,title:x.name||"Belge",projectId:x.project_id||null,excerpt:String(x.content||"").replace(/\s+/g," ").slice(0,220)}));
@@ -349,7 +369,7 @@ async function handleChat(req,env,ctx){
  }
  const vision=messages.some(m=>Array.isArray(m.content)&&m.content.some(p=>p.type==="image_url"));
  try{
-  if(body.search===true&&!vision){
+  if(searchRequested&&!vision){
    const plain=await runPlain(env,enriched,1800),draft=modelText(plain);
    if(!draft)throw new Error("Arama sonuçları geldi ancak model boş yanıt üretti.");
    const audit=await selfAudit(env,question,draft);
@@ -369,7 +389,7 @@ async function handleChat(req,env,ctx){
   ctx.waitUntil((async()=>{try{
    let raw="",buf="",reader=pair[1].getReader(),dec=new TextDecoder();
    for(;;){const z=await reader.read();if(z.done)break;buf+=dec.decode(z.value,{stream:true});const ls=buf.split("\n");buf=ls.pop();for(const line of ls){if(!line.startsWith("data:"))continue;const v=line.slice(5).trim();if(!v||v==="[DONE]")continue;try{const j=JSON.parse(v);raw+=j.choices?.[0]?.delta?.content||""}catch(e){}}}
-   await log(env,body.search?"web-chat":"chat",result.provider,true,Date.now()-start,searchProvider||searchState);
+   await log(env,searchRequested?"web-chat":"chat",result.provider,true,Date.now()-start,searchProvider||searchState);
    if(question)await env.DB?.prepare("INSERT INTO conversations(id,user_id,role,content) VALUES(?,?,?,?)").bind(uid(),userId,"user",question).run();
    if(raw)await env.DB?.prepare("INSERT INTO conversations(id,user_id,role,content) VALUES(?,?,?,?)").bind(uid(),userId,"assistant",raw.slice(0,6000)).run();
   }catch(e){}})());
