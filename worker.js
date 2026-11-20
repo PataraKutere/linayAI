@@ -4,7 +4,7 @@ const FALLBACK_MODELS=["@cf/openai/gpt-oss-120b"];
 const VISION_MODEL="@cf/qwen/qwen3.8-27b";
 const EMBED_MODEL="@cf/baai/bge-m3";
 const GEMINI_MODEL="gemini-flash-lite-latest";
-const CORS={"Access-Control-Allow-Origin":ALLOWED_ORIGIN,"Access-Control-Allow-Headers":"Accept, Content-Type, X-Linay-Admin","Access-Control-Allow-Methods":"GET, POST, DELETE, OPTIONS","Access-Control-Expose-Headers":"X-Linay-Provider, X-Linay-Search, X-Linay-Trace, X-Linay-Sources, X-Linay-Agent-Steps","Access-Control-Max-Age":"86400","Vary":"Origin"};
+const CORS={"Access-Control-Allow-Origin":ALLOWED_ORIGIN,"Access-Control-Allow-Headers":"Accept, Content-Type, X-Linay-Admin","Access-Control-Allow-Methods":"GET, POST, DELETE, OPTIONS","Access-Control-Expose-Headers":"X-Linay-Provider, X-Linay-Search, X-Linay-Trace, X-Linay-Sources, X-Linay-Documents, X-Linay-Agent-Steps","Access-Control-Max-Age":"86400","Vary":"Origin"};
 const json=(data,status=200,extra={})=>new Response(JSON.stringify(data),{status,headers:{...CORS,"Content-Type":"application/json",...extra}});
 const uid=()=>crypto.randomUUID();
 const safeId=x=>String(x||"").trim();
@@ -120,37 +120,41 @@ async function searchWeb(query,env){
  throw new Error("Bağımsız arama sağlayıcıları yanıt vermedi. SearXNG/Brave yapılandırması yok veya DuckDuckGo erişimi başarısız.");
 }
 async function embed(env,text){const r=await env.AI.run(EMBED_MODEL,{text:[String(text).slice(0,7000)]});const v=r?.data?.[0]||r?.result?.data?.[0];if(!Array.isArray(v))throw new Error("Embedding modeli geçerli vektör döndürmedi.");return v}
-async function ragSearch(env,userId,query){
+async function ragSearch(env,userId,query,projectId=null){
  if(!env.DB)return [];
  try{
-  const hasDocs=await env.DB.prepare("SELECT 1 AS present FROM documents WHERE user_id=? LIMIT 1").bind(userId).first();
+  const hasDocs=await env.DB.prepare("SELECT 1 AS present FROM documents WHERE user_id=? AND (? IS NULL OR project_id=? OR project_id IS NULL) LIMIT 1").bind(userId,projectId,projectId).first();
   if(!hasDocs)return [];
   if(env.VECTOR&&env.AI){
    try{
-    const v=await embed(env,query),r=await env.VECTOR.query(v,{topK:5,filter:{userId:userId}});
-    const ids=(r.matches||[]).map(x=>x.id);await log(env,"rag-query","Vectorize",true,0,"matches="+ids.length);
+    const v=await embed(env,query);let matches=[];
+    if(projectId){const scoped=await env.VECTOR.query(v,{topK:5,filter:{userId:userId,projectId:projectId}});matches.push(...(scoped.matches||[]))}
+    const broad=await env.VECTOR.query(v,{topK:8,filter:{userId:userId}});matches.push(...(broad.matches||[]));
+    const ids=[...new Set(matches.map(x=>x.id))];await log(env,"rag-query","Vectorize",true,0,"matches="+ids.length);
     if(ids.length){
-     const rows=await env.DB.prepare("SELECT c.id,c.content,c.document_id,d.name FROM chunks c JOIN documents d ON d.id=c.document_id WHERE c.user_id=? AND c.id IN ("+ids.map(()=>"?").join(",")+")").bind(userId,...ids).all();
-     const map=new Map((rows.results||[]).map(x=>[x.id,x]));const found=ids.map(id=>map.get(id)).filter(Boolean).slice(0,5);
+     const rows=await env.DB.prepare("SELECT c.id AS chunk_id,c.content,c.document_id,d.name,d.project_id FROM chunks c JOIN documents d ON d.id=c.document_id WHERE c.user_id=? AND c.id IN ("+ids.map(()=>"?").join(",")+") AND (? IS NULL OR d.project_id=? OR d.project_id IS NULL)").bind(userId,...ids,projectId,projectId).all();
+     const map=new Map((rows.results||[]).map(x=>[x.chunk_id,x]));
+     const found=ids.map(id=>map.get(id)).filter(Boolean).sort((x,y)=>(y.project_id===projectId?1:0)-(x.project_id===projectId?1:0)).slice(0,5);
      if(found.length)return found;
     }
    }catch(e){await log(env,"rag-vector-unavailable","Workers AI/Vectorize",false,0,e.message||e)}
   }
-  const stop=new Set(["what","which","where","when","that","this","with","from","have","does","your","file","document","the","and","for","about","tell","show","read","please","nedir","nedeni","hangi","bana","hakkında","belge","dosya","içerik","içinde","olan","bunu","şunu","nedir","indexed","named","exact","contain"]);
-  const terms=[...new Set((String(query).toLocaleLowerCase("tr-TR").match(/[\p{L}\p{N}]{3,}/gu)||[]).filter(x=>!stop.has(x)))].slice(0,10);
+  const stop=new Set(["what","which","where","when","that","this","with","from","have","does","your","file","document","the","and","for","about","tell","show","read","please","nedir","nedeni","hangi","bana","hakkında","belge","dosya","içerik","içinde","olan","bunu","şunu","indexed","named","exact","contain"]);
+  const terms=[...new Set((String(query).toLocaleLowerCase("tr-TR").match(/[\\p{L}\\p{N}]{3,}/gu)||[]).filter(x=>!stop.has(x)))].slice(0,10);
   if(!terms.length)return [];
   const where=terms.map(()=>"(d.name LIKE ? OR c.content LIKE ?)").join(" OR ");
   const args=[userId,...terms.flatMap(x=>["%"+x+"%","%"+x+"%"])];
-  const fallback=await env.DB.prepare("SELECT c.id,c.content,c.document_id,d.name FROM chunks c JOIN documents d ON d.id=c.document_id WHERE c.user_id=? AND ("+where+") ORDER BY d.created_at DESC LIMIT 5").bind(...args).all();
+  const scope=projectId?" AND (d.project_id=? OR d.project_id IS NULL)":"";
+  const fallback=await env.DB.prepare("SELECT c.id AS chunk_id,c.content,c.document_id,d.name,d.project_id FROM chunks c JOIN documents d ON d.id=c.document_id WHERE c.user_id=? AND ("+where+")"+scope+" ORDER BY CASE WHEN d.project_id=? THEN 0 ELSE 1 END,d.created_at DESC LIMIT 5").bind(...args,...(projectId?[projectId]:[null])).all();
   await log(env,"rag-keyword-fallback","D1",true,0,"matches="+(fallback.results||[]).length);
   return fallback.results||[];
  }catch(e){await log(env,"rag-query","D1",false,0,e.message||e);return []}
 }
-async function saveDocument(env,userId,name,text){
+async function saveDocument(env,userId,name,text,projectId=null){
  if(!env.DB)throw new Error("Belge veritabanı bağlı değil.");
  const id=uid(),clean=String(text||"").trim().slice(0,200000);if(!clean)throw new Error("Dosyada okunabilir metin bulunamadı.");
  const docName=String(name||"Belge").slice(0,180);
- await env.DB.prepare("INSERT INTO documents(id,user_id,name) VALUES(?,?,?)").bind(id,userId,docName).run();
+ await env.DB.prepare("INSERT INTO documents(id,user_id,name,project_id) VALUES(?,?,?,?)").bind(id,userId,docName,projectId||null).run();
  const chunks=[];for(let i=0;i<clean.length;i+=850){const part=clean.slice(i,Math.min(clean.length,i+1050));if(part.trim())chunks.push({id:uid(),content:part})}
  for(const c of chunks)await env.DB.prepare("INSERT INTO chunks(id,user_id,document_id,content) VALUES(?,?,?,?)").bind(c.id,userId,id,c.content).run();
  let vectorIndexed=!!(env.VECTOR&&env.AI),vectorError="";
@@ -158,12 +162,12 @@ async function saveDocument(env,userId,name,text){
   for(let i=0;i<chunks.length;i+=4){
    const batch=chunks.slice(i,i+4),vectors=[];
    try{
-    for(const c of batch){const v=await embed(env,c.content);vectors.push({id:c.id,values:v,metadata:{userId,documentId:id}})}
+    for(const c of batch){const v=await embed(env,c.content);vectors.push({id:c.id,values:v,metadata:{userId,documentId:id,projectId:projectId||"global"}})}
     const mutation=await env.VECTOR.upsert(vectors);await log(env,"vector-upsert","Vectorize",true,0,JSON.stringify(mutation).slice(0,300));
    }catch(e){vectorIndexed=false;vectorError=String(e.message||e);await log(env,"vector-upsert","Vectorize",false,0,vectorError);break}
   }
  }
- return {id,name:docName,chunks:chunks.length,vectorIndexed,vectorError:vectorError.slice(0,180)};
+ return {id,name:docName,projectId:projectId||null,chunks:chunks.length,vectorIndexed,vectorError:vectorError.slice(0,180)};
 }
 async function loadMemory(env,userId){
  if(!env.DB)return {memories:[],recent:[]};
@@ -175,10 +179,10 @@ async function loadMemory(env,userId){
  }catch(e){}
  return {memories,recent};
 }
-function sseFromText(text,provider,searchState,trace,sources=[],agentSteps=0){
+function sseFromText(text,provider,searchState,trace,sources=[],agentSteps=0,documents=[]){
  const enc=new TextEncoder();const chunks=[];for(let i=0;i<text.length;i+=90)chunks.push(text.slice(i,i+90));
  const stream=new ReadableStream({start(c){for(const t of chunks)c.enqueue(enc.encode("data: "+JSON.stringify({choices:[{delta:{content:t},index:0}]})+"\n\n"));c.enqueue(enc.encode("data: [DONE]\n\n"));c.close()}});
- return new Response(stream,{headers:{...CORS,"Content-Type":"text/event-stream; charset=utf-8","Cache-Control":"no-cache","X-Linay-Provider":provider,"X-Linay-Search":searchState,"X-Linay-Trace":trace,"X-Linay-Sources":encodeURIComponent(JSON.stringify(sources.slice(0,7))),"X-Linay-Agent-Steps":String(agentSteps)}});
+ return new Response(stream,{headers:{...CORS,"Content-Type":"text/event-stream; charset=utf-8","Cache-Control":"no-cache","X-Linay-Provider":provider,"X-Linay-Search":searchState,"X-Linay-Trace":trace,"X-Linay-Sources":encodeURIComponent(JSON.stringify(sources.slice(0,7))),"X-Linay-Documents":encodeURIComponent(JSON.stringify(documents.slice(0,5))),"X-Linay-Agent-Steps":String(agentSteps)}});
 }
 async function callModel(env,messages,vision=false){
  const models=vision?[VISION_MODEL]:[MODEL,...FALLBACK_MODELS];let last;
@@ -228,7 +232,7 @@ function modelText(value){
  for(const c of candidates){if(typeof c==="string"&&c.trim())return c;if(Array.isArray(c)){const t=c.map(x=>typeof x==="string"?x:(x?.text||x?.content||"")).join("").trim();if(t)return t}}
  return "";
 }
-async function agentRun(env,userId,messages){
+async function agentRun(env,userId,messages,projectId=null){
  const tools=["search_web","read_url","calculator","current_time","knowledge_search"];
  let observations=[],steps=0;
  const requestText=contentText(lastUser(messages));
@@ -237,7 +241,7 @@ async function agentRun(env,userId,messages){
  else if(/what time|current time|saat kaç|şu an saat/i.test(requestText)){observations.push({tool:"current_time",...{time:new Intl.DateTimeFormat("tr-TR",{timeZone:"Europe/Istanbul",dateStyle:"full",timeStyle:"long"}).format(new Date()),timezone:"Europe/Istanbul"}});steps++}
  else if(/https?:\/\//i.test(requestText)&&/read|open|summarize|özet|incele|oku/i.test(requestText)){const url=requestText.match(/https?:\/\/[^\s)]+/i)?.[0];try{if(url)observations.push({tool:"read_url",...await readPage(url)})}catch(e){observations.push({tool:"read_url",error:String(e.message||e)})}steps++}
  else if(/research|search|look up|araştır|güncel|latest|news/i.test(requestText)){try{const result=await searchWeb(requestText,env);observations.push({tool:"search_web",...result})}catch(e){observations.push({tool:"search_web",error:String(e.message||e)})}steps++}
- else if(/belge|document|dosya|file/i.test(requestText)){observations.push({tool:"knowledge_search",results:await ragSearch(env,userId,requestText)});steps++}
+ else if(/belge|document|dosya|file/i.test(requestText)){observations.push({tool:"knowledge_search",results:await ragSearch(env,userId,requestText,projectId)});steps++}
  for(;steps<4;steps++){
   const planner=[{role:"system",content:messages.filter(m=>m.role==="system").map(m=>contentText(m)).join("\n")+"\n\nSen Linay araç kullanan ajansın. Gerekiyorsa tam olarak tek JSON nesnesi üret: {\"tool\":\"search_web|read_url|calculator|current_time|knowledge_search|final\",\"args\":{\"query\":\"...\",\"url\":\"...\",\"expression\":\"...\"},\"answer\":\"...\"}. Araçları gerektiğinde kullan. Kullanıcı açıkça bir araç istediyse MUTLAKA çalıştır. Matematik işlemi varsa calculator kullan; güncel araştırma isteniyorsa search_web kullan; URL verilmişse read_url kullan; saat soruluyorsa current_time kullan; kullanıcı belgesi soruluyorsa knowledge_search kullan. En fazla dört araç adımı. Kaynakları uydurma. Sonuca ulaştıysan tool=final ile cevap ver. Gözlemler: "+JSON.stringify(observations).slice(0,10000)},...messages.filter(m=>m.role!=="system")];
   const p=await runPlain(env,planner,500);
@@ -251,7 +255,7 @@ async function agentRun(env,userId,messages){
    if(action.tool==="read_url"){result=await readPage(action.args?.url);observations.push({tool:action.tool,...result})}
    if(action.tool==="calculator"){result={result:calc(action.args?.expression||"")};observations.push({tool:action.tool,...result})}
    if(action.tool==="current_time"){result={time:new Intl.DateTimeFormat("tr-TR",{timeZone:action.args?.timezone||"Europe/Istanbul",dateStyle:"full",timeStyle:"long"}).format(new Date()),timezone:action.args?.timezone||"Europe/Istanbul"};observations.push({tool:action.tool,...result})}
-   if(action.tool==="knowledge_search"){result=await ragSearch(env,userId,action.args?.query||contentText(lastUser(messages)));observations.push({tool:action.tool,results:result})}
+   if(action.tool==="knowledge_search"){result=await ragSearch(env,userId,action.args?.query||contentText(lastUser(messages)),projectId);observations.push({tool:action.tool,results:result})}
   }catch(e){observations.push({tool:action.tool,error:String(e.message||e)})}
  }
  const context=[{role:"system",content:messages.filter(m=>m.role==="system").map(m=>contentText(m)).join("\n")+"\n\nAraç gözlemleri (yalnızca bunlara dayan): "+JSON.stringify(observations).slice(0,12000)+"\nKullanıcıya sonuçları açıkla. Araç başarısızsa bunu belirt."},...messages.filter(m=>m.role!=="system")];
@@ -261,7 +265,7 @@ async function agentRun(env,userId,messages){
 async function handleChat(req,env,ctx){
  const body=await req.json(),messages=Array.isArray(body.messages)?body.messages:[];if(!messages.length)return json({error:"Mesaj bulunamadı"},400);
  if(!validUserId(body.userId))return json({error:"Geçersiz kullanıcı kimliği."},400);
- const userId=safeId(body.userId),start=Date.now(),last=lastUser(messages),question=contentText(last).slice(0,1200),searchQuery=searchQueryFromMessages(messages);
+ const userId=safeId(body.userId),projectId=typeof body.projectId==="string"&&/^[a-zA-Z0-9_-]{1,100}$/.test(body.projectId)?body.projectId:null,start=Date.now(),last=lastUser(messages),question=contentText(last).slice(0,1200),searchQuery=searchQueryFromMessages(messages);
  let searchState="off",searchContext="",searchProvider="",searchSources=[];
  if(body.search===true){
   try{const sr=await searchWeb(searchQuery||question,env);searchProvider=sr.provider;searchSources=sr.results;searchState="success";searchContext="\n\nWEB SEARCH RESULTS — Use these results, compare dates and sources, cite each factual paragraph with [n]. Do not claim you opened pages unless you did.\n"+sr.results.map((x,i)=>"["+ (i+1)+"] "+x.title+"\nURL: "+x.url+"\nSnippet: "+x.snippet).join("\n\n")}
@@ -269,14 +273,15 @@ async function handleChat(req,env,ctx){
  }
  const mem=await loadMemory(env,userId);
  const asksAboutDocuments=/(yüklediğim|yukledigim|eklediğim|ekledigim|paylaştığım|paylastigim|dosya|belge|doküman|dokuman|pdf|dosyanın|dosyanin|belgenin|belge içeriği|dosya içeriği|içinde ne yazıyor|içeriğinde ne var)/i.test(question);
- const rag=asksAboutDocuments?await ragSearch(env,userId,question):[];
+ const rag=asksAboutDocuments?await ragSearch(env,userId,question,projectId):[];
+  const documentSources=rag.map(x=>({documentId:x.document_id,chunkId:x.chunk_id||x.id,title:x.name||"Belge",projectId:x.project_id||null,excerpt:String(x.content||"").replace(/\\s+/g," ").slice(0,220)}));
  const originalSystem=messages.filter(m=>m.role==="system").map(m=>contentText(m)).join("\n");
  const requestContext=new Set(messages.filter(m=>m&&["user","assistant"].includes(m.role)).map(m=>m.role+"\n"+contentText(m)));
  const recentContext=mem.recent.filter(m=>!requestContext.has(m.role+"\n"+m.content));
- const sys=originalSystem+"\n\nLinayAI: Be accurate, concise and honest. For logic, distinguish what follows from what does not follow. Never invent current facts or sources. If sources are supplied, cite them using their numbered URLs. "+(mem.memories.length?"\nUSER SAVED MEMORY:\n"+mem.memories.map(x=>x.content).join("\n"):"")+(recentContext.length?"\nRECENT SERVER CONTEXT (older messages not already present in this request):\n"+recentContext.map(x=>x.role+": "+x.content).join("\n"):"")+(rag.length?"\nIMPORTANT: THE USER DOCUMENT SEARCH FOUND THE FOLLOWING EXCERPTS FROM THE USER UPLOADED FILES. YOU CAN READ THESE EXCERPTS. Use them to answer questions about those files. Never claim you cannot access a file when an excerpt is provided.\nUSER DOCUMENT EXCERPTS:\n"+rag.map(x=>"[Document: "+(x.name||"uploaded file")+"]\n"+x.content).join("\n---\n"):"")+searchContext;
+ const sys=originalSystem+"\n\nLinayAI: Be accurate, concise and honest. For logic, distinguish what follows from what does not follow. Never invent current facts or sources. If sources are supplied, cite them using their numbered URLs. "+(mem.memories.length?"\nUSER SAVED MEMORY:\n"+mem.memories.map(x=>x.content).join("\n"):"")+(recentContext.length?"\nRECENT SERVER CONTEXT (older messages not already present in this request):\n"+recentContext.map(x=>x.role+": "+x.content).join("\n"):"")+(rag.length?"\nIMPORTANT: THE USER DOCUMENT SEARCH FOUND THE FOLLOWING EXCERPTS FROM THE USER UPLOADED FILES. YOU CAN READ THESE EXCERPTS. Use them to answer questions about those files. Never claim you cannot access a file when an excerpt is provided.\nUSER DOCUMENT EXCERPTS:\n"+rag.map((x,i)=>"[Belge: "+(x.name||"yüklenen dosya")+" | Parça "+(i+1)+"]\n"+x.content).join("\n---\n"):"")+searchContext;
  const enriched=[{role:"system",content:sys},...messages.filter(m=>m.role!=="system")];
  if(body.agent===true){
-  try{const a=await agentRun(env,userId,enriched);const answer=a.answer+(searchSources.length?"\n\nKaynaklar:\n"+searchSources.map((x,i)=>"["+ (i+1)+"] ["+x.title+"]("+x.url+")").join("\n"):"");ctx.waitUntil((async()=>{await log(env,"agent", "Workers AI",true,Date.now()-start,"steps="+a.steps);if(question)await env.DB?.prepare("INSERT INTO conversations(id,user_id,role,content) VALUES(?,?,?,?)").bind(uid(),userId,"user",question).run();if(answer)await env.DB?.prepare("INSERT INTO conversations(id,user_id,role,content) VALUES(?,?,?,?)").bind(uid(),userId,"assistant",answer.slice(0,6000)).run()})());return sseFromText(answer,"Workers AI Agent · "+(a.model||MODEL),searchState,uid(),searchSources,a.steps)}
+  try{const a=await agentRun(env,userId,enriched,projectId);const answer=a.answer+(searchSources.length?"\n\nKaynaklar:\n"+searchSources.map((x,i)=>"["+ (i+1)+"] ["+x.title+"]("+x.url+")").join("\n"):"");ctx.waitUntil((async()=>{await log(env,"agent", "Workers AI",true,Date.now()-start,"steps="+a.steps);if(question)await env.DB?.prepare("INSERT INTO conversations(id,user_id,role,content) VALUES(?,?,?,?)").bind(uid(),userId,"user",question).run();if(answer)await env.DB?.prepare("INSERT INTO conversations(id,user_id,role,content) VALUES(?,?,?,?)").bind(uid(),userId,"assistant",answer.slice(0,6000)).run()})());const agentDocs=(a.observations||[]).filter(x=>x.tool==="knowledge_search").flatMap(x=>x.results||[]).map(x=>({documentId:x.document_id,chunkId:x.chunk_id||x.id,title:x.name||"Belge",projectId:x.project_id||null,excerpt:String(x.content||"").replace(/\\s+/g," ").slice(0,220)}));return sseFromText(answer,"Workers AI Agent · "+(a.model||MODEL),searchState,uid(),searchSources,a.steps,agentDocs)}
   catch(e){await log(env,"agent","Workers AI",false,Date.now()-start,e.message);return json({error:"Ajan görevi tamamlayamadı: "+e.message},503)}
  }
  const vision=messages.some(m=>Array.isArray(m.content)&&m.content.some(p=>p.type==="image_url"));
@@ -285,11 +290,11 @@ async function handleChat(req,env,ctx){
    const plain=await runPlain(env,enriched,1800),answer=modelText(plain);
    if(!answer)throw new Error("Arama sonuçları geldi ancak model boş yanıt üretti.");
    await log(env,"web-chat",plain.__linayModel||MODEL,true,Date.now()-start,searchProvider||searchState);
-   return sseFromText(answer,String(plain.__linayModel||"").startsWith("Gemini Backup")?plain.__linayModel:"Workers AI · "+(plain.__linayModel||MODEL),searchState,uid(),searchSources);
+   return sseFromText(answer,String(plain.__linayModel||"").startsWith("Gemini Backup")?plain.__linayModel:"Workers AI · "+(plain.__linayModel||MODEL),searchState,uid(),searchSources,0,documentSources);
   }
   const result=await callModel(env,enriched,vision);
   const trace=uid();
-  if(result.text){const answer=result.text+(body.search===true&&result.sources?.length?"\n\nSources: "+result.sources.map(x=>x.title+" — "+x.uri).join(" | "):"");ctx.waitUntil(log(env,"chat",result.provider,true,Date.now()-start,"backup"));return sseFromText(answer,result.provider,searchState,uid(),searchSources)}
+  if(result.text){const answer=result.text+(body.search===true&&result.sources?.length?"\n\nSources: "+result.sources.map(x=>x.title+" — "+x.uri).join(" | "):"");ctx.waitUntil(log(env,"chat",result.provider,true,Date.now()-start,"backup"));return sseFromText(answer,result.provider,searchState,uid(),searchSources,0,documentSources)}
   const stream=result.stream;
   const pair=stream.tee();
   ctx.waitUntil((async()=>{try{
@@ -299,7 +304,7 @@ async function handleChat(req,env,ctx){
    if(question)await env.DB?.prepare("INSERT INTO conversations(id,user_id,role,content) VALUES(?,?,?,?)").bind(uid(),userId,"user",question).run();
    if(raw)await env.DB?.prepare("INSERT INTO conversations(id,user_id,role,content) VALUES(?,?,?,?)").bind(uid(),userId,"assistant",raw.slice(0,6000)).run();
   }catch(e){}})());
-  return new Response(pair[0],{headers:{...CORS,"Content-Type":"text/event-stream; charset=utf-8","Cache-Control":"no-cache","X-Linay-Provider":result.provider,"X-Linay-Search":searchState+(searchProvider?":"+searchProvider:""),"X-Linay-Trace":trace,"X-Linay-Sources":encodeURIComponent(JSON.stringify(searchSources.slice(0,7)))}});
+  return new Response(pair[0],{headers:{...CORS,"Content-Type":"text/event-stream; charset=utf-8","Cache-Control":"no-cache","X-Linay-Provider":result.provider,"X-Linay-Search":searchState+(searchProvider?":"+searchProvider:""),"X-Linay-Trace":trace,"X-Linay-Sources":encodeURIComponent(JSON.stringify(searchSources.slice(0,7))),"X-Linay-Documents":encodeURIComponent(JSON.stringify(documentSources.slice(0,5)))}});
  }catch(e){await log(env,"chat","all-models",false,Date.now()-start,e.message);return json({error:"Tüm modeller başarısız oldu: "+e.message},503)}
 }
 export default {async fetch(req,env,ctx){
@@ -314,10 +319,10 @@ export default {async fetch(req,env,ctx){
   try{const b=await req.json();if(!validUserId(b.userId))return json({error:"Geçersiz kullanıcı kimliği."},400);const userId=safeId(b.userId),content=String(b.content||"").trim().slice(0,6000);if(!env.DB)return json({error:"Hafıza veritabanı bağlı değil"},503);await env.DB.prepare("DELETE FROM memories WHERE user_id=?").bind(userId).run();if(content)await env.DB.prepare("INSERT INTO memories(id,user_id,content) VALUES(?,?,?)").bind(uid(),userId,content).run();return json({ok:true})}catch(e){return json({error:e.message},500)}
  }
  if(path==="/documents"&&req.method==="POST"){
-  try{const b=await req.json();if(!validUserId(b.userId))return json({error:"Geçersiz kullanıcı kimliği."},400);const userId=safeId(b.userId),d=await saveDocument(env,userId,b.name,b.text);await log(env,"document-index","Workers AI",true,0,d.chunks+" chunks");return json({ok:true,document:d})}catch(e){await log(env,"document-index","Workers AI",false,0,e.message);return json({error:e.message},500)}
+  try{const b=await req.json();if(!validUserId(b.userId))return json({error:"Geçersiz kullanıcı kimliği."},400);const userId=safeId(b.userId),projectId=typeof b.projectId==="string"&&/^[a-zA-Z0-9_-]{1,100}$/.test(b.projectId)?b.projectId:null,d=await saveDocument(env,userId,b.name,b.text,projectId);await log(env,"document-index","Workers AI",true,0,d.chunks+" chunks");return json({ok:true,document:d})}catch(e){await log(env,"document-index","Workers AI",false,0,e.message);return json({error:e.message},500)}
  }
  if(path==="/documents"&&req.method==="GET"){
-  const rawUserId=url.searchParams.get("userId");if(!validUserId(rawUserId))return json({error:"Geçersiz kullanıcı kimliği."},400);const userId=safeId(rawUserId);if(!env.DB)return json({documents:[]});const r=await env.DB.prepare("SELECT id,name,created_at FROM documents WHERE user_id=? ORDER BY created_at DESC LIMIT 50").bind(userId).all();return json({documents:r.results||[]});
+  const rawUserId=url.searchParams.get("userId");if(!validUserId(rawUserId))return json({error:"Geçersiz kullanıcı kimliği."},400);const userId=safeId(rawUserId);if(!env.DB)return json({documents:[]});const projectId=url.searchParams.get("projectId");const r=await env.DB.prepare("SELECT id,name,project_id,created_at FROM documents WHERE user_id=? ORDER BY created_at DESC LIMIT 100").bind(userId).all();return json({documents:(r.results||[]).filter(d=>!projectId||d.project_id===projectId||d.project_id===null)});
  }
  if(path.startsWith("/documents/")&&req.method==="DELETE"){
   const id=path.split("/").pop(),rawUserId=url.searchParams.get("userId");if(!validUserId(rawUserId))return json({error:"Geçersiz kullanıcı kimliği."},400);const userId=safeId(rawUserId);try{const r=await env.DB.prepare("SELECT id FROM chunks WHERE user_id=? AND document_id=?").bind(userId,id).all();const ids=(r.results||[]).map(x=>x.id);if(ids.length&&env.VECTOR)await env.VECTOR.deleteByIds(ids);await env.DB.prepare("DELETE FROM chunks WHERE user_id=? AND document_id=?").bind(userId,id).run();await env.DB.prepare("DELETE FROM documents WHERE user_id=? AND id=?").bind(userId,id).run();return json({ok:true})}catch(e){return json({error:e.message},500)}
