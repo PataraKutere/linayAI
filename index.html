@@ -306,6 +306,18 @@ body.voice-speaking #voiceOrbButton:before,body.voice-speaking #voiceOrbButton:a
   #bar button,#bar button#go{flex-basis:38px;width:38px;min-width:38px;height:40px}
   #bar button#research,#bar button#agent{flex-basis:54px;width:54px;min-width:54px}
 }
+
+/* Adım 5: compact assistant tools and approval-only memory suggestions */
+.smart-actions{display:flex;flex-wrap:wrap;gap:6px;margin:3px 0 12px 2px}
+.smart-actions button{min-height:32px;padding:5px 10px;border:1px solid #ffffff16;border-radius:9px;background:#111a2b;color:#bfc9e4;font-size:11px}
+.smart-actions button:hover{background:#202b47;border-color:#8875c8;color:#fff}
+.memory-suggestion{display:flex;flex-wrap:wrap;align-items:center;gap:7px;margin:7px 0 14px;padding:11px 12px;border:1px solid #8e7ad044;border-radius:12px;background:linear-gradient(110deg,#17152b,#101a2b);color:#dcd9f5;font-size:12px}
+.memory-suggestion b{flex:1 0 100%;font-size:12px;color:#c9b8ff}
+.memory-suggestion p{flex:1 0 100%;margin:0;color:#b9c4dc;line-height:1.5}
+.memory-suggestion button{min-height:36px;padding:6px 12px;border:1px solid #ffffff20;border-radius:9px;background:#202744;color:#e8eaff;font-size:11px}
+.memory-suggestion button[data-memory-approve]{background:#59478e;border-color:#a994ed;color:white}
+.memory-suggestion button:disabled{opacity:.65}
+@media(max-width:760px){.smart-actions{gap:5px;margin:3px 0 10px}.smart-actions button{min-height:36px;padding:6px 9px}.memory-suggestion{gap:6px;padding:10px}.memory-suggestion button{flex:1;min-height:40px}}
 </style><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
@@ -458,11 +470,42 @@ function tg(force){const side=$('side'),shade=$('shade');if(matchMedia('(max-wid
 function endPrivateChat(){S.chats=S.chats.filter(c=>!c.hidden);privateChat=false}
 function nc(){stopSpeech();endPrivateChat();S.cur=null;render();tg(false);inp.focus()}
 function startPrivateChat(){stopSpeech();endPrivateChat();privateChat=true;S.cur=null;render();tg(false);inp.focus()}
+async function approveMemoryCandidate(candidate,box){
+ if(!candidate||!candidate.text||box.dataset.state!=='pending')return;
+ const button=box.querySelector('[data-memory-approve]');if(button){button.disabled=true;button.textContent='Kaydediliyor…'}
+ try{
+  const current=await apiFetch(PROXY+'/memory?userId='+encodeURIComponent(USER_ID));
+  if(!current.ok)throw new Error('Mevcut hafıza okunamadı.');
+  const saved=await current.json(),existing=String(saved.content||'').trim();
+  const duplicate=existing.split('\n').map(x=>x.replace(/^[-•*]\s*/,'').trim().toLocaleLowerCase('tr-TR')).includes(candidate.text.toLocaleLowerCase('tr-TR'));
+  const merged=duplicate?existing:[existing,'• '+candidate.text].filter(Boolean).join('\n');
+  const response=await apiFetch(PROXY+'/memory',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:USER_ID,content:merged.slice(0,6000)})});
+  if(!response.ok)throw new Error('Hafıza kaydedilemedi.');
+  S.cfg.memory=merged;save();box.dataset.state='approved';box.innerHTML='<span>✓ Onaylandı ve hafızaya kaydedildi</span>';
+ }catch(e){if(button){button.disabled=false;button.textContent='Hafızaya ekle'}alert('Hafıza kaydedilemedi: '+e.message)}
+}
+function renderMemorySuggestion(messageEl,candidate){
+ if(!candidate||!candidate.text||privateChat)return;
+ const box=document.createElement('div');box.className='memory-suggestion';box.dataset.state='pending';
+ const label=document.createElement('b');label.textContent='Hafıza önerisi';
+ const note=document.createElement('p');note.textContent='Linay bunu kalıcı tercih/proje notu olarak hatırlamayı öneriyor: “'+candidate.text+'”';
+ const approve=document.createElement('button');approve.type='button';approve.dataset.memoryApprove='1';approve.textContent='Hafızaya ekle';approve.onclick=()=>approveMemoryCandidate(candidate,box);
+ const reject=document.createElement('button');reject.type='button';reject.textContent='Reddet';reject.onclick=()=>{box.dataset.state='rejected';box.remove()};
+ box.append(label,note,approve,reject);messageEl.parentElement.appendChild(box);
+}
+function runSmartAction(kind,answer){
+ const instructions={summary:'Önceki yanıtını anlamı ve önemli ayrıntıları koruyarak kısa biçimde özetle.',bullets:'Önemli noktaları düzenli maddeler halinde yaz.',clear:'Önceki yanıtını daha açık, sade ve anlaşılır biçimde yeniden yaz.',code:'Önceki yanıttaki kodu bölüm bölüm açıkla; ne yaptığını, girdileri/çıktıları ve önemli satırları belirt.'};
+ inp.value=instructions[kind]+'\n\nYanıt:\n'+String(answer||'').slice(0,9000);grow();inp.focus();send();
+}
 function add(role,html,last,media){
  const w=document.createElement('div');w.className='w';
  const d=document.createElement('div');d.className=role=='user'?'u':'a';d.innerHTML=html;w.appendChild(d);
- if(role!='user'){const a=document.createElement('div');a.className='act';a.innerHTML='<button>🔊</button><button>📋</button><button title="Yanıtı kaydet">☆</button>'+(last?'<button>🔄</button>':'');
-  a.children[0].onclick=()=>say(d.innerText,a.children[0],cur()?.id);a.children[1].onclick=async()=>{const ok=await copyText(d.innerText);a.children[1].textContent=ok?'Kopyalandı':'Kopyalanamadı';setTimeout(()=>a.children[1].textContent='📋',1200)};a.children[2].onclick=()=>bookmarkMessage(d.innerText);if(last)a.children[3].onclick=regen;w.appendChild(a)}
+ if(role!='user'){
+  const a=document.createElement('div');a.className='act';a.innerHTML='<button>🔊</button><button>📋</button><button title="Yanıtı kaydet">☆</button>'+(last?'<button>🔄</button>':'');
+  a.children[0].onclick=()=>say(d.innerText,a.children[0],cur()?.id);a.children[1].onclick=async()=>{const ok=await copyText(d.innerText);a.children[1].textContent=ok?'Kopyalandı':'Kopyalanamadı';setTimeout(()=>a.children[1].textContent='📋',1200)};a.children[2].onclick=()=>bookmarkMessage(d.innerText);if(last)a.children[3].onclick=regen;w.appendChild(a);
+  const smart=document.createElement('div');smart.className='smart-actions';const options=[['summary','Özetle'],['bullets','Maddeleştir'],['clear','Daha net yaz']];if(d.querySelector('pre code'))options.push(['code','Kodu açıkla']);
+  options.forEach(([kind,label])=>{const button=document.createElement('button');button.type='button';button.textContent=label;button.onclick=()=>runSmartAction(kind,d.innerText);smart.appendChild(button)});w.appendChild(smart);
+ }
  $('msgs').appendChild(w);return d;
 }
 function render(){
@@ -477,7 +520,7 @@ function render(){
   $('list').appendChild(r)});
  const m=$('msgs');m.innerHTML='';
  if(!c||!c.msgs.length){m.innerHTML='<div id="hello"><div class="zy-orb" aria-hidden="true"></div><div class="welcome-kicker">LINAY AI · YARDIMCIN HAZIR</div><h2>Bugün ne yapmak istersin?</h2><p class="welcome-sub">Sorunu yaz, bir dosya ekle veya aşağıdaki örneklerden biriyle başla.</p>'+QUICK+'</div>'; $("features").innerHTML=CARDS;}
- else c.msgs.forEach((x,i)=>{const d=add(x.role==='user'?'user':'model',x.role==='user'?esc(x.t||'')+(x.att&&x.att.length?`<div class="att">📎 ${esc(x.att.join(', '))}</div>`: ''):md(x.text),i==c.msgs.length-1);if(x.media)showMedia(d,x.media);});
+ else c.msgs.forEach((x,i)=>{const d=add(x.role==='user'?'user':'model',x.role==='user'?esc(x.t||'')+(x.att&&x.att.length?`<div class="att">📎 ${esc(x.att.join(', '))}</div>`: ''):md(x.text),i==c.msgs.length-1);if(x.media)showMedia(d,x.media);if(x.role!=='user'&&x.memoryCandidate)renderMemorySuggestion(d,x.memoryCandidate)});
  m.querySelectorAll('.quick-actions button').forEach(d=>d.onclick=()=>{inp.value=d.dataset.p;inp.focus();grow()});$('features').querySelectorAll('.cards div').forEach(d=>d.onclick=()=>{inp.value=d.dataset.p;inp.focus();grow()});if(c&&c.msgs.length)$('features').innerHTML='';m.scrollTop=m.scrollHeight;
 }
 
@@ -632,7 +675,7 @@ async function send(){
   const r=await apiFetch(PROXY+'/chat',{method:'POST',headers:{'Content-Type':'application/json'},signal:ctl.signal,body:JSON.stringify({messages,search:useSearch,agent:!!(S.cfg.agent||S.cfg.research),userId:USER_ID,projectId:c.projectId||null})});
   if(!r.ok){let msg='HTTP '+r.status;try{const j=await r.json();msg=j.error||msg}catch{}throw new Error(msg)}
   const provider=r.headers.get('X-Linay-Provider')||'Cloudflare Workers AI';
-  const searchState=r.headers.get('X-Linay-Search')||'off';let citations=[],documentCitations=[];try{citations=JSON.parse(decodeURIComponent(r.headers.get('X-Linay-Sources')||'%5B%5D'))}catch(e){}try{documentCitations=JSON.parse(decodeURIComponent(r.headers.get('X-Linay-Documents')||'%5B%5D'))}catch(e){}
+  const searchState=r.headers.get('X-Linay-Search')||'off';let citations=[],documentCitations=[],memoryCandidate=null;try{citations=JSON.parse(decodeURIComponent(r.headers.get('X-Linay-Sources')||'%5B%5D'))}catch(e){}try{documentCitations=JSON.parse(decodeURIComponent(r.headers.get('X-Linay-Documents')||'%5B%5D'))}catch(e){}try{memoryCandidate=JSON.parse(decodeURIComponent(r.headers.get('X-Linay-Memory-Candidate')||'null'))}catch(e){}
   let agentSteps=Number(r.headers.get('X-Linay-Agent-Steps')||0);
   let agentTrace=[];try{agentTrace=JSON.parse(decodeURIComponent(r.headers.get('X-Linay-Agent-Trace')||'%5B%5D'))}catch(e){}
   if(useSearch&&searchState==='failed')out+='*(İnternet araması başarısız oldu; yanıt güncel kaynaklarla doğrulanamadı.)*\n\n';
@@ -641,7 +684,7 @@ async function send(){
   const rd=r.body.getReader(),dc=new TextDecoder();let buf='';
   for(;;){const {done,value}=await rd.read();if(done)break;buf+=dc.decode(value,{stream:true});const ls=buf.split('\n');buf=ls.pop();for(const l of ls){if(!l.startsWith('data:'))continue;const raw=l.slice(5).trim();if(!raw||raw==='[DONE]')continue;let j;try{j=JSON.parse(raw)}catch{continue}if(j.error)throw new Error(j.error.message||'Model yanıt hatası');
    if(j.progress&&agentProgress){const list=agentProgress.querySelector('#agentLiveSteps');if(list){const ev=j.progress;let li=[...list.children].find(x=>x.dataset.tool===(ev.tool||'plan')&&x.dataset.status==='started');if(ev.status==='started'){li=document.createElement('li');li.dataset.tool=ev.tool||'plan';li.dataset.status='started';li.textContent=ev.label||'Görev adımı başlatıldı';list.appendChild(li)}else if(li){li.textContent=(ev.label||li.textContent)+' ✓';li.dataset.status='done'}else{li=document.createElement('li');li.textContent=(ev.label||'Adım tamamlandı')+' ✓';list.appendChild(li)}}continue}
-   if(j.meta){citations=j.meta.sources||citations;documentCitations=j.meta.documents||documentCitations;agentSteps=Number(j.meta.steps||0);agentTrace=j.meta.trace||agentTrace;if(agentProgress){agentProgress.querySelector('b').textContent='✓ Ajan araç adımlarını tamamladı'}continue}
+   if(j.meta){citations=j.meta.sources||citations;documentCitations=j.meta.documents||documentCitations;memoryCandidate=j.meta.memoryCandidate||memoryCandidate;agentSteps=Number(j.meta.steps||0);agentTrace=j.meta.trace||agentTrace;if(agentProgress){agentProgress.querySelector('b').textContent='✓ Ajan araç adımlarını tamamladı'}continue}
    out+=(j.choices?.[0]?.delta?.content||'');el.innerHTML=md(out);$('msgs').scrollTop=$('msgs').scrollHeight;}}
   if(!useSearch)out=out.replace(/\n\s*(?:\*\*)?(?:Kaynaklar|Sources|Kaynakça)(?:\*\*)?\s*\n[\s\S]*$/i,'').trim();
   if(!out)out='(Boş yanıt geldi, tekrar dene.)';if(docNotice)out+=docNotice;
@@ -649,9 +692,9 @@ async function send(){
   if(agentMode){const used=agentTrace.length?[...new Set(agentTrace.map(x=>x.label||x.tool))].join(', '):'Ek araç kullanılmadı';const traceLines=agentTrace.length?agentTrace.map((x,i)=>(i+1)+'. '+(x.label||x.tool)+(x.status==='failed'?' — başarısız'+(x.detail?': '+x.detail:''):' — tamamlandı')).join('\n'):'Araç kullanımı gerekmedi; görev doğrudan yanıtlandı.';out+='\n\n**Ajan özeti** · '+agentSteps+' adım\nKullanılan araçlar: '+used+'\n\n**Adım sonuçları**\n'+traceLines;if(agentProgress)agentProgress.innerHTML='<b>✓ Ajan görevi tamamlandı · '+agentSteps+' adım</b><div>Kullanılan araçlar: '+esc(used)+'</div><ol>'+agentTrace.map(x=>'<li>'+esc(x.label||x.tool)+(x.status==='failed'?' — başarısız':' — tamamlandı')+(x.detail?' · '+esc(x.detail):'')+'</li>').join('')+(agentTrace.length?'':'<li>Ek araç adımı gerekmedi.</li>')+'</ol>'}
   const mi=out.match(/\[RESIM:\s*([^\]]+)\]/i);
   if(mi){out=out.replace(mi[0],'').trim();el.innerHTML=md(out);const ie=add('model','');const generated=await genImg(mi[1].trim(),ie,true),mediaId='gen-'+c.id+'-'+Date.now();if(!privateChat)await mediaPut(mediaId,generated.src);generatedMedia=[{id:mediaId,name:'Oluşturulan resim',src:privateChat?generated.src:undefined}];out+='\\n\\n🖼 *Resim oluşturuldu: '+generated.prompt+'*';shown=true}
-  c.msgs.push({role:'model',parts:[{text:out}],text:out,media:generatedMedia});
+  c.msgs.push({role:'model',parts:[{text:out}],text:out,media:generatedMedia,memoryCandidate:!privateChat?memoryCandidate:null});
  }catch(e){
-  if(e.name==='AbortError'){if(out)c.msgs.push({role:'model',parts:[{text:out}],text:out});else c.msgs.pop()}
+  if(e.name==='AbortError'){if(out)c.msgs.push({role:'model',parts:[{text:out}],text:out,memoryCandidate:!privateChat?memoryCandidate:null});else c.msgs.pop()}
   else{c.msgs.pop();files=sf;chips();inp.value=text;el.className='a err';const em=String(e.message||e);el.textContent=(useSearch&&(/429|RESOURCE_EXHAUSTED|rate.?limit|quota/i.test(em))?'Google arama kotası dolmuş veya hız sınırına ulaşılmış. Bu nedenle web araması yapılamadı. Bir süre sonra tekrar dene. Ayrıntı: ': 'Hata: ')+em}
  }
  busy=false;$('go').textContent='➤';save();if(!el.classList.contains('err')&&!shown)render();if(voiceReplyPending){voiceReplyPending=false;if(!el.classList.contains('err'))speakAssistant(out);else if(voiceSessionActive)stopVoiceSession('Yanıt alınamadı. Tekrar deneyebilirsin.');}
