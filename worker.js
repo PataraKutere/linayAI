@@ -235,10 +235,10 @@ function modelText(value){
  for(const c of candidates){if(typeof c==="string"&&c.trim())return c;if(Array.isArray(c)){const t=c.map(x=>typeof x==="string"?x:(x?.text||x?.content||"")).join("").trim();if(t)return t}}
  return "";
 }
-async function agentRun(env,userId,messages,projectId=null){
+async function agentRun(env,userId,messages,projectId=null,onProgress=()=>{}){
  const tools=["search_web","read_url","calculator","current_time","knowledge_search"];
  let observations=[],steps=0;
- const requestText=contentText(lastUser(messages));
+ const requestText=contentText(lastUser(messages));onProgress({label:"İsteğin kapsamı belirleniyor",status:"started"});
  const mult=requestText.match(/(\d+(?:[.,]\d+)?)\s*(?:multiplied by|times|çarpı|ile çarp|×|x)\s*(\d+(?:[.,]\d+)?)/i);
  if(mult&&/calculator|calculate|multiply|çarp|hesap/i.test(requestText)){const expression=mult[1].replace(",",".")+"*"+mult[2].replace(",","." );observations.push({tool:"calculator",expression,result:calc(expression)});steps++}
  else if(/what time|current time|saat kaç|şu an saat/i.test(requestText)){observations.push({tool:"current_time",...{time:new Intl.DateTimeFormat("tr-TR",{timeZone:"Europe/Istanbul",dateStyle:"full",timeStyle:"long"}).format(new Date()),timezone:"Europe/Istanbul"}});steps++}
@@ -253,6 +253,7 @@ async function agentRun(env,userId,messages,projectId=null){
   if(action.tool==="final")return {answer:String(action.answer||""),steps,observations,model:p.__linayModel||MODEL};
   if(!tools.includes(action.tool))break;
   let result;
+  onProgress({tool:action.tool,label:({search_web:"Web’de arama yapılıyor",read_url:"Bağlantı okunuyor",calculator:"Hesaplama yapılıyor",current_time:"Saat bilgisi alınıyor",knowledge_search:"Proje ve belge hafızası aranıyor"})[action.tool]||"Araç çalıştırılıyor",status:"started"});
   try{
    if(action.tool==="search_web"){const s=await searchWeb(action.args?.query||contentText(lastUser(messages)),env);result=s;observations.push({tool:action.tool,...s})}
    if(action.tool==="read_url"){result=await readPage(action.args?.url);observations.push({tool:action.tool,...result})}
@@ -260,6 +261,7 @@ async function agentRun(env,userId,messages,projectId=null){
    if(action.tool==="current_time"){result={time:new Intl.DateTimeFormat("tr-TR",{timeZone:action.args?.timezone||"Europe/Istanbul",dateStyle:"full",timeStyle:"long"}).format(new Date()),timezone:action.args?.timezone||"Europe/Istanbul"};observations.push({tool:action.tool,...result})}
    if(action.tool==="knowledge_search"){result=await ragSearch(env,userId,action.args?.query||contentText(lastUser(messages)),projectId);observations.push({tool:action.tool,results:result})}
   }catch(e){observations.push({tool:action.tool,error:String(e.message||e)})}
+  onProgress({tool:action.tool,label:({search_web:"Web araması tamamlandı",read_url:"Bağlantı okundu",calculator:"Hesaplama tamamlandı",current_time:"Saat bilgisi alındı",knowledge_search:"Belge araması tamamlandı"})[action.tool]||"Araç adımı tamamlandı",status:"done"});
  }
  const context=[{role:"system",content:messages.filter(m=>m.role==="system").map(m=>contentText(m)).join("\n")+"\n\nAraç gözlemleri (yalnızca bunlara dayan): "+JSON.stringify(observations).slice(0,12000)+"\nKullanıcıya sonuçları açıkla. Araç başarısızsa bunu belirt."},...messages.filter(m=>m.role!=="system")];
  const out=await runPlain(env,context,1800);
@@ -284,8 +286,21 @@ async function handleChat(req,env,ctx){
  const sys=originalSystem+"\n\nLinayAI: Be accurate, concise and honest. For logic, distinguish what follows from what does not follow. Never invent current facts or sources. If sources are supplied, cite them using their numbered URLs. "+(mem.memories.length?"\nUSER SAVED MEMORY:\n"+mem.memories.map(x=>x.content).join("\n"):"")+(recentContext.length?"\nRECENT SERVER CONTEXT (older messages not already present in this request):\n"+recentContext.map(x=>x.role+": "+x.content).join("\n"):"")+(rag.length?"\nIMPORTANT: THE USER DOCUMENT SEARCH FOUND THE FOLLOWING EXCERPTS FROM THE USER UPLOADED FILES. YOU CAN READ THESE EXCERPTS. Use them to answer questions about those files. Never claim you cannot access a file when an excerpt is provided.\nUSER DOCUMENT EXCERPTS:\n"+rag.map((x,i)=>"[Belge: "+(x.name||"yüklenen dosya")+" | Parça "+(i+1)+"]\n"+x.content).join("\n---\n"):"")+searchContext;
  const enriched=[{role:"system",content:sys},...messages.filter(m=>m.role!=="system")];
  if(body.agent===true){
-  try{const a=await agentRun(env,userId,enriched,projectId);const answer=a.answer+(searchSources.length?"\n\nKaynaklar:\n"+searchSources.map((x,i)=>"["+ (i+1)+"] ["+x.title+"]("+x.url+")").join("\n"):"");ctx.waitUntil((async()=>{await log(env,"agent", "Workers AI",true,Date.now()-start,"steps="+a.steps);if(question)await env.DB?.prepare("INSERT INTO conversations(id,user_id,role,content) VALUES(?,?,?,?)").bind(uid(),userId,"user",question).run();if(answer)await env.DB?.prepare("INSERT INTO conversations(id,user_id,role,content) VALUES(?,?,?,?)").bind(uid(),userId,"assistant",answer.slice(0,6000)).run()})());const agentDocs=(a.observations||[]).filter(x=>x.tool==="knowledge_search").flatMap(x=>x.results||[]).map(x=>({documentId:x.document_id,chunkId:x.chunk_id||x.id,title:x.name||"Belge",projectId:x.project_id||null,excerpt:String(x.content||"").replace(/\\s+/g," ").slice(0,220)}));const agentTrace=(a.observations||[]).map(x=>({tool:x.tool,label:({search_web:"İnternette arama yapıldı",read_url:"Verilen bağlantı okundu",calculator:"Hesaplama aracı çalıştırıldı",current_time:"Güncel saat bilgisi alındı",knowledge_search:"Proje / belge hafızasında arama yapıldı"})[x.tool]||"Araç çalıştırıldı"}));return sseFromText(answer,"Workers AI Agent · "+(a.model||MODEL),searchState,uid(),searchSources,a.steps,agentDocs,agentTrace)}
-  catch(e){await log(env,"agent","Workers AI",false,Date.now()-start,e.message);return json({error:"Ajan görevi tamamlayamadı: "+e.message},503)}
+  const enc=new TextEncoder();let streamController;
+  const stream=new ReadableStream({start(controller){streamController=controller}});
+  const emit=value=>{try{streamController.enqueue(enc.encode("data: "+JSON.stringify(value)+"\\n\\n"))}catch(e){}};
+  (async()=>{try{
+   emit({progress:{label:"Görev planlanıyor",status:"started"}});
+   const a=await agentRun(env,userId,enriched,projectId,event=>emit({progress:event}));
+   const answer=a.answer+(searchSources.length?"\\n\\nKaynaklar:\\n"+searchSources.map((x,i)=>"["+ (i+1)+"] ["+x.title+"]("+x.url+")").join("\\n"):"");
+   ctx.waitUntil((async()=>{await log(env,"agent","Workers AI",true,Date.now()-start,"steps="+a.steps);if(question)await env.DB?.prepare("INSERT INTO conversations(id,user_id,role,content) VALUES(?,?,?,?)").bind(uid(),userId,"user",question).run();if(answer)await env.DB?.prepare("INSERT INTO conversations(id,user_id,role,content) VALUES(?,?,?,?)").bind(uid(),userId,"assistant",answer.slice(0,6000)).run()})());
+   const agentDocs=(a.observations||[]).filter(x=>x.tool==="knowledge_search").flatMap(x=>x.results||[]).map(x=>({documentId:x.document_id,chunkId:x.chunk_id||x.id,title:x.name||"Belge",projectId:x.project_id||null,excerpt:String(x.content||"").replace(/\\s+/g," ").slice(0,220)}));
+   const agentTrace=(a.observations||[]).map(x=>({tool:x.tool,label:({search_web:"İnternette arama yapıldı",read_url:"Verilen bağlantı okundu",calculator:"Hesaplama aracı çalıştırıldı",current_time:"Güncel saat bilgisi alındı",knowledge_search:"Proje / belge hafızasında arama yapıldı"})[x.tool]||"Araç çalıştırıldı"}));
+   emit({meta:{sources:searchSources,documents:agentDocs,steps:a.steps,trace:agentTrace}});
+   for(let i=0;i<answer.length;i+=90)emit({choices:[{delta:{content:answer.slice(i,i+90)},index:0}]});
+   emit("[DONE]");streamController.close();
+  }catch(e){await log(env,"agent","Workers AI",false,Date.now()-start,e.message);emit({error:{message:"Ajan görevi tamamlayamadı: "+String(e.message||e)}});emit("[DONE]");try{streamController.close()}catch(x){}}})();
+  return new Response(stream,{headers:{...CORS,"Content-Type":"text/event-stream; charset=utf-8","Cache-Control":"no-cache","X-Linay-Provider":"Workers AI Agent","X-Linay-Search":searchState,"X-Linay-Trace":uid(),"X-Linay-Sources":"%5B%5D","X-Linay-Documents":"%5B%5D","X-Linay-Agent-Steps":"0","X-Linay-Agent-Trace":"%5B%5D"}});
  }
  const vision=messages.some(m=>Array.isArray(m.content)&&m.content.some(p=>p.type==="image_url"));
  try{
