@@ -176,6 +176,8 @@ body.text-mode #msgs{display:block;flex:1 1 auto}
 body.text-mode #bar{display:flex}
 body.text-mode #chips{display:flex;max-width:850px;width:calc(100% - 28px);margin:0 auto}
 body.text-mode #features{display:block}
+body:not(.text-mode) #features{display:none}
+body.text-mode #hello{display:none}
 #inp{color:#f3f6ff}
 #inp::placeholder{color:#8290aa}
 #bar button{color:#c5d2ed}
