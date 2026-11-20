@@ -709,7 +709,6 @@ async function send(){
   const searchState=r.headers.get('X-Linay-Search')||'off';let citations=[],documentCitations=[];try{citations=JSON.parse(decodeURIComponent(r.headers.get('X-Linay-Sources')||'%5B%5D'))}catch(e){}try{documentCitations=JSON.parse(decodeURIComponent(r.headers.get('X-Linay-Documents')||'%5B%5D'))}catch(e){}
   let agentSteps=Number(r.headers.get('X-Linay-Agent-Steps')||0);
   let agentTrace=[];try{agentTrace=JSON.parse(decodeURIComponent(r.headers.get('X-Linay-Agent-Trace')||'%5B%5D'))}catch(e){}
-  if(agentProgress){agentProgress.innerHTML='<b>✓ Ajan araç adımlarını tamamladı</b><ol>'+agentTrace.map(x=>'<li>'+esc(x.label||x.tool||'Araç çalıştırıldı')+'</li>').join('')+(agentTrace.length?'':'<li>Ek araç adımı gerekmedi; yanıt hazırlanıyor.</li>')+'</ol><small>Şimdi sonuç oluşturuluyor…</small>'}
   if(useSearch&&searchState==='failed')out+='*(İnternet araması başarısız oldu; yanıt güncel kaynaklarla doğrulanamadı.)*\n\n';
   if(provider.includes('Gemini Backup'))out+=(provider.includes('ücretsiz günlük kotası doldu')?'*(Cloudflare Workers AI ücretsiz günlük kotası doldu; Gemini yedek model devrede.)*\n\n':'*(Ana model geçici olarak kullanılamadı; Gemini yedek model devreye girdi.)*\n\n');
   if(provider.includes('Web search unavailable'))out+='*(Web araması şu anda erişilemiyor; aşağıdaki yanıt güncel internet kaynaklarıyla doğrulanmadı.)*\n\n';
