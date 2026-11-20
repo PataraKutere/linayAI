@@ -526,43 +526,9 @@ export default {async fetch(req,env,ctx){
    }
    const detail=outcome.error+(retried?" (yeniden deneme yapıldı)":"");
    await log(env,"image-generation","Gemini "+model,false,Date.now()-started,detail);
-   // A free-tier Gemini 429 must not block new image generation: switch to FLUX.
-   // Do not use a generation-only fallback for edits, because it cannot preserve the source image.
-   if(outcome.status===429&&!image&&env.AI){
-    const fallbackModel="@cf/black-forest-labs/flux-1-schnell";
-    try{
-     const result=await env.AI.run(fallbackModel,{prompt:fullPrompt,steps:4});
-     if(!result?.image)throw new Error("Model görsel verisi döndürmedi.");
-     await log(env,"image-generation","Workers AI "+fallbackModel,true,Date.now()-started,"Gemini 429 kotası nedeniyle otomatik yedek kullanıldı.");
-     return json({image:result.image,type:"image/jpeg",provider:"Workers AI",model:fallbackModel,apiVersion:"Cloudflare Workers AI",edited:false,fallbackReason:"Gemini API ücretsiz kota sınırı (HTTP 429)",ratio,style});
-    }catch(e){
-     const fallbackError="Gemini kotası dolu; FLUX yedek modeli de başarısız: "+String(e?.message||e);
-     await log(env,"image-generation","Workers AI "+fallbackModel,false,Date.now()-started,fallbackError);
-     return json({error:fallbackError,provider:"Workers AI",model:fallbackModel,apiVersion:"Cloudflare Workers AI",fallbackReason:"Gemini API HTTP 429"},503);
-    }
-   }
    return json({error:detail,provider:"Gemini",model,apiVersion,edited:!!image},outcome.status||502);
   }
-  // Fallback is allowed only when Gemini is not configured, never after a Gemini API failure.
-  if(image)return json({error:"Görsel düzenleme yapılamadı: GEMINI_API_KEY tanımlı değil. Kaynak görsel korunarak işlem durduruldu.",provider:"LinayAI",model:null,edited:true},503);
-  if(env.AI){
-   const fallbackModel="@cf/black-forest-labs/flux-1-schnell";
-   try{
-    const result=await env.AI.run(fallbackModel,{prompt:fullPrompt,steps:4});
-    if(result?.image){
-     await log(env,"image-generation","Workers AI "+fallbackModel,true,Date.now()-started,"Gemini anahtarı tanımlı değil; fallback kullanıldı.");
-     return json({image:result.image,type:"image/jpeg",provider:"Workers AI",model:fallbackModel,apiVersion:"Cloudflare Workers AI",edited:false,fallbackReason:"GEMINI_API_KEY tanımlı değil",ratio,style});
-    }
-    throw new Error("Model görsel verisi döndürmedi.");
-   }catch(e){
-    const detail="Workers AI yedek modeli ("+fallbackModel+") başarısız: "+String(e?.message||e);
-    await log(env,"image-generation","Workers AI "+fallbackModel,false,Date.now()-started,detail);
-    return json({error:detail,provider:"Workers AI",model:fallbackModel,apiVersion:"Cloudflare Workers AI"},503);
-   }
-  }
-  const detail="Görsel üretilemedi: GEMINI_API_KEY tanımlı değil ve Workers AI bağlantısı bulunamadı.";
-  await log(env,"image-generation","LinayAI",false,Date.now()-started,detail);
-  return json({error:detail,provider:"LinayAI",model:null},503);
+  return json({error:"Gemini API anahtarı tanımlı değil. Yalnızca Gemini görsel motoru etkin.",provider:"Gemini",model,apiVersion,edited:!!image},503);
  }
  return new Response("Linay API",{status:404,headers:CORS});
 }};
