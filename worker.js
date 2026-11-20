@@ -1,6 +1,6 @@
 const ALLOWED_ORIGIN="https://patarakutere.github.io";
-const MODEL="@cf/openai/gpt-oss-120b";
-const FALLBACK_MODELS=["@cf/qwen/qwen3.8-27b"];
+const MODEL="@cf/qwen/qwen3.8-27b";
+const FALLBACK_MODELS=["@cf/openai/gpt-oss-120b"];
 const VISION_MODEL="@cf/qwen/qwen3.8-27b";
 const EMBED_MODEL="@cf/baai/bge-m3";
 const GEMINI_MODEL="gemini-flash-lite-latest";
@@ -166,7 +166,7 @@ async function saveDocument(env,userId,name,text){
 }
 async function loadMemory(env,userId){
  if(!env.DB)return {memories:[],recent:[]};
- try{const [m,c]=await Promise.all([env.DB.prepare("SELECT content FROM memories WHERE user_id=? ORDER BY created_at DESC LIMIT 8").bind(userId).all(),env.DB.prepare("SELECT role,content FROM conversations WHERE user_id=? ORDER BY created_at DESC LIMIT 8").bind(userId).all()]);return {memories:m.results||[],recent:(c.results||[]).reverse()}}catch(e){return {memories:[],recent:[]}}
+ try{const m=await env.DB.prepare("SELECT content FROM memories WHERE user_id=? ORDER BY created_at DESC LIMIT 8").bind(userId).all();return {memories:m.results||[],recent:[]}}catch(e){return {memories:[],recent:[]}}
 }
 function sseFromText(text,provider,searchState,trace,sources=[],agentSteps=0){
  const enc=new TextEncoder();const chunks=[];for(let i=0;i<text.length;i+=90)chunks.push(text.slice(i,i+90));
@@ -259,7 +259,9 @@ async function handleChat(req,env,ctx){
   try{const sr=await searchWeb(searchQuery||question,env);searchProvider=sr.provider;searchSources=sr.results;searchState="success";searchContext="\n\nWEB SEARCH RESULTS — Use these results, compare dates and sources, cite each factual paragraph with [n]. Do not claim you opened pages unless you did.\n"+sr.results.map((x,i)=>"["+ (i+1)+"] "+x.title+"\nURL: "+x.url+"\nSnippet: "+x.snippet).join("\n\n")}
   catch(e){try{if(env.GEMINI_API_KEY){const searchSystem={role:"system",content:"Current date: "+new Intl.DateTimeFormat("en-CA",{timeZone:"Europe/Istanbul",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date())+" (Europe/Istanbul). Resolve short follow-up messages using the earlier conversation. Search the exact teams and date for sports scores. Prefer official football federations, UEFA, or reputable live-score providers. Never invent a score or claim a past event is in the future. Cite the exact result and its source."};const g=await gemini(env,[searchSystem,...messages.filter(m=>m.role!=="system")],true);searchState="gemini-backup";searchProvider="Gemini Google Search";searchContext="\n\nIndependent search unavailable; Gemini Google Search fallback findings:\n"+g.text+"\nSources:\n"+(g.sources||[]).map(x=>x.title+" "+x.uri).join("\n");searchSources=(g.sources||[]).map(x=>({title:x.title||"Source",url:x.uri,snippet:"Google Search grounding"})).filter(x=>safeUrl(x.url));}else throw e}catch(g){searchState="failed";searchContext="\n\nAll web search providers failed. Do not pretend to have verified current facts. Tell the user web search failed. Error: "+String(g.message||g)}}
  }
- const mem=await loadMemory(env,userId),rag=await ragSearch(env,userId,question);
+ const mem=await loadMemory(env,userId);
+ const asksAboutDocuments=/(yüklediğim|yukledigim|eklediğim|ekledigim|paylaştığım|paylastigim|dosya|belge|doküman|dokuman|pdf|dosyanın|dosyanin|belgenin|belge içeriği|dosya içeriği|içinde ne yazıyor|içeriğinde ne var)/i.test(question);
+ const rag=asksAboutDocuments?await ragSearch(env,userId,question):[];
  const originalSystem=messages.filter(m=>m.role==="system").map(m=>contentText(m)).join("\n");
  const sys=originalSystem+"\n\nLinayAI: Be accurate, concise and honest. For logic, distinguish what follows from what does not follow. Never invent current facts or sources. If sources are supplied, cite them using their numbered URLs. "+(mem.memories.length?"\nUSER SAVED MEMORY:\n"+mem.memories.map(x=>x.content).join("\n"):"")+(mem.recent.length?"\nRECENT SERVER CONTEXT:\n"+mem.recent.map(x=>x.role+": "+x.content).join("\n"):"")+(rag.length?"\nIMPORTANT: THE USER DOCUMENT SEARCH FOUND THE FOLLOWING EXCERPTS FROM THE USER UPLOADED FILES. YOU CAN READ THESE EXCERPTS. Use them to answer questions about those files. Never claim you cannot access a file when an excerpt is provided.\nUSER DOCUMENT EXCERPTS:\n"+rag.map(x=>"[Document: "+(x.name||"uploaded file")+"]\n"+x.content).join("\n---\n"):"")+searchContext;
  const enriched=[{role:"system",content:sys},...messages.filter(m=>m.role!=="system")];
@@ -277,7 +279,7 @@ async function handleChat(req,env,ctx){
   }
   const result=await callModel(env,enriched,vision);
   const trace=uid();
-  if(result.text){const answer=result.text+(result.sources?.length?"\n\nSources: "+result.sources.map(x=>x.title+" — "+x.uri).join(" | "):"");ctx.waitUntil(log(env,"chat",result.provider,true,Date.now()-start,"backup"));return sseFromText(answer,result.provider,searchState,uid(),searchSources)}
+  if(result.text){const answer=result.text+(body.search===true&&result.sources?.length?"\n\nSources: "+result.sources.map(x=>x.title+" — "+x.uri).join(" | "):"");ctx.waitUntil(log(env,"chat",result.provider,true,Date.now()-start,"backup"));return sseFromText(answer,result.provider,searchState,uid(),searchSources)}
   const stream=result.stream;
   const pair=stream.tee();
   ctx.waitUntil((async()=>{try{
