@@ -4,7 +4,7 @@
 <meta name="theme-color" content="#080b13">
 <link rel="manifest" href="manifest.json">
 <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
-<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png?v=38">\n<link rel="apple-touch-icon" href="icon-192.png?v=38">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Linay">
 <title>Linay — Sesli Yapay Zekâ</title>
@@ -261,6 +261,105 @@ body.voice-speaking .voice-orb-core{animation:orbSpeak .55s ease-in-out infinite
 @media(max-width:760px){.workspace-tools{grid-template-columns:1fr 1fr}.project-list{max-height:145px}}
 #bar button#research{font-size:12px;width:auto;min-width:62px;height:34px;padding:0 10px;border:1px solid var(--bd);border-radius:10px;background:var(--card);color:var(--fg);white-space:nowrap}#bar button#research.on{background:linear-gradient(135deg,#7053bd,#3e66a8);border-color:#a38be8;color:white;box-shadow:0 0 18px #8267d54a}@media(max-width:760px){#bar button#research{font-size:11px;min-width:56px;padding:0 7px}}
 .pref-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:12px 0}.pref-grid label{display:grid;gap:6px}.pref-grid select{width:100%;background:#0d0a12;border:1px solid #40314f;border-radius:10px;padding:9px;color:var(--fg)}
+
+/* LINAY VISUAL REFRESH v38 — presentation only; app logic and API wiring untouched */
+:root{
+ --bg:#070713;--fg:#f5f2ff;--mu:#a8a5c6;--card:#111126;--bd:#30294e;--ac:#a78bfa;
+ --linay-violet:#a78bfa;--linay-blue:#63b7ff;--linay-cyan:#67e8f9;
+}
+#side{
+ width:286px;min-width:286px;gap:13px;padding:20px 15px 16px;
+ background:linear-gradient(160deg,rgba(19,16,42,.94),rgba(8,10,25,.97) 58%,rgba(12,10,31,.96));
+ border-right:1px solid rgba(177,164,255,.16);
+ box-shadow:18px 0 60px rgba(2,3,15,.34),inset -1px 0 rgba(255,255,255,.025);
+ backdrop-filter:blur(28px) saturate(145%);-webkit-backdrop-filter:blur(28px) saturate(145%);
+}
+#side.closed{width:286px;min-width:286px}
+#side .new-chat-btn{
+ position:relative;isolation:isolate;overflow:hidden;min-height:52px;padding:0 14px;gap:12px;
+ border:1px solid rgba(199,183,255,.36);border-radius:16px;
+ color:#fff;background:linear-gradient(112deg,rgba(130,91,230,.42),rgba(67,105,202,.25) 54%,rgba(42,184,218,.13));
+ box-shadow:0 10px 28px rgba(91,66,180,.23),inset 0 1px rgba(255,255,255,.17);
+ letter-spacing:.01em;transition:transform .24s cubic-bezier(.2,.8,.2,1),border-color .24s,box-shadow .24s,background .24s;
+}
+#side .new-chat-btn:before{
+ content:"";position:absolute;z-index:-1;inset:0;opacity:.72;
+ background:linear-gradient(105deg,transparent 8%,rgba(255,255,255,.13) 45%,transparent 72%);
+ transform:translateX(-110%);transition:transform .65s ease;
+}
+#side .new-chat-btn:hover{transform:translateY(-2px);border-color:rgba(191,176,255,.72);background:linear-gradient(112deg,rgba(147,105,255,.54),rgba(74,126,231,.34) 58%,rgba(52,203,226,.2));box-shadow:0 14px 34px rgba(99,76,202,.34),inset 0 1px rgba(255,255,255,.22)}
+#side .new-chat-btn:hover:before{transform:translateX(110%)}
+#side .new-chat-btn:active{transform:translateY(0) scale(.985)}
+#side .new-chat-btn svg{width:20px;height:20px;stroke:#e7e1ff;filter:drop-shadow(0 0 8px rgba(171,145,255,.8))}
+#side .new-chat-btn kbd{border-color:rgba(220,211,255,.2);background:rgba(255,255,255,.08);color:#d8d0ff}
+#side .nb.ghost{min-height:43px;text-align:left;padding:0 13px;border-radius:13px;background:rgba(255,255,255,.035);border:1px solid rgba(190,180,255,.11);transition:background .2s,border-color .2s,transform .2s}
+#side .nb.ghost:hover{background:rgba(151,126,255,.1);border-color:rgba(176,156,255,.28);transform:translateY(-1px)}
+#q{min-height:44px;padding:0 14px;border-radius:13px;background:rgba(255,255,255,.045);border:1px solid rgba(182,174,232,.15);color:#f4f0ff;box-shadow:inset 0 1px 0 rgba(255,255,255,.035);transition:border-color .2s,background .2s,box-shadow .2s}
+#q:focus{outline:none;background:rgba(255,255,255,.065);border-color:rgba(167,139,250,.62);box-shadow:0 0 0 3px rgba(167,139,250,.12)}
+.workspace-tools{gap:7px}
+.workspace-tools button{min-height:40px;border-radius:12px;background:rgba(255,255,255,.045);border:1px solid rgba(190,180,255,.13);transition:background .2s,border-color .2s,transform .2s}
+.workspace-tools button:hover{background:rgba(139,113,238,.14);border-color:rgba(177,153,255,.35);transform:translateY(-1px)}
+.project-list{gap:6px;padding:2px 1px 5px}
+.project-row{gap:5px}
+.project-item{min-height:38px;padding:9px 11px;border:1px solid transparent;border-radius:11px;transition:background .2s,border-color .2s,color .2s}
+.project-item:hover{background:rgba(255,255,255,.045);color:#f1ecff}
+.project-item.active{background:linear-gradient(100deg,rgba(142,108,239,.2),rgba(89,135,221,.09));border-color:rgba(168,145,255,.3);color:#f2edff;box-shadow:inset 3px 0 #a78bfa}
+.project-filter{padding:10px 10px 6px;color:#8e8bb5;font-size:10px;letter-spacing:.15em}
+#list{padding:2px 1px 10px;scrollbar-width:thin;scrollbar-color:rgba(166,146,231,.3) transparent}
+#list .ci{min-height:42px;margin:4px 0;border:1px solid transparent;border-radius:12px;transition:background .2s,border-color .2s,transform .2s}
+#list .ci:hover{background:rgba(255,255,255,.045);border-color:rgba(180,166,255,.12);transform:translateX(2px)}
+#list .ci.on{background:linear-gradient(100deg,rgba(145,111,240,.2),rgba(78,120,205,.1));border-color:rgba(170,146,255,.32);box-shadow:inset 3px 0 #a78bfa}
+#list .ci span{padding:10px 11px;color:#d8d5ef;font-size:12.5px}
+#list .ci.on span{color:#fff}
+#list .ci button{border-radius:9px;color:#9c96c2}
+#list .ci button:hover{background:rgba(255,255,255,.09);color:#fff}
+#brandLogo{width:40px;height:40px;overflow:hidden;border-radius:13px;border:1px solid rgba(188,168,255,.36);background:linear-gradient(145deg,#151044,#080b20);box-shadow:0 0 22px rgba(112,89,236,.25),inset 0 1px rgba(255,255,255,.16);transition:transform .22s,box-shadow .22s}
+#brandLogo:hover{transform:translateY(-1px) scale(1.035);box-shadow:0 0 28px rgba(112,126,255,.38),inset 0 1px rgba(255,255,255,.2)}
+#brandLogo img{display:block;width:100%;height:100%;object-fit:cover}
+#voiceStage{
+ isolation:isolate;min-height:330px;
+ background:radial-gradient(ellipse at 50% 52%,rgba(62,52,139,.2),transparent 43%),radial-gradient(ellipse at 18% 18%,rgba(36,108,190,.11),transparent 42%),radial-gradient(ellipse at 82% 84%,rgba(132,58,190,.12),transparent 44%);
+}
+#voiceStage:before{content:"";position:absolute;z-index:-2;width:min(88vw,700px);height:min(88vw,700px);border-radius:50%;background:radial-gradient(circle,rgba(81,92,205,.16) 0%,rgba(82,63,175,.1) 28%,rgba(42,104,175,.055) 48%,transparent 72%);filter:blur(8px);pointer-events:none}
+#voiceStage:after{content:"";position:absolute;z-index:-1;inset:0;pointer-events:none;background:linear-gradient(118deg,transparent 14%,rgba(89,148,255,.035) 34%,transparent 48%),linear-gradient(298deg,transparent 20%,rgba(190,105,255,.045) 47%,transparent 70%);mask-image:radial-gradient(ellipse at center,#000 5%,transparent 78%)}
+#voiceOrbButton{isolation:isolate;width:190px;height:190px;filter:drop-shadow(0 12px 36px rgba(56,81,210,.18))}
+#voiceOrbButton:before,#voiceOrbButton:after{content:"";position:absolute;inset:5px;border-radius:50%;pointer-events:none}
+#voiceOrbButton:before{border:1px solid rgba(139,168,255,.27);box-shadow:0 0 38px rgba(91,123,255,.12),inset 0 0 38px rgba(130,115,255,.08);transform:rotate(-24deg) scaleX(1.12);animation:orbOrbit 13s linear infinite}
+#voiceOrbButton:after{inset:15px;border:1px solid rgba(111,216,255,.14);transform:rotate(28deg) scaleX(.82);box-shadow:0 0 30px rgba(76,177,255,.12);animation:orbOrbitReverse 17s linear infinite}
+.voice-orb-halo{inset:0;border:1px solid rgba(169,166,255,.3);background:radial-gradient(circle,rgba(107,108,240,.09),transparent 66%);box-shadow:0 0 75px rgba(84,105,245,.2),inset 0 0 48px rgba(117,141,255,.1)}
+.voice-orb-halo:before,.voice-orb-halo:after{content:"";position:absolute;inset:9%;border-radius:50%;border:1px solid rgba(125,185,255,.2);box-shadow:0 0 32px rgba(100,145,255,.16),inset 0 0 28px rgba(140,110,255,.09)}
+.voice-orb-halo:after{inset:19%;border-color:rgba(196,139,255,.22);transform:rotate(55deg) scaleX(1.12)}
+.voice-orb-core{width:124px;height:124px;background:radial-gradient(circle at 34% 23%,#fff 0%,#dceaff 5%,#a7b8ff 13%,#7486f4 27%,#4d54c7 47%,#332c91 68%,#141538 100%);box-shadow:0 0 28px rgba(133,151,255,.85),0 0 78px rgba(89,91,236,.54),0 0 128px rgba(51,143,244,.22),inset -15px -20px 30px rgba(4,7,28,.8),inset 7px 9px 21px rgba(255,255,255,.72);transition:transform .35s cubic-bezier(.2,.8,.2,1),box-shadow .35s,filter .35s}
+.voice-orb-core:before{inset:7px;border:1px solid rgba(255,255,255,.42);box-shadow:inset 0 0 24px rgba(255,255,255,.19),0 0 16px rgba(130,175,255,.24)}
+.voice-orb-core:after{top:15px;left:29px;width:39px;height:19px;background:rgba(255,255,255,.78);filter:blur(11px);box-shadow:12px 24px 35px rgba(124,155,255,.32)}
+body.voice-listening #voiceOrbButton:before{border-color:rgba(127,190,255,.75);box-shadow:0 0 32px rgba(79,153,255,.36)}
+body.voice-listening .voice-orb-halo{border-color:rgba(130,190,255,.75);box-shadow:0 0 0 10px rgba(96,151,255,.08),0 0 90px rgba(69,131,255,.38),inset 0 0 48px rgba(120,164,255,.15)}
+body.voice-listening .voice-orb-core{filter:saturate(1.22);box-shadow:0 0 40px rgba(119,177,255,.95),0 0 112px rgba(57,131,255,.76),0 0 150px rgba(56,83,238,.32),inset -15px -20px 30px rgba(4,7,28,.8),inset 7px 9px 21px rgba(255,255,255,.76)}
+body.voice-thinking #voiceOrbButton:after{border-color:rgba(204,151,255,.55);box-shadow:0 0 34px rgba(157,103,255,.28)}
+body.voice-thinking .voice-orb-core{filter:hue-rotate(24deg) saturate(1.25);box-shadow:0 0 40px rgba(177,129,255,.85),0 0 118px rgba(116,78,235,.62),inset -15px -20px 30px rgba(4,7,28,.8),inset 7px 9px 21px rgba(255,255,255,.76)}
+body.voice-speaking .voice-orb-core{filter:hue-rotate(-12deg) saturate(1.3);box-shadow:0 0 42px rgba(123,221,255,.95),0 0 120px rgba(79,116,255,.78),0 0 160px rgba(157,80,255,.28),inset -15px -20px 30px rgba(4,7,28,.8),inset 7px 9px 21px rgba(255,255,255,.76)}
+body.voice-speaking #voiceOrbButton:before,body.voice-speaking #voiceOrbButton:after{animation-duration:5s}
+@keyframes orbOrbit{to{transform:rotate(336deg) scaleX(1.12)}}
+@keyframes orbOrbitReverse{to{transform:rotate(-332deg) scaleX(.82)}}
+#voiceStatus{color:#d3d7ff;text-shadow:0 0 22px rgba(142,151,255,.22)}
+#voiceGreeting{background:linear-gradient(100deg,#fff 15%,#d9d5ff 56%,#9ccaff);-webkit-background-clip:text;background-clip:text;color:transparent;text-shadow:none}
+#voiceSessionBtn{background:linear-gradient(110deg,#8467ed,#536fe0 58%,#368cc8);border:1px solid rgba(201,194,255,.55);box-shadow:0 10px 32px rgba(92,92,221,.27),inset 0 1px rgba(255,255,255,.2)}
+#voiceSessionBtn:hover{filter:brightness(1.1);transform:translateY(-1px);box-shadow:0 14px 38px rgba(92,92,221,.36),inset 0 1px rgba(255,255,255,.25)}
+@media(max-width:760px){
+ #side{width:min(86vw,310px);min-width:min(86vw,310px);padding-left:15px;padding-right:15px}
+ #side.closed{width:min(86vw,310px);min-width:min(86vw,310px)}
+ #voiceStage{min-height:280px}
+ #voiceOrbButton{width:164px;height:164px}
+ .voice-orb-core{width:108px;height:108px}
+ body.has-chat:not(.text-mode) #voiceOrbButton{width:84px;height:84px}
+ body.has-chat:not(.text-mode) .voice-orb-core{width:58px;height:58px}
+ #brandLogo{width:36px;height:36px}
+}
+@media(prefers-reduced-motion:reduce){
+ #voiceOrbButton:before,#voiceOrbButton:after{animation:none!important}
+ #side .new-chat-btn,#list .ci,.project-item,#brandLogo{transition:none!important}
+}
+
 </style>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
@@ -376,7 +475,7 @@ const cur=()=>S.chats.find(c=>c.id===S.cur);
 const FB='gemini-flash-lite-latest';
 const QUICK='<div class="quick-actions"><button data-p="Gökyüzünde dalgalanan Türk bayrağının etkileyici, sinematik bir görselini oluştur">✦ Resim oluştur</button><button data-p="Benimle yaratıcı fikirler üzerine beyin fırtınası yap">✧ Fikir üret</button><button data-p="Bugün yapmam gerekenler için uygulanabilir bir plan hazırla">▤ Plan yap</button></div>';
 const CARDS='<div class="cards">'+[['▧','Resim üretici','Metinden etkileyici görseller oluştur','Gökyüzünde dalgalanan Türk bayrağını sinematik bir fotoğraf olarak oluştur'],['◉','Bir şey öğren','Merak ettiğin konuyu sade ve anlaşılır öğren','Galatasaray Spor Kulübünün kuruluşundan bugüne tarihini ve başarılarını anlat'],['⌘','Kod asistanı','Kod yaz, hataları bul ve projeler geliştir','Python ile basit bir hesap makinesi yaz ve açıkla']].map(([i,t,d,p])=>`<div data-p="${p}"><span class="card-icon">${i}</span><b>${t}</b><small>${d}</small></div>`).join('')+'</div>';
-function logo(n,id){return '<svg width="'+n+'" height="'+n+'" viewBox="0 0 100 100" role="img" aria-label="LinayAI simgesi"><defs><radialGradient id="lg'+id+'" cx="32%" cy="24%" r="78%"><stop offset="0" stop-color="#e1d2ff"/><stop offset=".4" stop-color="#9568d8"/><stop offset="1" stop-color="#39234f"/></radialGradient></defs><rect x="4" y="4" width="92" height="92" rx="29" fill="#130d1d" stroke="#7955a6" stroke-width="3"/><circle cx="50" cy="50" r="29" fill="url(#lg'+id+')"/><path d="M50 12 59 39 88 50 59 59 50 88 41 59 12 50 41 39Z" fill="#e4d5ff"/><circle cx="50" cy="50" r="8" fill="#fff"/></svg>'}
+function logo(n,id){return '<img src="icon-192.png?v=38" width="'+n+'" height="'+n+'" alt="LinayAI" decoding="async">';}
 $('brandLogo').innerHTML=logo(32,'brand');
 $('brandLogo').onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();nc()}};
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));

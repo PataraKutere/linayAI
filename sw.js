@@ -1,13 +1,13 @@
 // Linay service worker: önce internet, olmazsa önbellek.
 // Eski önbelleği zorla temizlemek istersen V değerini değiştir (linay-v5 gibi).
-const V='linay-v37';
+const V='linay-v38';
 let upgrade=false;
 self.addEventListener('install',e=>{upgrade=!!self.registration.active;e.waitUntil(self.skipWaiting())});
 self.addEventListener('activate',e=>e.waitUntil((async()=>{
  const stale=(await caches.keys()).filter(k=>k!==V);
  for(const k of stale)await caches.delete(k);
  await self.clients.claim();
- if(upgrade||stale.length)for(const c of await self.clients.matchAll({type:'window'}))try{await c.navigate(c.url)}catch(_){}
+ // Do not reload active tabs during activation: an ongoing voice/chat session must survive.\n // Fresh assets are used on the next normal navigation or user-initiated refresh.
 })()));
 const clean=async r=>r.redirected?new Response(await r.blob(),{status:r.status,statusText:r.statusText,headers:r.headers}):r;
 const store=(q,r)=>{if(!r.ok)return;const c=r.clone();caches.open(V).then(x=>x.put(q,c))};
