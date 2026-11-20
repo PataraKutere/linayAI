@@ -983,13 +983,25 @@ async function genImg(text,el,raw,sourceImage=null){
  try{
   if(!PROXY)throw new Error('Görsel sunucusuna bağlantı yapılandırılmamış.');
   const r=await apiFetch(PROXY+'/image',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt:text,ratio,style,image:sourceImage}),signal:AbortSignal.timeout(120000)});
-  const j=await r.json().catch(()=>({}));if(!r.ok||!j.image)throw new Error(j.error||('HTTP '+r.status));
+  const j=await r.json().catch(()=>({}));
+  if(!r.ok||!j.image){
+   const engine=j.provider?(j.provider+(j.model?' / '+j.model:'')):'Görsel servisi';
+   const version=j.apiVersion?' · API '+j.apiVersion:'';
+   throw new Error((j.error||('HTTP '+r.status))+' ['+engine+version+']');
+  }
   const src='data:'+(j.type||'image/png')+';base64,'+j.image;
-  el.innerHTML='<div class="generated-image-card"><img alt="Oluşturulan görsel"><div class="generated-image-actions"><a download="linay-gorsel.png">İndir</a><span>'+esc(j.provider||'LinayAI')+(j.edited?' · Görsel düzenlendi':'')+'</span></div><div class="att">'+esc(text)+'</div></div>';
+  const engine=esc(j.provider||'Bilinmeyen motor'),model=esc(j.model||'model bilgisi yok'),version=esc(j.apiVersion||'');
+  const fallback=j.fallbackReason?'<small>Yedek motor nedeni: '+esc(j.fallbackReason)+'</small>':'';
+  el.innerHTML='<div class="generated-image-card"><img alt="Oluşturulan görsel"><div class="generated-image-actions"><a download="linay-gorsel.png">İndir</a><span>'+engine+' · '+model+(version?' · '+version:'')+(j.edited?' · Görsel düzenlendi':' · Görsel üretildi')+'</span></div>'+fallback+'<div class="att">'+esc(text)+'</div></div>';
   const img=el.querySelector('img');img.src=src;el.querySelector('a').href=src;
   img.onload=()=>requestAnimationFrame(()=>{m.scrollTop=wasAtBottom?m.scrollHeight:Math.max(oldTop,el.offsetTop-m.offsetTop-24)});
-  return {prompt:text,src,provider:j.provider,edited:!!j.edited};
- }catch(e){const message=String(e.message||e);el.innerHTML='<div class="image-error"><b>Görsel oluşturulamadı</b><p>'+esc(message)+'</p><button type="button" class="image-retry">Tekrar dene</button></div>';el.querySelector('.image-retry').onclick=()=>genImg(text,el,raw,sourceImage);return {prompt:text,src:null,error:message}}
+  return {prompt:text,src,provider:j.provider,model:j.model,apiVersion:j.apiVersion,edited:!!j.edited};
+ }catch(e){
+  const message=String(e.message||e);
+  el.innerHTML='<div class="image-error"><b>Görsel oluşturulamadı</b><p>'+esc(message)+'</p><button type="button" class="image-retry">Tekrar dene</button></div>';
+  el.querySelector('.image-retry').onclick=()=>genImg(text,el,raw,sourceImage);
+  return {prompt:text,src:null,error:message};
+ }
 }
 function makeChatTitle(value){
  const stop=new Set(['lütfen','bana','bir','şey','hakkında','ile','için','nasıl','nedir','ne','kadar','mi','mı','mu','mü','acaba','yardım','eder','misin','misiniz','istiyorum','yapar','yapabilir','anlat','açıkla']);
