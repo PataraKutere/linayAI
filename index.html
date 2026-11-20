@@ -232,6 +232,29 @@ dialog input,dialog textarea{background:#0b1220;border-color:#334765;color:#eef3
 button:focus-visible,[role="button"]:focus-visible,a:focus-visible{outline:2px solid #a77bff;outline-offset:2px}
 #msgs{scroll-behavior:auto}
 @media(max-width:760px){#inp,#q,dialog input,dialog textarea{font-size:16px}#bar{padding-bottom:max(8px,env(safe-area-inset-bottom))}}
+
+/* Linay 2026 voice identity: canlı mor-mavi ışık küresi */
+#voiceStage{background:radial-gradient(ellipse at 50% 44%,#29204b42 0%,#11101c00 58%);}
+#voiceStage:before{width:min(88vw,650px);height:min(88vw,650px);background:radial-gradient(circle,#7d54e52b 0%,#4263bb1c 34%,#18213b12 54%,transparent 72%);filter:blur(8px);animation:stageGlow 8s ease-in-out infinite alternate;}
+#voiceOrbButton{width:224px;height:224px;margin:4px 0 2px;filter:drop-shadow(0 16px 48px #6844d44a);}
+.voice-orb-halo{inset:4px;border:1px solid #b99aff42;box-shadow:0 0 34px #7958db36,0 0 90px #526fe326,inset 0 0 46px #b68cff12;}
+.voice-orb-halo:before,.voice-orb-halo:after{content:"";position:absolute;inset:12px;border-radius:50%;border:1px solid #8fbbff24;}
+.voice-orb-halo:after{inset:25px;border-color:#d1a5ff20;}
+.voice-orb-core{width:150px;height:150px;background:radial-gradient(ellipse at 34% 21%,#fff1ff 0%,#e2b5ff 5%,#b779f5 13%,#8057e7 27%,#4c4cc1 43%,#253c91 62%,#121d48 81%,#080d22 100%);box-shadow:0 0 28px #bd83ff88,0 0 72px #8054e877,0 0 128px #4c69d64d,inset -18px -22px 34px #080b25,inset 8px 10px 22px #ffffff80;animation:orbIdle 7s ease-in-out infinite;}
+.voice-orb-core:before{inset:8px;border:1px solid #ffffff59;box-shadow:inset 0 0 25px #ffffff24,0 0 18px #c7a1ff25;}
+.voice-orb-core:after{top:20px;left:35px;width:46px;height:22px;background:#fff;filter:blur(13px);opacity:.82;}
+body.voice-listening .voice-orb-halo{animation:voicePulse 1.7s ease-out infinite;border-color:#c9b1ffb0;box-shadow:0 0 0 16px #a77bff16,0 0 100px #8b68ff70;}
+body.voice-listening .voice-orb-core{animation:orbListen 1.5s ease-in-out infinite alternate;box-shadow:0 0 38px #d3aaffc7,0 0 100px #936bffb0,0 0 155px #536ee866,inset -18px -22px 34px #080b25,inset 8px 10px 22px #ffffff80;}
+body.voice-thinking .voice-orb-core{animation:orbThink 1.2s ease-in-out infinite;}
+body.voice-speaking .voice-orb-core{animation:orbSpeak .55s ease-in-out infinite alternate;box-shadow:0 0 42px #e0b2ffcc,0 0 110px #986affb0,0 0 160px #5277ed66,inset -18px -22px 34px #080b25,inset 8px 10px 22px #ffffff80;}
+#voiceGreeting{font-size:clamp(28px,4.3vw,42px);letter-spacing:-.05em;text-shadow:0 4px 30px #a78bfa20;}
+#voiceStatus{color:#d0c8ed;font-size:14px;}
+#voiceSessionBtn{background:linear-gradient(115deg,#a77bff,#7359dc 55%,#5278d9);border-color:#c9b3ff70;box-shadow:0 10px 36px #7651db55, inset 0 1px 0 #ffffff30;}
+@keyframes orbIdle{0%,100%{transform:translateY(0) scale(1);filter:hue-rotate(0)}50%{transform:translateY(-7px) scale(1.025);filter:hue-rotate(12deg)}}
+@keyframes orbListen{from{transform:scale(.97) rotate(-2deg)}to{transform:scale(1.055) rotate(2deg)}}
+@keyframes stageGlow{from{opacity:.55;transform:scale(.94)}to{opacity:1;transform:scale(1.07)}}
+@media(max-width:760px){#voiceStage{gap:10px;padding:20px 14px 14px}#voiceOrbButton{width:184px;height:184px;margin:2px 0}.voice-orb-core{width:124px;height:124px}#voiceGreeting{font-size:28px}body.has-chat:not(.text-mode) #voiceStage{flex-basis:245px;min-height:230px;padding:9px 12px 6px;gap:4px}body.has-chat:not(.text-mode) #voiceOrbButton{width:86px;height:86px}body.has-chat:not(.text-mode) .voice-orb-core{width:58px;height:58px}}
+@media(prefers-reduced-motion:reduce){#voiceStage:before,.voice-orb-core{animation:none!important}*{scroll-behavior:auto!important;}}
 </style>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
