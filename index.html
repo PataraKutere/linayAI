@@ -1026,7 +1026,7 @@ async function refreshChatTitle(chatId,message){
   const chat=S.chats.find(item=>String(item.id)===String(chatId));
   if(!chat||chat.hidden)return;
   const firstUser=chat.msgs.find(item=>item.role==="user");
-  if(!firstUser||String(firstUser.t||"")!==String(message||""))return;
+  if(!firstUser||String(firstUser.t||firstUser.att?.[0]||"")!==String(message||""))return;
   chat.title=String(data.title).replace(/\s+/g," ").trim().slice(0,64);
   const row=[...document.querySelectorAll("#list .ci")].find(item=>item.dataset.chatId===String(chatId));
   if(row){row.querySelector("span").textContent=chat.title;row.querySelector("span").title=chat.title}
