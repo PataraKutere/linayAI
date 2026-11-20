@@ -682,7 +682,7 @@ async function send(){
  const agentMode=!!(S.cfg.agent||S.cfg.research);
  const el=add('model',agentMode?'<span style="color:var(--mu)">Ajan görevi devraldı…</span>':'<span style="color:var(--mu)">Linay düşünüyor…</span>');
  let agentProgress=null;
- if(agentMode){agentProgress=document.createElement('div');agentProgress.className='agent-progress';agentProgress.innerHTML='<b><span class="pulse"></span>Ajan çalışıyor</b><div>Görev analiz ediliyor. Kullanılan araç adımları tamamlandığında burada listelenecek.</div>';el.parentElement.appendChild(agentProgress)}
+ if(agentMode){agentProgress=document.createElement('div');agentProgress.className='agent-progress';agentProgress.innerHTML='<b><span class="pulse"></span>Ajan çalışıyor</b><div>Görev planlanıyor ve araç adımları canlı olarak gösteriliyor.</div><ol id="agentLiveSteps"></ol>';el.parentElement.appendChild(agentProgress)}
  busy=true;$('go').textContent='■';ctl=new AbortController();
  if(text&&(imgMode||(!sf.length&&text.length<200&&IMG_RE.test(text)))){
   imgMode=false;$('img').classList.remove('on');
@@ -707,14 +707,17 @@ async function send(){
   if(!r.ok){let msg='HTTP '+r.status;try{const j=await r.json();msg=j.error||msg}catch{}throw new Error(msg)}
   const provider=r.headers.get('X-Linay-Provider')||'Cloudflare Workers AI';
   const searchState=r.headers.get('X-Linay-Search')||'off';let citations=[],documentCitations=[];try{citations=JSON.parse(decodeURIComponent(r.headers.get('X-Linay-Sources')||'%5B%5D'))}catch(e){}try{documentCitations=JSON.parse(decodeURIComponent(r.headers.get('X-Linay-Documents')||'%5B%5D'))}catch(e){}
-  const agentSteps=Number(r.headers.get('X-Linay-Agent-Steps')||0);
+  let agentSteps=Number(r.headers.get('X-Linay-Agent-Steps')||0);
   let agentTrace=[];try{agentTrace=JSON.parse(decodeURIComponent(r.headers.get('X-Linay-Agent-Trace')||'%5B%5D'))}catch(e){}
   if(agentProgress){agentProgress.innerHTML='<b>✓ Ajan araç adımlarını tamamladı</b><ol>'+agentTrace.map(x=>'<li>'+esc(x.label||x.tool||'Araç çalıştırıldı')+'</li>').join('')+(agentTrace.length?'':'<li>Ek araç adımı gerekmedi; yanıt hazırlanıyor.</li>')+'</ol><small>Şimdi sonuç oluşturuluyor…</small>'}
   if(useSearch&&searchState==='failed')out+='*(İnternet araması başarısız oldu; yanıt güncel kaynaklarla doğrulanamadı.)*\n\n';
   if(provider.includes('Gemini Backup'))out+=(provider.includes('ücretsiz günlük kotası doldu')?'*(Cloudflare Workers AI ücretsiz günlük kotası doldu; Gemini yedek model devrede.)*\n\n':'*(Ana model geçici olarak kullanılamadı; Gemini yedek model devreye girdi.)*\n\n');
   if(provider.includes('Web search unavailable'))out+='*(Web araması şu anda erişilemiyor; aşağıdaki yanıt güncel internet kaynaklarıyla doğrulanmadı.)*\n\n';
   const rd=r.body.getReader(),dc=new TextDecoder();let buf='';
-  for(;;){const {done,value}=await rd.read();if(done)break;buf+=dc.decode(value,{stream:true});const ls=buf.split('\n');buf=ls.pop();for(const l of ls){if(!l.startsWith('data:'))continue;const raw=l.slice(5).trim();if(!raw||raw==='[DONE]')continue;let j;try{j=JSON.parse(raw)}catch{continue}if(j.error)throw new Error(j.error.message||'Model yanıt hatası');out+=(j.choices?.[0]?.delta?.content||'');el.innerHTML=md(out);$('msgs').scrollTop=$('msgs').scrollHeight;}}
+  for(;;){const {done,value}=await rd.read();if(done)break;buf+=dc.decode(value,{stream:true});const ls=buf.split('\n');buf=ls.pop();for(const l of ls){if(!l.startsWith('data:'))continue;const raw=l.slice(5).trim();if(!raw||raw==='[DONE]')continue;let j;try{j=JSON.parse(raw)}catch{continue}if(j.error)throw new Error(j.error.message||'Model yanıt hatası');
+   if(j.progress&&agentProgress){const list=agentProgress.querySelector('#agentLiveSteps');if(list){const ev=j.progress;let li=[...list.children].find(x=>x.dataset.tool===(ev.tool||'plan')&&x.dataset.status==='started');if(ev.status==='started'){li=document.createElement('li');li.dataset.tool=ev.tool||'plan';li.dataset.status='started';li.textContent=ev.label||'Görev adımı başlatıldı';list.appendChild(li)}else if(li){li.textContent=(ev.label||li.textContent)+' ✓';li.dataset.status='done'}else{li=document.createElement('li');li.textContent=(ev.label||'Adım tamamlandı')+' ✓';list.appendChild(li)}}continue}
+   if(j.meta){citations=j.meta.sources||citations;documentCitations=j.meta.documents||documentCitations;agentSteps=Number(j.meta.steps||0);agentTrace=j.meta.trace||agentTrace;if(agentProgress){agentProgress.querySelector('b').textContent='✓ Ajan araç adımlarını tamamladı'}continue}
+   out+=(j.choices?.[0]?.delta?.content||'');el.innerHTML=md(out);$('msgs').scrollTop=$('msgs').scrollHeight;}}
   if(!useSearch)out=out.replace(/\n\s*(?:\*\*)?(?:Kaynaklar|Sources|Kaynakça)(?:\*\*)?\s*\n[\s\S]*$/i,'').trim();
   if(!out)out='(Boş yanıt geldi, tekrar dene.)';if(docNotice)out+=docNotice;
   const validCitations=citations.filter(x=>/^https?:\/\//i.test(String(x.url||'')));if(useSearch&&validCitations.length)out+='\n\n**İnternet kaynakları**\n'+validCitations.map(x=>'- ['+(x.title||'Kaynak')+']('+x.url+')').join('\n');if(documentCitations.length)out+='\n\n**Belge hafızasında kullanılan kaynaklar**\n'+documentCitations.map((x,i)=>'- **'+(x.title||'Belge')+'** · Parça '+(i+1)+(x.projectId?' · Proje belgesi':' · Genel belge')+(x.excerpt?'\n  > '+String(x.excerpt).slice(0,180):'')).join('\n');
