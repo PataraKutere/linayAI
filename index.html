@@ -369,7 +369,7 @@ function nc(){stopSpeech();endPrivateChat();S.cur=null;render();tg(false);inp.fo
 function startPrivateChat(){stopSpeech();endPrivateChat();privateChat=true;S.cur=null;render();tg(false);inp.focus()}
 function add(role,html,last,media){
  const w=document.createElement('div');w.className='w';
- const d=document.createElement('div');d.className=role=='user'?'u':'a';d.innerHTML=html;w.appendChild(d);if(media&&media.length)showMedia(d,media);
+ const d=document.createElement('div');d.className=role=='user'?'u':'a';d.innerHTML=html;w.appendChild(d);
  if(role!='user'){const a=document.createElement('div');a.className='act';a.innerHTML='<button>🔊</button><button>📋</button>'+(last?'<button>🔄</button>':'');
   a.children[0].onclick=()=>say(d.innerText,a.children[0],cur()?.id);a.children[1].onclick=async()=>{const ok=await copyText(d.innerText);a.children[1].textContent=ok?'Kopyalandı':'Kopyalanamadı';setTimeout(()=>a.children[1].textContent='📋',1200)};if(last)a.children[2].onclick=regen;w.appendChild(a)}
  $('msgs').appendChild(w);return d;
@@ -383,7 +383,7 @@ function render(){
   r.lastChild.onclick=()=>{if(speechChatId===x.id)stopSpeech();S.chats=S.chats.filter(y=>y.id!=x.id);if(S.cur==x.id)S.cur=null;save();render()};
   $('list').appendChild(r)});
  const m=$('msgs');m.innerHTML='';
- if(!c||!c.msgs.length){m.innerHTML='<div id="hello"><div class="zy-orb" aria-hidden="true"></div><h2>Beratın yüce beynine başvur</h2>'+QUICK+'</div>'; $("features").innerHTML=CARDS;}
+ if(!c||!c.msgs.length){m.innerHTML='<div id="hello"><div class="zy-orb" aria-hidden="true"></div><h2>Aklındaki her şeyi Linay’e sor</h2>'+QUICK+'</div>'; $("features").innerHTML=CARDS;}
  else c.msgs.forEach((x,i)=>{const d=add(x.role==='user'?'user':'model',x.role==='user'?esc(x.t||'')+(x.att&&x.att.length?`<div class="att">📎 ${esc(x.att.join(', '))}</div>`: ''):md(x.text),i==c.msgs.length-1);if(x.media)showMedia(d,x.media);});
  m.querySelectorAll('.quick-actions button').forEach(d=>d.onclick=()=>{inp.value=d.dataset.p;inp.focus();grow()});$('features').querySelectorAll('.cards div').forEach(d=>d.onclick=()=>{inp.value=d.dataset.p;inp.focus();grow()});if(c&&c.msgs.length)$('features').innerHTML='';m.scrollTop=m.scrollHeight;
 }
