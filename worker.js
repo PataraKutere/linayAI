@@ -554,7 +554,7 @@ export default {async fetch(req,env,ctx){
      for(let i=0;i<bytes.length;i+=0x8000)binary+=String.fromCharCode(...bytes.subarray(i,i+0x8000));
      const fallbackBase64=btoa(binary);
      await log(env,"image-generation","Pollinations / FLUX (Fallback)",true,Date.now()-started,"Cloudflare günlük neuron kotası dolu; ratio="+ratio+"; style="+style);
-     return json({image:fallbackBase64,type:contentType==="image/jpeg"?"image/jpeg":contentType,provider:"Pollinations",model:"FLUX (Fallback)",apiVersion:"Pollinations",engine:"Pollinations / FLUX (Fallback)",promptUsed:fluxPrompt,edited:false,ratio,style,fallbackReason:"Cloudflare Workers AI günlük ücretsiz neuron kotası dolduğu için yedek motor kullanıldı.",dailyLimit:30});
+     return json({image:fallbackBase64,imageDataUrl:"data:"+contentType+";base64,"+fallbackBase64,type:contentType,provider:"Pollinations",model:"FLUX (Fallback)",apiVersion:"Pollinations",engine:"Pollinations / FLUX (Fallback)",promptUsed:fluxPrompt,edited:false,ratio,style,fallbackReason:"Cloudflare Workers AI günlük ücretsiz neuron kotası dolduğu için yedek motor kullanıldı.",dailyLimit:30});
     }catch(fallbackError){
      const fallbackDetail=String(fallbackError?.message||fallbackError||"Bilinmeyen Pollinations hatası");
      await log(env,"image-generation","Pollinations / FLUX (Fallback)",false,Date.now()-started,fallbackDetail);
