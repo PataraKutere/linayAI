@@ -365,7 +365,19 @@ body.voice-speaking #voiceOrbButton:before,body.voice-speaking #voiceOrbButton:a
 #bar button#agent{display:inline-flex;align-items:center;justify-content:center;gap:6px;width:auto;min-width:68px;padding:0 10px;border:1px solid #ffffff18;border-radius:10px;background:#111a2b;color:#c5d2ed;font-size:12px;white-space:nowrap}
 #bar button#agent svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
 #bar button#agent.on{background:linear-gradient(135deg,#55418f,#344f91);border-color:#a99aff;color:#fff;box-shadow:0 0 16px #7666d833}
-@media(max-width:760px){#bar button#agent{min-width:58px;padding:0 7px;font-size:11px}}
+#bar{position:relative}
+#agentHelp{position:absolute;z-index:20;left:130px;bottom:calc(100% + 12px);width:min(310px,calc(100vw - 34px));padding:14px 15px;border:1px solid #6576b8;border-radius:14px;background:#111a2b;box-shadow:0 16px 44px #000b;text-align:left;font-size:12px;color:#e9edff}
+#agentHelp[hidden]{display:none}#agentHelp b{font-size:13px;color:#fff}#agentHelp p{margin:7px 0;color:#c5cfe7;line-height:1.5}#agentHelp small{color:#98a8ca}
+#modeGuide{max-width:850px;width:calc(100% - 44px);margin:0 auto 9px;display:flex;gap:7px 14px;flex-wrap:wrap;color:#8e9bb8;font-size:10px}
+#modeGuide span{padding-left:12px;border-left:1px solid #35425e}
+.welcome-kicker{margin-top:16px;color:#9baee4;font-size:10px;letter-spacing:.22em;font-weight:700}
+#hello h2{margin:10px 0 8px}.welcome-sub{margin:0 auto 18px;max-width:460px;color:#aab6ce;font-size:13px}
+#features .cards{grid-template-columns:repeat(4,minmax(0,1fr));max-width:850px}#features .cards div{min-height:126px}
+.agent-progress{margin-top:12px;padding:10px 12px;border:1px solid #52638d55;border-radius:12px;background:#0c1422;color:#c6d2ed;font-size:12px}
+.agent-progress b{display:block;color:#e5eaff;margin-bottom:5px}.agent-progress .pulse{display:inline-block;width:6px;height:6px;border-radius:50%;background:#9baaff;margin-right:7px;box-shadow:0 0 10px #9baaff;animation:agentPulse 1s infinite alternate}
+@keyframes agentPulse{to{opacity:.25}}.agent-progress ol{margin:7px 0 0;padding-left:20px;color:#aebbd5}.agent-progress li{margin:3px 0}
+@media(max-width:760px){#bar button#agent{min-width:58px;padding:0 7px;font-size:11px}#agentHelp{left:70px}#modeGuide{width:calc(100% - 20px);font-size:9px;gap:5px 9px}#features .cards{grid-template-columns:repeat(2,minmax(0,1fr))}#features .cards div{min-height:112px}}
+@media(max-height:760px) and (min-width:761px){#hello{padding-top:0}#features .cards div{min-height:100px}}
 </style>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
@@ -411,7 +423,9 @@ body.voice-speaking #voiceOrbButton:before,body.voice-speaking #voiceOrbButton:a
   <textarea id="inp" rows="1" placeholder="Bir şey sor…"></textarea>
   <button id="mic" title="Sesle yaz"><svg viewBox="0 0 24 24"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10v2a7 7 0 0 0 14 0v-2M12 19v3m-4 0h8"/></svg></button>
   <button id="go">➤</button>
+  <div id="agentHelp" role="status" hidden><b>Ajan modu ne yapar?</b><p>İsteğini adımlara böler; gerektiğinde web’de arama yapar, bağlantı okur, hesaplama yapar veya proje belgelerinde arama yapar. Normal sohbetten farklı olarak araç kullanır.</p><small>Basit sorular için kapalı tut. Çok adımlı işler için aç.</small></div>
  </div>
+ <div id="modeGuide">Normal sohbet · Doğrudan yanıtlar <span>Web: kaynaklı internet araması</span><span>Ajan: araçlarla çok adımlı görev</span></div>
  <div id="features"></div>
  <input type="file" id="f" hidden multiple accept="image/*,.pdf,.txt,.md,.csv,.json,.js,.py,.html,.css,.java,.c,.cpp,.docx,.xlsx,.tsv">
 </main>
@@ -479,8 +493,8 @@ function mediaGet(id){return mediaDB().then(db=>new Promise((resolve,reject)=>{c
 function showMedia(el,items){if(!items||!items.length)return;const box=document.createElement('div');box.className='media-gallery';el.appendChild(box);items.forEach(async item=>{try{const src=item.src||await mediaGet(item.id);if(!src)return;const im=document.createElement('img');im.src=src;im.alt=item.name||'Sohbet görseli';box.appendChild(im)}catch(e){}})}
 const cur=()=>S.chats.find(c=>c.id===S.cur);
 const FB='gemini-flash-lite-latest';
-const QUICK='<div class="quick-actions"><button data-p="Gökyüzünde dalgalanan Türk bayrağının etkileyici, sinematik bir görselini oluştur">✦ Resim oluştur</button><button data-p="Benimle yaratıcı fikirler üzerine beyin fırtınası yap">✧ Fikir üret</button><button data-p="Bugün yapmam gerekenler için uygulanabilir bir plan hazırla">▤ Plan yap</button></div>';
-const CARDS='<div class="cards">'+[['▧','Resim üretici','Metinden etkileyici görseller oluştur','Gökyüzünde dalgalanan Türk bayrağını sinematik bir fotoğraf olarak oluştur'],['◉','Bir şey öğren','Merak ettiğin konuyu sade ve anlaşılır öğren','Galatasaray Spor Kulübünün kuruluşundan bugüne tarihini ve başarılarını anlat'],['⌘','Kod asistanı','Kod yaz, hataları bul ve projeler geliştir','Python ile basit bir hesap makinesi yaz ve açıkla']].map(([i,t,d,p])=>`<div data-p="${p}"><span class="card-icon">${i}</span><b>${t}</b><small>${d}</small></div>`).join('')+'</div>';
+const QUICK='<div class="quick-actions"><button data-p="Bana şu konuda kısa ve anlaşılır bilgi ver: yapay zekâ nasıl çalışır?">✦ Bir şey sor</button><button data-p="Bu hafta öğrenebileceğim üç yeni beceri öner">✧ Fikir üret</button></div>';
+const CARDS='<div class="cards">'+[['⌕','Araştır','Güncel bilgileri web kaynaklarıyla karşılaştır','2026 yılında Türkiye’de yapay zekâ alanındaki son gelişmeleri güvenilir kaynaklarla araştır'],['⌘','Kod yaz','Kod üret, hataları bul ve projeni geliştir','Python ile çalışan basit bir hesap makinesi yaz ve kodu açıkla'],['▤','Dosya incele','PDF, belge veya yüklediğin dosyadan bilgi çıkar','Yüklediğim dosyayı incele, önemli noktaları ve eksik bilgileri özetle'],['✧','Fikir üret','Yeni fikirler bul, seçenekleri değerlendir','Ücretsiz başlayabileceğim, gelir potansiyeli olan 5 web uygulaması fikri üret']].map(([i,t,d,p])=>`<div data-p="${p}"><span class="card-icon">${i}</span><b>${t}</b><small>${d}</small></div>`).join('')+'</div>';
 function logo(n,id){return '<svg viewBox="0 0 40 40" width="'+n+'" height="'+n+'" role="img" aria-label="LinayAI"><defs><radialGradient id="linayMarkGlow" cx="32%" cy="24%"><stop offset="0" stop-color="#f2d8ff"/><stop offset=".28" stop-color="#a879ff"/><stop offset=".68" stop-color="#526fe0"/><stop offset="1" stop-color="#111a3a"/></radialGradient></defs><rect x="1" y="1" width="38" height="38" rx="12" fill="#10152a" stroke="#9d8aff" stroke-opacity=".55"/><circle cx="20" cy="20" r="12.5" fill="url(#linayMarkGlow)"/><circle cx="16" cy="14" r="3.4" fill="#fff" opacity=".62"/><circle cx="20" cy="20" r="15.5" fill="none" stroke="#91a7ff" stroke-opacity=".3"/></svg>';}
 $('brandLogo').innerHTML=logo(32,'brand');
 $('brandLogo').onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();nc()}};
@@ -535,7 +549,7 @@ function render(){
   r.children[1].onclick=()=>moveChatToProject(x.id);r.lastChild.onclick=()=>{if(speechChatId===x.id)stopSpeech();S.chats=S.chats.filter(y=>y.id!=x.id);if(S.cur==x.id)S.cur=null;save();render()};
   $('list').appendChild(r)});
  const m=$('msgs');m.innerHTML='';
- if(!c||!c.msgs.length){m.innerHTML='<div id="hello"><div class="zy-orb" aria-hidden="true"></div><h2>Aklındaki her şeyi Linay’e sor</h2>'+QUICK+'</div>'; $("features").innerHTML=CARDS;}
+ if(!c||!c.msgs.length){m.innerHTML='<div id="hello"><div class="zy-orb" aria-hidden="true"></div><div class="welcome-kicker">LINAY AI · YARDIMCIN HAZIR</div><h2>Bugün ne yapmak istersin?</h2><p class="welcome-sub">Sorunu yaz, bir dosya ekle veya aşağıdaki örneklerden biriyle başla.</p>'+QUICK+'</div>'; $("features").innerHTML=CARDS;}
  else c.msgs.forEach((x,i)=>{const d=add(x.role==='user'?'user':'model',x.role==='user'?esc(x.t||'')+(x.att&&x.att.length?`<div class="att">📎 ${esc(x.att.join(', '))}</div>`: ''):md(x.text),i==c.msgs.length-1);if(x.media)showMedia(d,x.media);});
  m.querySelectorAll('.quick-actions button').forEach(d=>d.onclick=()=>{inp.value=d.dataset.p;inp.focus();grow()});$('features').querySelectorAll('.cards div').forEach(d=>d.onclick=()=>{inp.value=d.dataset.p;inp.focus();grow()});if(c&&c.msgs.length)$('features').innerHTML='';m.scrollTop=m.scrollHeight;
 }
@@ -664,7 +678,11 @@ async function send(){
  let c=cur();
  if(!c){c={id:Date.now(),title:(text||files[0].name).slice(0,40),msgs:[],hidden:privateChat,projectId:privateChat?null:S.activeProjectId};S.chats.push(c);S.cur=c.id}
  const sf=files;const imageFiles=sf.filter(f=>f.part&&f.part.inlineData&&String(f.part.inlineData.mimeType||'').startsWith('image/'));const media=imageFiles.map((f,i)=>({id:'up-'+c.id+'-'+Date.now()+'-'+i,name:f.name,src:privateChat?'data:'+f.part.inlineData.mimeType+';base64,'+f.part.inlineData.data:undefined}));if(!privateChat)await Promise.all(media.map((m,i)=>{const f=imageFiles[i].part.inlineData;return mediaPut(m.id,'data:'+f.mimeType+';base64,'+f.data)}));const parts=sf.map(f=>f.part);if(text)parts.push({text});const um={role:'user',parts,t:text,att:sf.map(f=>f.name),media};c.msgs.push(um);files=[];chips();inp.value='';grow();render();
- const el=add('model','<span style="color:var(--mu)">Linay düşünüyor…</span>');busy=true;$('go').textContent='■';ctl=new AbortController();
+ const agentMode=!!(S.cfg.agent||S.cfg.research);
+ const el=add('model',agentMode?'<span style="color:var(--mu)">Ajan görevi devraldı…</span>':'<span style="color:var(--mu)">Linay düşünüyor…</span>');
+ let agentProgress=null;
+ if(agentMode){agentProgress=document.createElement('div');agentProgress.className='agent-progress';agentProgress.innerHTML='<b><span class="pulse"></span>Ajan çalışıyor</b><div>İstek değerlendiriliyor; gerekli araç adımları yürütülecek.</div>';el.parentElement.appendChild(agentProgress)}
+ busy=true;$('go').textContent='■';ctl=new AbortController();
  if(text&&(imgMode||(!sf.length&&text.length<200&&IMG_RE.test(text)))){
   imgMode=false;$('img').classList.remove('on');
   const generated=await genImg(text,el),mediaId='gen-'+c.id+'-'+Date.now();if(!privateChat)await mediaPut(mediaId,generated.src);c.msgs.push({role:'model',parts:[{text:'[Resim oluşturuldu: '+generated.prompt+']'}],text:'🖼 Resim oluşturuldu: '+generated.prompt,media:[{id:mediaId,name:'Oluşturulan resim',src:privateChat?generated.src:undefined}]});busy=false;$('go').textContent='➤';save();render();return;
@@ -689,6 +707,8 @@ async function send(){
   const provider=r.headers.get('X-Linay-Provider')||'Cloudflare Workers AI';
   const searchState=r.headers.get('X-Linay-Search')||'off';let citations=[],documentCitations=[];try{citations=JSON.parse(decodeURIComponent(r.headers.get('X-Linay-Sources')||'%5B%5D'))}catch(e){}try{documentCitations=JSON.parse(decodeURIComponent(r.headers.get('X-Linay-Documents')||'%5B%5D'))}catch(e){}
   const agentSteps=Number(r.headers.get('X-Linay-Agent-Steps')||0);
+  let agentTrace=[];try{agentTrace=JSON.parse(decodeURIComponent(r.headers.get('X-Linay-Agent-Trace')||'%5B%5D'))}catch(e){}
+  if(agentProgress){agentProgress.innerHTML='<b>✓ Ajan araç adımlarını tamamladı</b><ol>'+agentTrace.map(x=>'<li>'+esc(x.label||x.tool||'Araç çalıştırıldı')+'</li>').join('')+(agentTrace.length?'':'<li>Ek araç adımı gerekmedi; yanıt hazırlanıyor.</li>')+'</ol><small>Şimdi sonuç oluşturuluyor…</small>'}
   if(useSearch&&searchState==='failed')out+='*(İnternet araması başarısız oldu; yanıt güncel kaynaklarla doğrulanamadı.)*\n\n';
   if(provider.includes('Gemini Backup'))out+=(provider.includes('ücretsiz günlük kotası doldu')?'*(Cloudflare Workers AI ücretsiz günlük kotası doldu; Gemini yedek model devrede.)*\n\n':'*(Ana model geçici olarak kullanılamadı; Gemini yedek model devreye girdi.)*\n\n');
   if(provider.includes('Web search unavailable'))out+='*(Web araması şu anda erişilemiyor; aşağıdaki yanıt güncel internet kaynaklarıyla doğrulanmadı.)*\n\n';
@@ -697,7 +717,7 @@ async function send(){
   if(!useSearch)out=out.replace(/\n\s*(?:\*\*)?(?:Kaynaklar|Sources|Kaynakça)(?:\*\*)?\s*\n[\s\S]*$/i,'').trim();
   if(!out)out='(Boş yanıt geldi, tekrar dene.)';if(docNotice)out+=docNotice;
   const validCitations=citations.filter(x=>/^https?:\/\//i.test(String(x.url||'')));if(useSearch&&validCitations.length)out+='\n\n**İnternet kaynakları**\n'+validCitations.map(x=>'- ['+(x.title||'Kaynak')+']('+x.url+')').join('\n');if(documentCitations.length)out+='\n\n**Belge hafızasında kullanılan kaynaklar**\n'+documentCitations.map((x,i)=>'- **'+(x.title||'Belge')+'** · Parça '+(i+1)+(x.projectId?' · Proje belgesi':' · Genel belge')+(x.excerpt?'\n  > '+String(x.excerpt).slice(0,180):'')).join('\n');
-  if(S.cfg.agent)out+='\n\n*Linay ajanı '+agentSteps+' araç adımı kullandı.*';
+  if(agentMode){out+='\n\n**Ajanın izlediği adımlar**\n'+(agentTrace.length?agentTrace.map((x,i)=>(i+1)+'. '+(x.label||x.tool)).join('\n'):'Araç kullanımı gerekmedi; görev doğrudan yanıtlandı.')+'\n\n*Toplam araç adımı: '+agentSteps+'*';if(agentProgress)agentProgress.innerHTML='<b>✓ Görev tamamlandı</b><ol>'+agentTrace.map(x=>'<li>'+esc(x.label||x.tool)+'</li>').join('')+(agentTrace.length?'':'<li>Ek araç adımı gerekmedi.</li>')+'</ol>'}
   const mi=out.match(/\[RESIM:\s*([^\]]+)\]/i);
   if(mi){out=out.replace(mi[0],'').trim();el.innerHTML=md(out);const ie=add('model','');const generated=await genImg(mi[1].trim(),ie,true),mediaId='gen-'+c.id+'-'+Date.now();if(!privateChat)await mediaPut(mediaId,generated.src);generatedMedia=[{id:mediaId,name:'Oluşturulan resim',src:privateChat?generated.src:undefined}];out+='\\n\\n🖼 *Resim oluşturuldu: '+generated.prompt+'*';shown=true}
   c.msgs.push({role:'model',parts:[{text:out}],text:out,media:generatedMedia});
@@ -721,11 +741,13 @@ inp.oninput=grow;
 inp.onkeydown=e=>{if(e.key=='Enter'&&!e.shiftKey&&!matchMedia('(pointer:coarse)').matches){e.preventDefault();send()}};
 $('go').onclick=send;
 $('img').onclick=()=>{imgMode=!imgMode;$('img').classList.toggle('on',imgMode);if(imgMode)inp.placeholder='Nasıl bir resim istiyorsun?';else inp.placeholder='Bir şey sor…'};
-$('web').title="Bağımsız internet araması: DuckDuckGo / SearXNG / Brave";
+$('web').title="Web araması: İnternette ara, güncel sonuçları ve kaynak bağlantılarını getir.";
+$('research').title="Araştırma: Ajan + web araması; çok adımlı ve kaynaklı inceleme.";
+$('agent').title="Ajan: Araçlarla çok adımlı görev yürütür.";
 $('web').setAttribute('aria-label',"Bağımsız web araması");
-$('web').onclick=()=>{S.cfg.search=!S.cfg.search;$('web').classList.toggle('on',S.cfg.search);save()};
-$('agent').onclick=()=>{S.cfg.agent=!S.cfg.agent;$('agent').classList.toggle('on',S.cfg.agent);save()};
-$('research').onclick=()=>{if(!S.cfg.research){S.cfg.research=true;S.cfg.researchPrevious={search:!!S.cfg.search,agent:!!S.cfg.agent};S.cfg.search=true;S.cfg.agent=true}else{S.cfg.research=false;const p=S.cfg.researchPrevious||{};S.cfg.search=!!p.search;S.cfg.agent=!!p.agent;delete S.cfg.researchPrevious}$('research').classList.toggle('on',S.cfg.research);$('web').classList.toggle('on',S.cfg.search);$('agent').classList.toggle('on',S.cfg.agent);save()};
+$('web').onclick=()=>{S.cfg.search=!S.cfg.search;if(S.cfg.search){S.cfg.agent=false;S.cfg.research=false}$('agent').classList.toggle('on',S.cfg.agent);$('research').classList.toggle('on',S.cfg.research);$('web').classList.toggle('on',S.cfg.search);$('agentHelp').hidden=true;save()};
+$('agent').onclick=()=>{S.cfg.agent=!S.cfg.agent;if(S.cfg.agent){S.cfg.search=false;S.cfg.research=false}$('agent').classList.toggle('on',S.cfg.agent);$('web').classList.toggle('on',S.cfg.search);$('research').classList.toggle('on',S.cfg.research);$('agentHelp').hidden=!$('agentHelp').hidden;save()};
+$('research').onclick=()=>{if(!S.cfg.research){S.cfg.research=true;S.cfg.search=true;S.cfg.agent=true}else{S.cfg.research=false;S.cfg.search=false;S.cfg.agent=false}$('research').classList.toggle('on',S.cfg.research);$('web').classList.toggle('on',S.cfg.search);$('agent').classList.toggle('on',S.cfg.agent);$('agentHelp').hidden=true;save()};
 const SR=window.SpeechRecognition||window.webkitSpeechRecognition;let rec=null,voiceMode=false,voiceSessionActive=false,voiceReplyPending=false,voiceRetryCount=0;
 function setVoiceState(state,message){
  document.body.classList.remove('voice-listening','voice-thinking','voice-speaking','voice-error');
