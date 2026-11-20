@@ -274,7 +274,7 @@ async function handleChat(req,env,ctx){
  const mem=await loadMemory(env,userId);
  const asksAboutDocuments=/(yüklediğim|yukledigim|eklediğim|ekledigim|paylaştığım|paylastigim|dosya|belge|doküman|dokuman|pdf|dosyanın|dosyanin|belgenin|belge içeriği|dosya içeriği|içinde ne yazıyor|içeriğinde ne var)/i.test(question);
  const rag=asksAboutDocuments?await ragSearch(env,userId,question,projectId):[];
-  const documentSources=rag.map(x=>({documentId:x.document_id,chunkId:x.chunk_id||x.id,title:x.name||"Belge",projectId:x.project_id||null,excerpt:String(x.content||"").replace(/\\s+/g," ").slice(0,220)}));
+  const documentSources=rag.map(x=>({documentId:x.document_id,chunkId:x.chunk_id||x.id,title:x.name||"Belge",projectId:x.project_id||null,excerpt:String(x.content||"").replace(/\s+/g," ").slice(0,220)}));
  const originalSystem=messages.filter(m=>m.role==="system").map(m=>contentText(m)).join("\n");
  const requestContext=new Set(messages.filter(m=>m&&["user","assistant"].includes(m.role)).map(m=>m.role+"\n"+contentText(m)));
  const recentContext=mem.recent.filter(m=>!requestContext.has(m.role+"\n"+m.content));
