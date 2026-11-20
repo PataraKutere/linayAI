@@ -125,29 +125,32 @@ async function ragSearch(env,userId,query,projectId=null){
  try{
   const hasDocs=await env.DB.prepare("SELECT 1 AS present FROM documents WHERE user_id=? AND (? IS NULL OR project_id=? OR project_id IS NULL) LIMIT 1").bind(userId,projectId,projectId).first();
   if(!hasDocs)return [];
+  let semantic=[];
   if(env.VECTOR&&env.AI){
    try{
-    const v=await embed(env,query);let matches=[];
-    if(projectId){const scoped=await env.VECTOR.query(v,{topK:5,filter:{userId:userId,projectId:projectId}});matches.push(...(scoped.matches||[]))}
-    const broad=await env.VECTOR.query(v,{topK:8,filter:{userId:userId}});matches.push(...(broad.matches||[]));
-    const ids=[...new Set(matches.map(x=>x.id))];await log(env,"rag-query","Vectorize",true,0,"matches="+ids.length);
+    const v=await embed(env,query),r=await env.VECTOR.query(v,{topK:20,filter:{userId:userId}});
+    const ids=[...new Set((r.matches||[]).map(x=>x.id))];await log(env,"rag-query","Vectorize",true,0,"matches="+ids.length);
     if(ids.length){
      const rows=await env.DB.prepare("SELECT c.id AS chunk_id,c.content,c.document_id,d.name,d.project_id FROM chunks c JOIN documents d ON d.id=c.document_id WHERE c.user_id=? AND c.id IN ("+ids.map(()=>"?").join(",")+") AND (? IS NULL OR d.project_id=? OR d.project_id IS NULL)").bind(userId,...ids,projectId,projectId).all();
      const map=new Map((rows.results||[]).map(x=>[x.chunk_id,x]));
-     const found=ids.map(id=>map.get(id)).filter(Boolean).sort((x,y)=>(y.project_id===projectId?1:0)-(x.project_id===projectId?1:0)).slice(0,5);
-     if(found.length)return found;
+     semantic=ids.map(id=>map.get(id)).filter(Boolean);
     }
    }catch(e){await log(env,"rag-vector-unavailable","Workers AI/Vectorize",false,0,e.message||e)}
   }
   const stop=new Set(["what","which","where","when","that","this","with","from","have","does","your","file","document","the","and","for","about","tell","show","read","please","nedir","nedeni","hangi","bana","hakkında","belge","dosya","içerik","içinde","olan","bunu","şunu","indexed","named","exact","contain"]);
   const terms=[...new Set((String(query).toLocaleLowerCase("tr-TR").match(/[\p{L}\p{N}]{3,}/gu)||[]).filter(x=>!stop.has(x)))].slice(0,10);
-  if(!terms.length)return [];
-  const where=terms.map(()=>"(d.name LIKE ? OR c.content LIKE ?)").join(" OR ");
-  const args=[userId,...terms.flatMap(x=>["%"+x+"%","%"+x+"%"])];
-  const scope=projectId?" AND (d.project_id=? OR d.project_id IS NULL)":"";
-  const fallback=await env.DB.prepare("SELECT c.id AS chunk_id,c.content,c.document_id,d.name,d.project_id FROM chunks c JOIN documents d ON d.id=c.document_id WHERE c.user_id=? AND ("+where+")"+scope+" ORDER BY CASE WHEN d.project_id=? THEN 0 ELSE 1 END,d.created_at DESC LIMIT 5").bind(...args,...(projectId?[projectId]:[null])).all();
-  await log(env,"rag-keyword-fallback","D1",true,0,"matches="+(fallback.results||[]).length);
-  return fallback.results||[];
+  let keyword=[];
+  if(terms.length){
+   const where=terms.map(()=>"(d.name LIKE ? OR c.content LIKE ?)").join(" OR ");
+   const args=[userId,...terms.flatMap(x=>["%"+x+"%","%"+x+"%"])];
+   const scope=projectId?" AND (d.project_id=? OR d.project_id IS NULL)":"";
+   const fallback=await env.DB.prepare("SELECT c.id AS chunk_id,c.content,c.document_id,d.name,d.project_id FROM chunks c JOIN documents d ON d.id=c.document_id WHERE c.user_id=? AND ("+where+")"+scope+" ORDER BY CASE WHEN d.project_id=? THEN 0 ELSE 1 END,d.created_at DESC LIMIT 5").bind(...args,...(projectId?[projectId]:[null])).all();
+   keyword=fallback.results||[];
+   await log(env,"rag-keyword-fallback","D1",true,0,"matches="+keyword.length);
+  }
+  const combined=[...semantic,...keyword],unique=new Map();
+  for(const row of combined){if(row&&!unique.has(row.chunk_id||row.id))unique.set(row.chunk_id||row.id,row)}
+  return [...unique.values()].sort((x,y)=>(y.project_id===projectId?1:0)-(x.project_id===projectId?1:0)).slice(0,5);
  }catch(e){await log(env,"rag-query","D1",false,0,e.message||e);return []}
 }
 async function saveDocument(env,userId,name,text,projectId=null){
