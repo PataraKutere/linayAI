@@ -1,6 +1,6 @@
 // Linay service worker: önce internet, olmazsa önbellek.
 // Eski önbelleği zorla temizlemek istersen V değerini değiştir (linay-v5 gibi).
-const V='linay-v38';
+const V='linay-v39';
 self.addEventListener('install',e=>e.waitUntil(self.skipWaiting()));
 self.addEventListener('activate',e=>e.waitUntil((async()=>{
  const stale=(await caches.keys()).filter(k=>k!==V);
