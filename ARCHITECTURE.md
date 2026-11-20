@@ -4,8 +4,8 @@
 
 - Frontend: GitHub Pages (index.html, config.js, sw.js).
 - API: Cloudflare Worker snowy-meadow-02d9.
-- Main model: Cloudflare Workers AI @cf/openai/gpt-oss-120b.
-- Model fallback: @cf/qwen/qwen3.8-27b, then Gemini Flash Lite.
+- Main model: Cloudflare Workers AI @cf/qwen/qwen3.8-27b.
+- Model fallback: @cf/openai/gpt-oss-120b, then Gemini Flash Lite.
 - Vision: @cf/qwen/qwen3.8-27b.
 - Memory and document text: Cloudflare D1 database linayai-memory (EU jurisdiction).
 - Semantic retrieval: Cloudflare Vectorize index linayai-knowledge, 1,024 dimensions, cosine similarity, BGE-M3 embeddings, with a D1 keyword fallback while vector mutations propagate.
@@ -41,6 +41,13 @@ The browser extracts text from PDF (PDF.js), DOCX (Mammoth), XLSX (SheetJS), and
 ## Memory
 
 The browser creates a random client identifier and sends it with chat and memory requests. Explicit memory is stored in D1. Recent user and assistant turns are also stored for server-side context. This is a per-browser identity, not a full login/account system.
+
+## Frontend features
+
+- Voice-first chat uses browser speech recognition and speech synthesis. During Linay speech, tapping the orb/session control stops playback and immediately reopens listening (tap-to-interrupt); automatic full-duplex voice interruption is not claimed.
+- Research mode enables web search and agent steps together, adds source-comparison instructions, and restores the user's previous search/agent toggles when switched off.
+- Project workspaces keep chats grouped with per-project instructions. Chats can be moved between projects; deleting a project preserves its chats in the general list.
+- Saved answers are stored locally in the browser and can be copied or reopened.
 
 ## Agent tools
 
