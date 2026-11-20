@@ -1222,4 +1222,12 @@ document.addEventListener('touchend',e=>{if(!pullArmed)return;pullArmed=false;co
 })();
 if('serviceWorker' in navigator)navigator.serviceWorker.register('./sw.js').catch(()=>{});
 render();
+// Repair only legacy titles that visibly end in a truncation marks; do not bulk-regenerate normal titles.
+if(!privateChat&&PROXY){
+ for(const chat of S.chats){
+  const firstUser=chat.msgs?.find(item=>item.role==="user");
+  const firstText=String(firstUser?.t||firstUser?.att?.[0]||"").trim();
+  if(!chat.hidden&&firstText&&/(?:…|\.{2,})\s*$/.test(String(chat.title||"")))refreshChatTitle(chat.id,firstText);
+ }
+}
 </script></body></html>
