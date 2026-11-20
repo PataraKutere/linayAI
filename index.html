@@ -502,6 +502,7 @@ async function send(){
   if(provider.includes('Web search unavailable'))out+='*(Web araması şu anda erişilemiyor; aşağıdaki yanıt güncel internet kaynaklarıyla doğrulanmadı.)*\n\n';
   const rd=r.body.getReader(),dc=new TextDecoder();let buf='';
   for(;;){const {done,value}=await rd.read();if(done)break;buf+=dc.decode(value,{stream:true});const ls=buf.split('\n');buf=ls.pop();for(const l of ls){if(!l.startsWith('data:'))continue;const raw=l.slice(5).trim();if(!raw||raw==='[DONE]')continue;let j;try{j=JSON.parse(raw)}catch{continue}if(j.error)throw new Error(j.error.message||'Model yanıt hatası');out+=(j.choices?.[0]?.delta?.content||'');el.innerHTML=md(out);$('msgs').scrollTop=$('msgs').scrollHeight;}}
+  if(!useSearch)out=out.replace(/\n\s*(?:\*\*)?(?:Kaynaklar|Sources|Kaynakça)(?:\*\*)?\s*\n[\s\S]*$/i,'').trim();
   if(!out)out='(Boş yanıt geldi, tekrar dene.)';if(docNotice)out+=docNotice;
   if(useSearch&&citations.length)out+='\n\n**Kaynaklar**\n'+citations.map(x=>'- ['+(x.title||'Kaynak')+']('+x.url+')').join('\n');
   if(S.cfg.agent)out+='\n\n*Linay ajanı '+agentSteps+' araç adımı kullandı.*';
