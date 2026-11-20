@@ -19,7 +19,7 @@ async function chatMessages(messages,{search=false,agent=false}={}){
   if(!r.ok){const e=await r.json().catch(()=>({}));throw new Error("Chat failed "+r.status+": "+(e.error||""))}
   const reader=r.body.getReader(),decoder=new TextDecoder();let buffer="",answer="";
   for(;;){const {done,value}=await reader.read();if(done)break;buffer+=decoder.decode(value,{stream:true});const lines=buffer.split("\n");buffer=lines.pop();for(const line of lines){if(!line.startsWith("data:"))continue;const raw=line.slice(5).trim();if(!raw||raw==="[DONE]")continue;const j=JSON.parse(raw);answer+=j.choices?.[0]?.delta?.content||""}}
-  return {answer,provider:r.headers.get("X-Linay-Provider")||"",search:r.headers.get("X-Linay-Search")||"",sources:r.headers.get("X-Linay-Sources")||"[]",agentSteps:Number(r.headers.get("X-Linay-Agent-Steps")||0)};
+  return {answer,provider:r.headers.get("X-Linay-Provider")||"",search:r.headers.get("X-Linay-Search")||"",sources:r.headers.get("X-Linay-Sources")||"[]",agentSteps:Number(r.headers.get("X-Linay-Agent-Steps")||0),memoryCandidate:JSON.parse(decodeURIComponent(r.headers.get("X-Linay-Memory-Candidate")||"null")),selfAudit:r.headers.get("X-Linay-Self-Audit")||"not-needed"};
 }
 async function chat(question,options={}){return chatMessages([{role:"user",content:question}],options)}
 
@@ -49,6 +49,7 @@ console.log("PASS position reasoning");
 
 const math=await chat("What is 125 multiplied by 48? Reply with the result.");
 assert.match(math.answer,/6[\s,.]?000/,"Arithmetic test failed: "+math.answer);
+assert.equal(math.selfAudit,"checked","Math answer did not pass through self-audit");
 console.log("PASS arithmetic");
 
 const memoryText="Linay CI memory marker: amber-owl-2020";
@@ -57,6 +58,12 @@ assert.equal(r.ok,true,"Memory save failed");
 const saved=await get("/memory?userId="+encodeURIComponent(USER));
 assert.equal(saved.body.content,memoryText,"Persistent memory round-trip failed");
 console.log("PASS persistent memory");
+
+const memoryProposal=await chat("Please remember: I prefer concise Turkish answers.");
+assert.ok(memoryProposal.memoryCandidate?.text,"No explicit memory suggestion returned");
+const stillUnchanged=await get("memory?userId="+encodeURIComponent(USER));
+assert.equal(stillUnchanged.body.content,memoryText,"A memory suggestion was saved without user approval");
+console.log("PASS approval-gated memory suggestion (not saved automatically)");
 
 const doc=await fetch(BASE+"/documents",{method:"POST",headers:{Origin:ORIGIN,"Content-Type":"application/json"},body:JSON.stringify({userId:USER,name:"Linay CI RAG test",text:"Linay knowledge marker: violet-cedar-7319. This file verifies private document indexing and retrieval."})});
 const docBody=await doc.json();
