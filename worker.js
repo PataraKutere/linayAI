@@ -140,7 +140,7 @@ async function ragSearch(env,userId,query,projectId=null){
    }catch(e){await log(env,"rag-vector-unavailable","Workers AI/Vectorize",false,0,e.message||e)}
   }
   const stop=new Set(["what","which","where","when","that","this","with","from","have","does","your","file","document","the","and","for","about","tell","show","read","please","nedir","nedeni","hangi","bana","hakkında","belge","dosya","içerik","içinde","olan","bunu","şunu","indexed","named","exact","contain"]);
-  const terms=[...new Set((String(query).toLocaleLowerCase("tr-TR").match(/[\\p{L}\\p{N}]{3,}/gu)||[]).filter(x=>!stop.has(x)))].slice(0,10);
+  const terms=[...new Set((String(query).toLocaleLowerCase("tr-TR").match(/[\p{L}\p{N}]{3,}/gu)||[]).filter(x=>!stop.has(x)))].slice(0,10);
   if(!terms.length)return [];
   const where=terms.map(()=>"(d.name LIKE ? OR c.content LIKE ?)").join(" OR ");
   const args=[userId,...terms.flatMap(x=>["%"+x+"%","%"+x+"%"])];
