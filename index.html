@@ -224,8 +224,8 @@ dialog input,dialog textarea{background:#0b1220;border-color:#334765;color:#eef3
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head><body>
-<aside id="side">
- <button class="nb" onclick="nc()">+ Yeni sohbet</button>
+<aside id="side" class="closed">
+ <button class="new-chat-btn" onclick="nc()" aria-label="Yeni sohbet"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span>Yeni sohbet</span><kbd>＋</kbd></button>
  <button class="nb ghost" onclick="startPrivateChat()">◉ Gizli sohbet</button>
  <input id="q" placeholder="Sohbetlerde ara" oninput="render()">
  <div id="list"></div>
