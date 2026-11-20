@@ -6,6 +6,7 @@ on:
     paths:
       - "worker.js"
       - "index.html"
+      - "sw.js"
       - "tests/**"
       - ".github/workflows/linay-ai-tests.yml"
   workflow_dispatch:
@@ -31,6 +32,8 @@ jobs:
         run: node --input-type=module --check < worker.js
       - name: Check test syntax
         run: node --check tests/worker-smoke.mjs
+      - name: Check Service Worker syntax
+        run: node --check sw.js
       - name: Check inline browser scripts
         run: |
           node --input-type=module -e 'import fs from "node:fs"; const html=fs.readFileSync("index.html","utf8"); const scripts=[...html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/gi)].map(x=>x[1]).filter(x=>x.trim()); for (const [i,src] of scripts.entries()) new Function(src); console.log("PASS "+scripts.length+" inline scripts");'
