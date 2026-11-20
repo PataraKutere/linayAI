@@ -481,16 +481,16 @@ async function approveMemoryCandidate(candidate,box){
   const merged=duplicate?existing:[existing,'• '+candidate.text].filter(Boolean).join('\n');
   const response=await apiFetch(PROXY+'/memory',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:USER_ID,content:merged.slice(0,6000)})});
   if(!response.ok)throw new Error('Hafıza kaydedilemedi.');
-  S.cfg.memory=merged;save();box.dataset.state='approved';box.innerHTML='<span>✓ Onaylandı ve hafızaya kaydedildi</span>';
+  S.cfg.memory=merged;save();candidate.status='approved';box.dataset.state='approved';box.innerHTML='<span>✓ Onaylandı ve hafızaya kaydedildi</span>';save();
  }catch(e){if(button){button.disabled=false;button.textContent='Hafızaya ekle'}alert('Hafıza kaydedilemedi: '+e.message)}
 }
 function renderMemorySuggestion(messageEl,candidate){
- if(!candidate||!candidate.text||privateChat)return;
+ if(!candidate||!candidate.text||candidate.status!=='pending'||privateChat)return;
  const box=document.createElement('div');box.className='memory-suggestion';box.dataset.state='pending';
  const label=document.createElement('b');label.textContent='Hafıza önerisi';
  const note=document.createElement('p');note.textContent='Linay bunu kalıcı tercih/proje notu olarak hatırlamayı öneriyor: “'+candidate.text+'”';
  const approve=document.createElement('button');approve.type='button';approve.dataset.memoryApprove='1';approve.textContent='Hafızaya ekle';approve.onclick=()=>approveMemoryCandidate(candidate,box);
- const reject=document.createElement('button');reject.type='button';reject.textContent='Reddet';reject.onclick=()=>{box.dataset.state='rejected';box.remove()};
+ const reject=document.createElement('button');reject.type='button';reject.textContent='Reddet';reject.onclick=()=>{candidate.status='rejected';box.dataset.state='rejected';box.remove();save()};
  box.append(label,note,approve,reject);messageEl.parentElement.appendChild(box);
 }
 function runSmartAction(kind,answer){
@@ -503,8 +503,8 @@ function add(role,html,last,media){
  if(role!='user'){
   const a=document.createElement('div');a.className='act';a.innerHTML='<button>🔊</button><button>📋</button><button title="Yanıtı kaydet">☆</button>'+(last?'<button>🔄</button>':'');
   a.children[0].onclick=()=>say(d.innerText,a.children[0],cur()?.id);a.children[1].onclick=async()=>{const ok=await copyText(d.innerText);a.children[1].textContent=ok?'Kopyalandı':'Kopyalanamadı';setTimeout(()=>a.children[1].textContent='📋',1200)};a.children[2].onclick=()=>bookmarkMessage(d.innerText);if(last)a.children[3].onclick=regen;w.appendChild(a);
-  const smart=document.createElement('div');smart.className='smart-actions';const options=[['summary','Özetle'],['bullets','Maddeleştir'],['clear','Daha net yaz']];if(d.querySelector('pre code'))options.push(['code','Kodu açıkla']);
-  options.forEach(([kind,label])=>{const button=document.createElement('button');button.type='button';button.textContent=label;button.onclick=()=>runSmartAction(kind,d.innerText);smart.appendChild(button)});w.appendChild(smart);
+  if(last){const smart=document.createElement('div');smart.className='smart-actions';const options=[['summary','Özetle'],['bullets','Maddeleştir'],['clear','Daha net yaz']];if(d.querySelector('pre code'))options.push(['code','Kodu açıkla']);
+  options.forEach(([kind,label])=>{const button=document.createElement('button');button.type='button';button.textContent=label;button.onclick=()=>runSmartAction(kind,d.innerText);smart.appendChild(button)});w.appendChild(smart)}
  }
  $('msgs').appendChild(w);return d;
 }
