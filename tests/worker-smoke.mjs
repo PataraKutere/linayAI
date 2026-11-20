@@ -61,7 +61,7 @@ console.log("PASS persistent memory");
 
 const memoryProposal=await chat("Please remember: I prefer concise Turkish answers.");
 assert.ok(memoryProposal.memoryCandidate?.text,"No explicit memory suggestion returned");
-const stillUnchanged=await get("memory?userId="+encodeURIComponent(USER));
+const stillUnchanged=await get("/memory?userId="+encodeURIComponent(USER));
 assert.equal(stillUnchanged.body.content,memoryText,"A memory suggestion was saved without user approval");
 console.log("PASS approval-gated memory suggestion (not saved automatically)");
 
