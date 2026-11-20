@@ -413,7 +413,9 @@ export default {async fetch(req,env,ctx){
    ],100);
    let title=modelText(result).replace(/^[\s"\u201c\u201d]+|[\s"\u201c\u201d]+$/g,"").replace(/^(başlık|sohbet başlığı)\s*:\s*/i,"").replace(/\s+/g," ").trim();
    title=title.split(/\r?\n/)[0].replace(/[.!?]+$/,"").trim();
-   if(!title||title.length>64)throw new Error("Model geçerli ve kısa bir başlık döndürmedi.");
+   if(!title)throw new Error("Model geçerli ve kısa bir başlık döndürmedi.");
+   if(title.length>52)title=title.split(/\s+/).reduce((acc,word)=>acc&&acc.length+1+word.length<=52?acc+" "+word:"", "");
+   if(!title)throw new Error("Başlık 52 karakter sınırına sığmadı.");
    title=title.charAt(0).toLocaleUpperCase("tr-TR")+title.slice(1);
    await log(env,"chat-title",result.__linayModel||MODEL,true,Date.now()-started,title);
    return json({title,provider:result.__linayModel||MODEL});
