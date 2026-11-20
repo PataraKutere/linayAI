@@ -227,6 +227,11 @@ dialog input,dialog textarea{background:#0b1220;border-color:#334765;color:#eef3
 .new-chat-btn span{flex:1}
 .new-chat-btn kbd{font:11px/1 system-ui;color:#8494b3;border:1px solid #ffffff1c;border-radius:6px;padding:4px 6px;background:#ffffff06}
 
+
+/* Mobil klavye, güvenli alan ve erişilebilir odak iyileştirmeleri */
+button:focus-visible,[role="button"]:focus-visible,a:focus-visible{outline:2px solid #a77bff;outline-offset:2px}
+#msgs{scroll-behavior:auto}
+@media(max-width:760px){#inp,#q,dialog input,dialog textarea{font-size:16px}#bar{padding-bottom:max(8px,env(safe-area-inset-bottom))}}
 </style>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
@@ -329,7 +334,13 @@ const CARDS='<div class="cards">'+[['▧','Resim üretici','Metinden etkileyici 
 function logo(n,id){return '<svg width="'+n+'" height="'+n+'" viewBox="0 0 100 100" role="img" aria-label="LinayAI simgesi"><defs><radialGradient id="lg'+id+'" cx="32%" cy="24%" r="78%"><stop offset="0" stop-color="#e1d2ff"/><stop offset=".4" stop-color="#9568d8"/><stop offset="1" stop-color="#39234f"/></radialGradient></defs><rect x="4" y="4" width="92" height="92" rx="29" fill="#130d1d" stroke="#7955a6" stroke-width="3"/><circle cx="50" cy="50" r="29" fill="url(#lg'+id+')"/><path d="M50 12 59 39 88 50 59 59 50 88 41 59 12 50 41 39Z" fill="#e4d5ff"/><circle cx="50" cy="50" r="8" fill="#fff"/></svg>'}
 $('brandLogo').innerHTML=logo(32,'brand');
 $('brandLogo').onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();nc()}};
-const esc=s=>s.replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+async function copyText(value){
+ const text=String(value??'');
+ try{if(navigator.clipboard?.writeText){await navigator.clipboard.writeText(text);return true}}catch(_){}
+ try{const ta=document.createElement('textarea');ta.value=text;ta.setAttribute('readonly','');ta.style.position='fixed';ta.style.opacity='0';document.body.appendChild(ta);ta.select();const ok=document.execCommand('copy');ta.remove();if(ok)return true}catch(_){}
+ return false;
+}
 function md0(t){
  const b=[];
  t=t.replace(/```(\w*)\n?([\s\S]*?)(```|$)/g,(m,l,c)=>{b.push(`<div class="code"><div class="ch"><span>${l||'kod'}</span><div><button data-a="dl">İndir</button><button data-a="cp">Kopyala</button></div></div><pre><code>${esc(c)}</code></pre></div>`);return '\u0000'+(b.length-1)+'\u0000'});
@@ -360,7 +371,7 @@ function add(role,html,last,media){
  const w=document.createElement('div');w.className='w';
  const d=document.createElement('div');d.className=role=='user'?'u':'a';d.innerHTML=html;w.appendChild(d);if(media&&media.length)showMedia(d,media);
  if(role!='user'){const a=document.createElement('div');a.className='act';a.innerHTML='<button>🔊</button><button>📋</button>'+(last?'<button>🔄</button>':'');
-  a.children[0].onclick=()=>say(d.innerText,a.children[0],cur()?.id);a.children[1].onclick=()=>navigator.clipboard.writeText(d.innerText);if(last)a.children[2].onclick=regen;w.appendChild(a)}
+  a.children[0].onclick=()=>say(d.innerText,a.children[0],cur()?.id);a.children[1].onclick=async()=>{const ok=await copyText(d.innerText);a.children[1].textContent=ok?'Kopyalandı':'Kopyalanamadı';setTimeout(()=>a.children[1].textContent='📋',1200)};if(last)a.children[2].onclick=regen;w.appendChild(a)}
  $('msgs').appendChild(w);return d;
 }
 function render(){
@@ -613,7 +624,7 @@ $('msgs').addEventListener('click',e=>{
  const codeBlock=b.closest('.code');
  const code=codeBlock.querySelector('code').innerText;
  if(b.dataset.a=='cp'){
-  navigator.clipboard.writeText(code);b.textContent='Kopyalandı';setTimeout(()=>b.textContent='Kopyala',1200);
+  copyText(code).then(ok=>{b.textContent=ok?'Kopyalandı':'Kopyalanamadı';setTimeout(()=>b.textContent='Kopyala',1200)});
  }else if(b.dataset.a=='dl'){
   const lang=(codeBlock.querySelector('.ch span').innerText.trim()||'txt').toLowerCase();
   const ext=lang==='html'||lang==='svg'?lang:lang==='python'||lang==='py'?'py':lang==='javascript'||lang==='js'?'js':'txt';
@@ -626,7 +637,7 @@ $('msgs').addEventListener('click',e=>{
  }
 });
 let pullStartY=0,pullArmed=false,pullBusy=false;
-document.addEventListener('touchstart',e=>{if(e.touches.length!==1)return;const t=e.touches[0],m=$('msgs');pullStartY=t.clientY;pullArmed=t.clientY<145&&m.scrollTop<=0&&!pullBusy},{passive:true});
+document.addEventListener('touchstart',e=>{if(e.touches.length!==1)return;const t=e.touches[0],m=$('msgs');pullStartY=t.clientY;pullArmed=t.clientY<145&&m.scrollTop<=0&&!pullBusy&&!busy&&!voiceSessionActive&&!inp.value&&!files.length&&!document.querySelector('dialog[open]')&&!$('side').classList.contains('open')},{passive:true});
 document.addEventListener('touchmove',e=>{if(!pullArmed||e.touches.length!==1)return;const d=e.touches[0].clientY-pullStartY;if(d>8){e.preventDefault();if(d>40)$('pullHint').classList.add('show')}},{passive:false});
 document.addEventListener('touchend',e=>{if(!pullArmed)return;pullArmed=false;const t=e.changedTouches[0];if(t.clientY-pullStartY>95&&!pullBusy){pullBusy=true;$('pullHint').classList.add('show');setTimeout(()=>location.reload(),180)}else $('pullHint').classList.remove('show')},{passive:true});
 if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
