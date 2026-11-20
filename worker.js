@@ -540,11 +540,17 @@ export default {async fetch(req,env,ctx){
     if(!quota){
      return json({error:"Cloudflare FLUX görsel üretimi başarısız: "+rawError.slice(0,700),code:"FLUX_GENERATION_FAILED",provider:"Cloudflare Workers AI",model:fluxModel,apiVersion:"Workers AI",retryable:false,dailyLimit:30},503);
     }
-    // Cloudflare günlük ücretsiz neuron kotası dolduysa Pollinations / FLUX'a geç.
+    // Cloudflare ücretsiz kotası dolduysa önce Pollinations'ın anahtarsız legacy API'sini dene.
+    let pollinationsError="";
     try{
-     const fallbackUrl="https://image.pollinations.ai/prompt/"+encodeURIComponent(fluxPrompt)+"?model=flux&nologo=true";
-     const fallbackResponse=await fetch(fallbackUrl,{method:"GET",headers:{"Accept":"image/*"},signal:AbortSignal.timeout(90000)});
-     if(!fallbackResponse.ok)throw new Error("Pollinations HTTP "+fallbackResponse.status);
+     const dims=ratio==="16:9"?[1024,576]:ratio==="9:16"?[576,1024]:ratio==="4:3"?[1024,768]:ratio==="3:4"?[768,1024]:[1024,1024];
+     const seed=Math.floor(Math.random()*2147483647);
+     const fallbackUrl="https://image.pollinations.ai/prompt/"+encodeURIComponent(fluxPrompt)+"?width="+dims[0]+"&height="+dims[1]+"&seed="+seed;
+     const fallbackResponse=await fetch(fallbackUrl,{method:"GET",headers:{"Accept":"image/*"},signal:AbortSignal.timeout(45000)});
+     if(!fallbackResponse.ok){
+      const body=(await fallbackResponse.text().catch(()=>"")).slice(0,500);
+      throw new Error("Pollinations HTTP "+fallbackResponse.status+(body?": "+body:""));
+     }
      const contentType=(fallbackResponse.headers.get("content-type")||"").split(";")[0].trim().toLowerCase();
      if(!contentType.startsWith("image/"))throw new Error("Pollinations geçerli bir görsel yanıtı döndürmedi.");
      const buffer=await fallbackResponse.arrayBuffer();
@@ -554,11 +560,59 @@ export default {async fetch(req,env,ctx){
      for(let i=0;i<bytes.length;i+=0x8000)binary+=String.fromCharCode(...bytes.subarray(i,i+0x8000));
      const fallbackBase64=btoa(binary);
      await log(env,"image-generation","Pollinations / FLUX (Fallback)",true,Date.now()-started,"Cloudflare günlük neuron kotası dolu; ratio="+ratio+"; style="+style);
-     return json({image:fallbackBase64,imageDataUrl:"data:"+contentType+";base64,"+fallbackBase64,type:contentType,provider:"Pollinations",model:"FLUX (Fallback)",apiVersion:"Pollinations",engine:"Pollinations / FLUX (Fallback)",promptUsed:fluxPrompt,edited:false,ratio,style,fallbackReason:"Cloudflare Workers AI günlük ücretsiz neuron kotası dolduğu için yedek motor kullanıldı.",dailyLimit:30});
+     return json({image:fallbackBase64,imageDataUrl:"data:"+contentType+";base64,"+fallbackBase64,type:contentType,provider:"Pollinations",model:"FLUX (Fallback)",apiVersion:"Pollinations",engine:"Pollinations / FLUX (Fallback)",promptUsed:fluxPrompt,edited:false,ratio,style,fallbackReason:"Cloudflare Workers AI ücretsiz kotası dolduğu için anahtarsız Pollinations yedek motoru kullanıldı.",dailyLimit:30});
     }catch(fallbackError){
-     const fallbackDetail=String(fallbackError?.message||fallbackError||"Bilinmeyen Pollinations hatası");
-     await log(env,"image-generation","Pollinations / FLUX (Fallback)",false,Date.now()-started,fallbackDetail);
-     return json({error:"Cloudflare FLUX ücretsiz kotası doldu ve yedek görsel motoru da şu anda yanıt veremedi. Lütfen daha sonra tekrar dene.",code:"IMAGE_ENGINES_EXHAUSTED",provider:"LinayAI",engine:"Cloudflare FLUX + Pollinations",details:fallbackDetail.slice(0,400),retryable:true,dailyLimit:30},503);
+     pollinationsError=String(fallbackError?.message||fallbackError||"Bilinmeyen Pollinations hatası");
+     await log(env,"image-generation","Pollinations / FLUX (Fallback)",false,Date.now()-started,pollinationsError.slice(0,700));
+    }
+    // Pollinations erişilemez veya ücretsiz sınırına takılırsa Kavel'in anonim ücretsiz katmanını dene.
+    try{
+     const anonId="linay-"+crypto.randomUUID();
+     const kavelBase="https://www.kavel.ai";
+     const submitResponse=await fetch(kavelBase+"/api/ai/generate",{
+      method:"POST",
+      headers:{"Content-Type":"application/json","x-anon-id":anonId},
+      body:JSON.stringify({provider:"kie",mediaType:"image",model:"kavel-image-v1",scene:"text-to-image",prompt:fluxPrompt,options:{aspect_ratio:ratio}}),
+      signal:AbortSignal.timeout(15000)
+     });
+     const submit=await submitResponse.json().catch(()=>null);
+     if(!submitResponse.ok)throw new Error("Kavel gönderim HTTP "+submitResponse.status);
+     if(!submit||submit.code!==0)throw new Error("Kavel isteği reddedildi: "+String(submit?.message||"geçersiz yanıt"));
+     const taskId=submit.data?.id;
+     if(submit.data?.wall)throw new Error("Kavel ücretsiz günlük anonim kullanım sınırına ulaşıldı.");
+     if(typeof taskId!=="string"||!taskId)throw new Error("Kavel görev numarası döndürmedi.");
+     const deadline=Date.now()+105000;
+     let kavelImageUrl="";
+     while(Date.now()<deadline){
+      await new Promise(resolve=>setTimeout(resolve,4500));
+      const pollResponse=await fetch(kavelBase+"/api/ai/anon-query?taskId="+encodeURIComponent(taskId)+"&provider=kie&mediaType=image",{
+       method:"GET",headers:{"x-anon-id":anonId},signal:AbortSignal.timeout(12000)
+      });
+      const poll=await pollResponse.json().catch(()=>null);
+      if(!pollResponse.ok)continue;
+      if(!poll||poll.code!==0)continue;
+      const data=poll.data||{};
+      const images=Array.isArray(data.cleanImages)&&data.cleanImages.length?data.cleanImages:Array.isArray(data.images)?data.images:[];
+      if(images.length){kavelImageUrl=String(images[0]||"");if(kavelImageUrl)break;}
+      if(data.status==="failed"||data.status==="error")throw new Error("Kavel görsel isteğini tamamlayamadı.");
+     }
+     if(!kavelImageUrl)throw new Error("Kavel ücretsiz görsel kuyruğu zaman aşımına uğradı.");
+     const imageResponse=await fetch(kavelImageUrl,{headers:{"Accept":"image/*"},signal:AbortSignal.timeout(20000)});
+     if(!imageResponse.ok)throw new Error("Kavel görsel indirme HTTP "+imageResponse.status);
+     const contentType=(imageResponse.headers.get("content-type")||"image/webp").split(";")[0].trim().toLowerCase();
+     if(!contentType.startsWith("image/"))throw new Error("Kavel geçerli görsel verisi döndürmedi.");
+     const buffer=await imageResponse.arrayBuffer();
+     if(!buffer.byteLength)throw new Error("Kavel boş görsel verisi döndürdü.");
+     const bytes=new Uint8Array(buffer);
+     let binary="";
+     for(let i=0;i<bytes.length;i+=0x8000)binary+=String.fromCharCode(...bytes.subarray(i,i+0x8000));
+     const base64=btoa(binary);
+     await log(env,"image-generation","Kavel / ücretsiz anonim yedek",true,Date.now()-started,"Pollinations başarısız: "+pollinationsError.slice(0,250));
+     return json({image:base64,type:contentType,provider:"Kavel",model:"kavel-image-v1 (ücretsiz anonim)",apiVersion:"Kavel",engine:"Kavel / Ücretsiz anonim yedek",promptUsed:fluxPrompt,edited:false,ratio,style,fallbackReason:"Cloudflare ücretsiz kotası dolduğu için Kavel'in ücretsiz anonim yedek motoru kullanıldı. Ücretsiz çıktıda filigran bulunabilir.",watermarked:true,dailyLimit:30});
+    }catch(kavelError){
+     const kavelDetail=String(kavelError?.message||kavelError||"Bilinmeyen Kavel hatası");
+     await log(env,"image-generation","Kavel / ücretsiz anonim yedek",false,Date.now()-started,kavelDetail.slice(0,500));
+     return json({error:"Ücretsiz görsel motorlarının sınırına ulaşıldı veya servisler şu anda yanıt vermiyor. Hiçbir ücretli servise geçilmedi. Bir süre sonra yeniden dene.",code:"IMAGE_ENGINES_EXHAUSTED",provider:"LinayAI",engine:"Cloudflare FLUX + Pollinations + Kavel",details:"Pollinations: "+pollinationsError.slice(0,220)+" | Kavel: "+kavelDetail.slice(0,220),retryable:true,dailyLimit:30},503);
     }
    }
   }
